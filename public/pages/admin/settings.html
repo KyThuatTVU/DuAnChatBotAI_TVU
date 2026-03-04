@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cài đặt giao diện - CELRAS TVU Admin</title>
+    <!-- Tailwind CDN: viết class trực tiếp vào HTML -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif}
+        .admin-layout{min-height:100vh}
+        .admin-sidebar{width:240px;background:#1e293b;color:#fff;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;z-index:40;display:flex;flex-direction:column}
+        .admin-content{margin-left:240px;padding:32px;min-height:100vh}
+        .admin-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+        .admin-header h1{font-size:22px;font-weight:700;color:#111827}
+        .sidebar-logo{padding:20px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:8px}
+        .sidebar-logo span{font-weight:700;font-size:15px;color:#fff}
+        .nav-item{display:flex;align-items:center;gap:12px;padding:10px 20px;color:#94a3b8;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;text-decoration:none}
+        .nav-item:hover{background:rgba(255,255,255,.08);color:#f1f5f9}
+        .nav-item.active{background:rgba(14,165,233,.2);color:#38bdf8;border-right:3px solid #38bdf8}
+        .nav-item svg{width:18px;height:18px;flex-shrink:0}
+        .nav-section{padding:16px 20px 6px;font-size:11px;font-weight:600;text-transform:uppercase;color:#475569;letter-spacing:.08em}
+        .sidebar-logout{padding:16px 20px;border-top:1px solid rgba(255,255,255,.1);margin-top:auto}
+        .btn-primary{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;background:#0369a1;color:#fff;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:background .15s}
+        .btn-primary:hover{background:#0284c7}
+        .btn-outline{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+        .btn-outline:hover{background:#f9fafb}
+        .form-group{margin-bottom:18px}
+        .form-group label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px}
+        .form-group input,.form-group select,.form-group textarea{display:block;width:100%;padding:9px 13px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;color:#111827;background:#fff;outline:none;transition:border .15s;font-family:inherit}
+        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,.12)}
+        .toggle-switch{position:relative;display:inline-block;width:46px;height:26px}
+        .toggle-switch input{opacity:0;width:0;height:0}
+        .toggle-slider{position:absolute;cursor:pointer;inset:0;background:#d1d5db;border-radius:26px;transition:.25s}
+        .toggle-slider:before{content:'';position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.25s}
+        .toggle-switch input:checked+.toggle-slider{background:#0ea5e9}
+        .toggle-switch input:checked+.toggle-slider:before{transform:translateX(20px)}
+        .color-picker-group{display:flex;align-items:center;gap:8px}
+        .color-picker-group input[type="color"]{width:36px;height:36px;border:1px solid #e5e7eb;border-radius:6px;padding:2px;cursor:pointer}
+        .color-picker-group input[type="text"]{width:90px;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-family:monospace}
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;padding:16px}
+        .modal-overlay.active{display:flex}
+        .modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+        @media(max-width:768px){.admin-content{margin-left:0;padding:16px}.admin-sidebar{transform:translateX(-100%)}}
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <div class="admin-layout">
+        <aside class="admin-sidebar" id="adminSidebar">
+            <div class="sidebar-logo">
+                <a href="/DuAnChatbotThuVien/public/pages/chatbot.html" class="flex items-center gap-2" style="text-decoration:none">
+                    <img src="/DuAnChatbotThuVien/public/assets/images/logo.png" alt="Logo" class="w-8 h-8 rounded-full object-cover" onerror="this.src='https://ui-avatars.com/api/?name=CELRAS&background=0369a1&color=fff&rounded=true&size=36'">
+                    <span>CELRAS TVU</span>
+                </a>
+            </div>
+            <nav class="flex flex-col mt-1 flex-1">
+                <a href="dashboard.html" class="nav-item" data-page="dashboard"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1"/></svg>Dashboard</a>
+                <a href="questions.html" class="nav-item" data-page="questions"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Quản lý câu hỏi</a>
+                <a href="categories.html" class="nav-item" data-page="categories"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>Danh mục</a>
+                <a href="datasets.html" class="nav-item" data-page="datasets"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>Tải dữ liệu</a>
+                <a href="settings.html" class="nav-item active" data-page="settings"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Cài đặt giao diện</a>
+                <a href="unanswered.html" class="nav-item" data-page="unanswered"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>Chưa trả lời</a>
+            </nav>
+            <div class="sidebar-logout flex flex-col gap-1">
+                <a href="/DuAnChatbotThuVien/public/pages/chatbot.html" class="nav-item"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>Về trang chatbot</a>
+                <a href="#" onclick="logout();return false" class="nav-item" style="color:#f87171"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>Đăng xuất</a>
+            </div>
+        </aside>
+
+        <div class="admin-content">
+            <div class="admin-header">
+                <div>
+                    <h1>Cài đặt giao diện Chatbot</h1>
+                    <p class="text-sm text-gray-500 mt-1">Tùy chỉnh màu sắc, hiển thị và chủ đề theo sự kiện</p>
+                </div>
+                <button class="btn-primary" onclick="saveSettings()">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    Lưu thay đổi
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- General Settings -->
+                <div class="space-y-6">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <h2 class="text-lg font-semibold mb-4">Cài đặt chung</h2>
+                        
+                        <!-- Toggle Chatbot -->
+                        <div class="flex items-center justify-between py-3 border-b border-gray-100">
+                            <div>
+                                <p class="font-medium text-sm">Hiển thị Chatbot</p>
+                                <p class="text-xs text-gray-500">Bật/tắt chatbot trên website</p>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="settingEnabled" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="form-group mt-4">
+                            <label>Tiêu đề Chatbot</label>
+                            <input type="text" id="settingTitle" value="CELRAS TVU Chatbot">
+                        </div>
+                        <div class="form-group">
+                            <label>Tin nhắn chào mừng</label>
+                            <textarea id="settingWelcome" rows="3">Xin chào! Tôi là trợ lý thư viện. Bạn cần tôi giúp gì?</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Tin nhắn khi không có câu trả lời</label>
+                            <textarea id="settingNoAnswer" rows="3">Xin lỗi, tôi chưa có câu trả lời cho câu hỏi này. Bạn có thể liên hệ thủ thư để được hỗ trợ.</textarea>
+                        </div>
+                    </div>
+
+                    <!-- Color Settings -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <h2 class="text-lg font-semibold mb-4">Màu sắc</h2>
+                        
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm font-medium">Màu chính</label>
+                                <div class="color-picker-group">
+                                    <input type="color" id="colorPrimary" value="#0369a1" onchange="document.getElementById('colorPrimaryText').value = this.value">
+                                    <input type="text" id="colorPrimaryText" value="#0369a1" class="text-sm" onchange="document.getElementById('colorPrimary').value = this.value">
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm font-medium">Nền header</label>
+                                <div class="color-picker-group">
+                                    <input type="color" id="colorHeaderBg" value="#0369a1" onchange="document.getElementById('colorHeaderBgText').value = this.value">
+                                    <input type="text" id="colorHeaderBgText" value="#0369a1" class="text-sm" onchange="document.getElementById('colorHeaderBg').value = this.value">
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm font-medium">Chữ header</label>
+                                <div class="color-picker-group">
+                                    <input type="color" id="colorHeaderText" value="#ffffff" onchange="document.getElementById('colorHeaderTextVal').value = this.value">
+                                    <input type="text" id="colorHeaderTextVal" value="#ffffff" class="text-sm" onchange="document.getElementById('colorHeaderText').value = this.value">
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm font-medium">Bong bóng người dùng</label>
+                                <div class="color-picker-group">
+                                    <input type="color" id="colorUserBubble" value="#E3F2FD" onchange="document.getElementById('colorUserBubbleText').value = this.value">
+                                    <input type="text" id="colorUserBubbleText" value="#E3F2FD" class="text-sm" onchange="document.getElementById('colorUserBubble').value = this.value">
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm font-medium">Bong bóng bot</label>
+                                <div class="color-picker-group">
+                                    <input type="color" id="colorBotBubble" value="#F5F5F5" onchange="document.getElementById('colorBotBubbleText').value = this.value">
+                                    <input type="text" id="colorBotBubbleText" value="#F5F5F5" class="text-sm" onchange="document.getElementById('colorBotBubble').value = this.value">
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm font-medium">Nút chatbot</label>
+                                <div class="color-picker-group">
+                                    <input type="color" id="colorButton" value="#0369a1" onchange="document.getElementById('colorButtonText').value = this.value">
+                                    <input type="text" id="colorButtonText" value="#0369a1" class="text-sm" onchange="document.getElementById('colorButton').value = this.value">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview & Themes -->
+                <div class="space-y-6">
+                    <!-- Chat Preview -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <h2 class="text-lg font-semibold mb-4">Xem trước</h2>
+                        <div class="border border-gray-200 rounded-xl overflow-hidden max-w-sm mx-auto">
+                            <!-- Preview Header -->
+                            <div id="previewHeader" class="px-4 py-3 flex items-center gap-3" style="background: #0369a1">
+                                <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                                    <span class="text-white text-xs font-bold">C</span>
+                                </div>
+                                <span id="previewTitle" class="text-white font-semibold text-sm">CELRAS TVU Chatbot</span>
+                            </div>
+                            <!-- Preview Messages -->
+                            <div class="p-4 space-y-3 bg-gray-50 min-h-[200px]">
+                                <div class="flex gap-2">
+                                    <div class="w-7 h-7 bg-sky-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                        <span class="text-sky-700 text-xs font-bold">C</span>
+                                    </div>
+                                    <div id="previewBotBubble" class="px-3 py-2 rounded-lg text-sm max-w-[80%]" style="background: #F5F5F5">
+                                        Xin chào! 👋
+                                    </div>
+                                </div>
+                                <div class="flex gap-2 justify-end">
+                                    <div id="previewUserBubble" class="px-3 py-2 rounded-lg text-sm max-w-[80%] text-white" style="background: #0369a1">
+                                        Thư viện mở cửa mấy giờ?
+                                    </div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <div class="w-7 h-7 bg-sky-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                        <span class="text-sky-700 text-xs font-bold">C</span>
+                                    </div>
+                                    <div id="previewBotBubble2" class="px-3 py-2 rounded-lg text-sm max-w-[80%]" style="background: #F5F5F5">
+                                        Từ 7:30 - 21:00 (T2-T7)
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Preview Input -->
+                            <div class="px-4 py-3 bg-white border-t border-gray-100">
+                                <div class="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-full">
+                                    <span class="text-xs text-gray-400 flex-1">Nhắn tin...</span>
+                                    <span id="previewSendBtn" class="text-sky-600">▶</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn-outline w-full mt-4" onclick="updatePreview()">
+                            Cập nhật xem trước
+                        </button>
+                    </div>
+
+                    <!-- Event Themes -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-lg font-semibold">Chủ đề theo sự kiện</h2>
+                            <button class="btn-primary text-sm" onclick="openThemeModal()">+ Thêm</button>
+                        </div>
+                        <div class="space-y-3" id="themesList">
+                            <!-- Themes loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/DuAnChatbotThuVien/public/assets/js/admin.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadAdminPage('settings');
+            loadSettings();
+            loadThemes();
+        });
+
+        // Live preview
+        document.querySelectorAll('input[type="color"]').forEach(el => {
+            el.addEventListener('input', updatePreview);
+        });
+
+        function updatePreview() {
+            const h = document.getElementById('colorHeaderBg').value;
+            const ub = document.getElementById('colorPrimary').value;
+            const bb = document.getElementById('colorBotBubble').value;
+            document.getElementById('previewHeader').style.background = h;
+            document.getElementById('previewUserBubble').style.background = ub;
+            document.getElementById('previewBotBubble').style.background = bb;
+            document.getElementById('previewBotBubble2').style.background = bb;
+            document.getElementById('previewTitle').textContent = document.getElementById('settingTitle').value;
+        }
+    </script>
+</body>
+</html>

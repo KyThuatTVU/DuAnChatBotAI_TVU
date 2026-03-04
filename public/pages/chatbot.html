@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CELRAS TVU Chatbot - Trung tâm Học liệu và Chuyển đổi số</title>
+
+    <!-- Tailwind CDN: viết class trực tiếp vào HTML, có hiệu lực ngay, không cần build -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: { extend: { fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] } } }
+        }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="/DuAnChatbotThuVien/public/assets/images/logo.png" type="image/png">
+
+    <style>
+        /* ===== Style cho các phần tử do JS inject động ===== */
+        body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+
+        /* Tin nhắn */
+        .message { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 16px; }
+        .message.user { flex-direction: row-reverse; }
+        .message .avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; }
+        .message.bot .bubble {
+            background: #ffffff; color: #1f2937;
+            border-radius: 0 16px 16px 16px;
+            padding: 10px 14px; max-width: 72%;
+            font-size: 14px; line-height: 1.6;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            border: 1px solid #e5e7eb;
+        }
+        .message.user .bubble {
+            background: #0ea5e9; color: #fff;
+            border-radius: 16px 0 16px 16px;
+            padding: 10px 14px; max-width: 72%;
+            font-size: 14px; line-height: 1.6;
+        }
+
+        /* Typing indicator */
+        .typing-indicator { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+        .typing-indicator span {
+            display: inline-block; width: 7px; height: 7px;
+            border-radius: 50%; background: #93c5fd;
+            animation: tw-bounce 1.2s infinite;
+        }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes tw-bounce {
+            0%, 80%, 100% { transform: translateY(0); }
+            40%           { transform: translateY(-6px); }
+        }
+
+        /* Suggestion chip do JS render */
+        .suggestion-chip {
+            display: inline-flex; align-items: center;
+            padding: 8px 16px;
+            border: 1px solid #bae6fd; border-radius: 9999px;
+            background: rgba(255,255,255,0.75);
+            color: #0369a1; font-size: 13px; font-weight: 500;
+            cursor: pointer; transition: all 0.15s;
+            backdrop-filter: blur(4px);
+        }
+        .suggestion-chip:hover { background: #e0f2fe; border-color: #7dd3fc; }
+
+        /* Scrollbar mỏng */
+        #chatMessages::-webkit-scrollbar { width: 4px; }
+        #chatMessages::-webkit-scrollbar-track { background: transparent; }
+        #chatMessages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    </style>
+</head>
+
+<body class="bg-gradient-to-br from-sky-100 via-blue-50 to-cyan-100 min-h-screen flex flex-col">
+
+    <!-- ===== HEADER ===== -->
+    <header class="bg-white shadow-sm fixed top-0 left-0 right-0 z-50 h-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 h-full flex items-center justify-between">
+
+            <!-- Trái: Logo + Tên thương hiệu + Nút tạo chat mới -->
+            <div class="flex items-center gap-3">
+                <a href="/DuAnChatbotThuVien/public/pages/chatbot.html" class="flex items-center gap-2">
+                    <img
+                        src="/DuAnChatbotThuVien/public/assets/images/logo.png"
+                        alt="CELRAS TVU"
+                        class="w-9 h-9 rounded-full object-cover"
+                        onerror="this.src='https://ui-avatars.com/api/?name=CELRAS&background=0369a1&color=fff&rounded=true&size=36'"
+                    >
+                    <span class="font-bold text-blue-700 text-base hidden sm:inline">CELRAS TVU Chatbot</span>
+                </a>
+                <span class="text-gray-300 hidden sm:inline text-lg">|</span>
+                <button
+                    onclick="startNewChat()"
+                    class="hidden sm:inline-flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors shadow-sm"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Cuộc trò chuyện mới
+                </button>
+            </div>
+
+            <!-- Phải: Link trang chủ + Đăng nhập / Avatar user -->
+            <div class="flex items-center gap-3">
+                <a href="#" class="text-gray-500 hover:text-gray-800 text-sm font-medium hidden sm:inline transition-colors">
+                    Trở về trang chủ
+                </a>
+
+                <!-- Nút đăng nhập Google (hiện khi chưa đăng nhập) -->
+                <button
+                    id="loginBtn"
+                    onclick="loginWithGoogle()"
+                    class="flex items-center gap-2 bg-sky-50 hover:bg-sky-100 text-sky-700 font-semibold text-sm px-4 py-2 rounded-full transition-colors border border-sky-200"
+                >
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    </svg>
+                    Đăng nhập
+                </button>
+
+                <!-- Thông tin user sau khi đăng nhập (ẩn mặc định) -->
+                <div id="userInfo" class="hidden items-center gap-2">
+                    <img id="userAvatar" src="" alt="Avatar" class="w-8 h-8 rounded-full object-cover border-2 border-blue-200">
+                    <span id="userName" class="text-sm font-medium text-gray-700 hidden md:inline"></span>
+                    <button onclick="logout()" class="text-xs text-gray-400 hover:text-red-500 px-2 py-1 rounded hover:bg-red-50 transition-colors">
+                        Đăng xuất
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </header>
+
+
+    <!-- ===== KHU VỰC CHAT CHÍNH ===== -->
+    <main id="chatArea" class="flex-1 flex flex-col" style="padding-top: 64px;">
+
+        <!-- Vùng cuộn tin nhắn -->
+        <div id="chatMessages" class="flex-1 overflow-y-auto px-4 py-6">
+            <div class="max-w-3xl mx-auto">
+
+                <!-- Khối chào mừng -->
+                <div id="welcomeBlock" class="flex flex-col items-center text-center py-10 sm:py-16">
+                    <img
+                        id="botAvatarImg"
+                        src="/DuAnChatbotThuVien/public/assets/images/bot-avatar.png"
+                        alt="CELRAS Bot"
+                        class="w-24 h-24 rounded-full object-cover shadow-xl mb-5 border-4 border-white"
+                        onerror="this.src='https://ui-avatars.com/api/?name=CELRAS&background=0369a1&color=fff&rounded=true&size=96'"
+                    >
+                    <h2 id="greetingText" class="text-blue-600 font-bold text-xl sm:text-2xl mb-3">
+                        CELRAS TVU chúc bạn buổi sáng nhiều niềm vui! 👋
+                    </h2>
+                    <p class="text-gray-500 text-sm sm:text-base leading-relaxed max-w-lg">
+                        Bạn đang kết nối với <strong class="text-gray-700">CELRAS TVU Chatbot</strong> – trợ lý ảo
+                        của Trung tâm Học liệu và Chuyển đổi số, Trường Đại học Trà Vinh.
+                        Nếu có thắc mắc xoay quanh thư viện, tài liệu, dịch vụ số...
+                        đừng ngần ngại đặt câu hỏi để được hỗ trợ ngay nhé!
+                    </p>
+                </div>
+
+                <!-- Các tin nhắn sẽ được JS thêm vào đây -->
+
+            </div>
+        </div>
+
+        <!-- ===== INPUT + CÂU HỎI GỢI Ý (ghim phía dưới) ===== -->
+        <div class="flex-shrink-0 px-4 pb-4 pt-2" style="background: linear-gradient(to top, rgba(224,242,254,0.97) 60%, transparent)">
+            <div class="max-w-3xl mx-auto space-y-3 pt-4">
+
+                <!-- Câu hỏi gợi ý -->
+                <div id="suggestionsContainer" class="flex flex-wrap gap-2 justify-center">
+                    <button class="suggestion-chip" onclick="sendSuggestion(this)">Thư viện mở cửa lúc mấy giờ?</button>
+                    <button class="suggestion-chip" onclick="sendSuggestion(this)">Làm thế nào để mượn sách?</button>
+                    <button class="suggestion-chip" onclick="sendSuggestion(this)">Làm thẻ thư viện ở đâu?</button>
+                    <button class="suggestion-chip" onclick="sendSuggestion(this)">Tra cứu sách như thế nào?</button>
+                    <button class="suggestion-chip" onclick="sendSuggestion(this)">Thời hạn mượn sách là bao lâu?</button>
+                </div>
+
+                <!-- Ô nhập tin nhắn -->
+                <div class="bg-white rounded-2xl shadow-md border border-gray-200 flex items-end gap-2 px-4 py-3">
+                    <textarea
+                        id="chatInput"
+                        placeholder="Nhắn tin cho CELRAS TVU Chatbot..."
+                        rows="1"
+                        maxlength="3000"
+                        onkeydown="handleKeyDown(event)"
+                        oninput="updateCharCount(); autoResize(this)"
+                        class="flex-1 text-sm text-gray-700 placeholder-gray-400 bg-transparent border-none outline-none resize-none leading-relaxed"
+                        style="max-height: 100px; overflow-y: auto;"
+                    ></textarea>
+                    <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                        <span id="charCount" class="text-xs text-gray-400 tabular-nums">0 / 3000</span>
+                        <button
+                            id="sendBtn"
+                            onclick="sendMessage()"
+                            disabled
+                            class="w-9 h-9 flex items-center justify-center rounded-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-200 disabled:cursor-not-allowed transition-colors text-white shadow-sm"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="bg-blue-900 text-white py-4 px-6">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs sm:text-sm">
+            <span class="font-semibold uppercase tracking-wide text-blue-200">
+                Trung tâm Học liệu và Chuyển đổi số – Trường Đại học Trà Vinh
+            </span>
+            <span class="text-blue-300">Hotline: (0294) 3 855 246</span>
+            <span class="text-blue-300">celras@tvu.edu.vn</span>
+        </div>
+    </footer>
+
+
+    <!-- ===== SCRIPTS ===== -->
+    <script src="/DuAnChatbotThuVien/public/assets/js/auth.js"></script>
+    <script src="/DuAnChatbotThuVien/public/assets/js/chatbot.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Kiểm tra trạng thái đăng nhập
+            try {
+                const res = await fetch('/DuAnChatbotThuVien/public/index.php?url=api/auth/check');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.authenticated && data.admin) {
+                        document.getElementById('loginBtn').classList.add('hidden');
+                        const ui = document.getElementById('userInfo');
+                        ui.classList.remove('hidden');
+                        ui.classList.add('flex');
+                        document.getElementById('userAvatar').src = data.admin.avatar ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(data.admin.name)}&background=0369a1&color=fff&rounded=true`;
+                        document.getElementById('userName').textContent = data.admin.name;
+                    }
+                }
+            } catch (e) {}
+
+            initChatbot();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!-- Header Component - CELRAS TVU Chatbot -->
+<nav class="navbar">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+            <!-- Logo & Brand -->
+            <div class="flex items-center gap-3">
+                <a href="/DuAnChatbotThuVien/public/pages/chatbot.html" class="navbar-brand">
+                    <img src="/DuAnChatbotThuVien/public/assets/images/logo.png" alt="Logo" onerror="this.src='https://ui-avatars.com/api/?name=CELRAS&background=0369a1&color=fff&rounded=true&size=36'">
+                    <span>CELRAS TVU Chatbot</span>
+                </a>
+                <span class="text-gray-300 hidden sm:inline">|</span>
+                <button onclick="startNewChat()" class="btn-new-chat hidden sm:inline-flex">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Cuộc trò chuyện mới
+                </button>
+            </div>
+
+            <!-- Right nav -->
+            <div class="flex items-center gap-3">
+                <a href="/DuAnChatbotThuVien/public/pages/chatbot.html" class="btn-outline hidden sm:inline-flex">
+                    Trở về trang chủ
+                </a>
+                <a href="/DuAnChatbotThuVien/public/pages/login.html" class="btn-login" id="loginBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"/>
+                    </svg>
+                    Đăng nhập
+                </a>
+                <!-- Admin avatar (hidden by default, shown when logged in) -->
+                <div id="adminInfo" class="hidden items-center gap-2">
+                    <img id="adminAvatar" src="" alt="Avatar" class="w-8 h-8 rounded-full">
+                    <span id="adminName" class="text-sm font-medium text-gray-700 hidden sm:inline"></span>
+                    <button onclick="logout()" class="text-sm text-red-500 hover:text-red-700 ml-2">Đăng xuất</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</nav>

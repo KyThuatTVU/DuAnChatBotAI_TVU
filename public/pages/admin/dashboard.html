@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - CELRAS TVU Admin</title>
+    <!-- Tailwind CDN: viết class trực tiếp vào HTML -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif}
+        .admin-layout{min-height:100vh}
+        .admin-sidebar{width:240px;background:#1e293b;color:#fff;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;z-index:40;display:flex;flex-direction:column}
+        .admin-content{margin-left:240px;padding:32px;min-height:100vh}
+        .admin-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+        .admin-header h1{font-size:22px;font-weight:700;color:#111827}
+        .sidebar-logo{padding:20px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:8px}
+        .sidebar-logo span{font-weight:700;font-size:15px;color:#fff}
+        .nav-item{display:flex;align-items:center;gap:12px;padding:10px 20px;color:#94a3b8;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;text-decoration:none}
+        .nav-item:hover{background:rgba(255,255,255,.08);color:#f1f5f9}
+        .nav-item.active{background:rgba(14,165,233,.2);color:#38bdf8;border-right:3px solid #38bdf8}
+        .nav-item svg{width:18px;height:18px;flex-shrink:0}
+        .nav-section{padding:16px 20px 6px;font-size:11px;font-weight:600;text-transform:uppercase;color:#475569;letter-spacing:.08em}
+        .sidebar-logout{padding:16px 20px;border-top:1px solid rgba(255,255,255,.1);margin-top:auto}
+        .stat-card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.08);border:1px solid #e5e7eb}
+        .stat-number{font-size:28px;font-weight:700;color:#111827}
+        .stat-label{font-size:13px;color:#6b7280;margin-top:2px}
+        .btn-primary{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;background:#0369a1;color:#fff;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:background .15s}
+        .btn-primary:hover{background:#0284c7}
+        .btn-outline{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+        .btn-outline:hover{background:#f9fafb}
+        .btn-danger{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#fee2e2;color:#dc2626;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:none}
+        .btn-danger:hover{background:#fecaca}
+        .data-table{width:100%;border-collapse:collapse;font-size:14px}
+        .data-table thead th{background:#f8fafc;padding:11px 14px;text-align:left;font-size:12px;font-weight:600;text-transform:uppercase;color:#64748b;border-bottom:1px solid #e2e8f0}
+        .data-table tbody tr{border-bottom:1px solid #f1f5f9;transition:background .1s}
+        .data-table tbody tr:hover{background:#f8fafc}
+        .data-table tbody td{padding:12px 14px;color:#374151;vertical-align:top}
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;padding:16px}
+        .modal-overlay.active{display:flex}
+        .modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+        .form-group{margin-bottom:18px}
+        .form-group label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px}
+        .form-group input,.form-group select,.form-group textarea{display:block;width:100%;padding:9px 13px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;color:#111827;background:#fff;outline:none;transition:border .15s;font-family:inherit}
+        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,.12)}
+        .toggle-switch{position:relative;display:inline-block;width:46px;height:26px}
+        .toggle-switch input{opacity:0;width:0;height:0}
+        .toggle-slider{position:absolute;cursor:pointer;inset:0;background:#d1d5db;border-radius:26px;transition:.25s}
+        .toggle-slider:before{content:'';position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.25s}
+        .toggle-switch input:checked+.toggle-slider{background:#0ea5e9}
+        .toggle-switch input:checked+.toggle-slider:before{transform:translateX(20px)}
+        .color-picker-group{display:flex;align-items:center;gap:8px}
+        .color-picker-group input[type="color"]{width:36px;height:36px;border:1px solid #e5e7eb;border-radius:6px;padding:2px;cursor:pointer}
+        .color-picker-group input[type="text"]{width:90px;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-family:monospace}
+        .badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:9999px;font-size:12px;font-weight:600}
+        .badge-green,.badge-success{background:#dcfce7;color:#15803d}
+        .badge-yellow,.badge-warning{background:#fef9c3;color:#a16207}
+        .badge-red,.badge-danger{background:#fee2e2;color:#dc2626}
+        .badge-blue,.badge-info{background:#dbeafe;color:#1d4ed8}
+        @media(max-width:768px){.admin-content{margin-left:0;padding:16px}.admin-sidebar{transform:translateX(-100%)}}
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar" id="adminSidebar">
+            <div class="sidebar-logo">
+                <a href="/DuAnChatbotThuVien/public/pages/chatbot.html" class="flex items-center gap-2" style="text-decoration:none">
+                    <img src="/DuAnChatbotThuVien/public/assets/images/logo.png" alt="Logo" class="w-8 h-8 rounded-full object-cover" onerror="this.src='https://ui-avatars.com/api/?name=CELRAS&background=0369a1&color=fff&rounded=true&size=36'">
+                    <span>CELRAS TVU</span>
+                </a>
+            </div>
+            <nav class="flex flex-col mt-1 flex-1">
+                <a href="dashboard.html" class="nav-item active" data-page="dashboard"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1"/></svg>Dashboard</a>
+                <a href="questions.html" class="nav-item" data-page="questions"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Quản lý câu hỏi</a>
+                <a href="categories.html" class="nav-item" data-page="categories"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>Danh mục</a>
+                <a href="datasets.html" class="nav-item" data-page="datasets"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>Tải dữ liệu</a>
+                <a href="settings.html" class="nav-item" data-page="settings"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Cài đặt giao diện</a>
+                <a href="unanswered.html" class="nav-item" data-page="unanswered"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>Chưa trả lời</a>
+            </nav>
+            <div class="sidebar-logout flex flex-col gap-1">
+                <a href="/DuAnChatbotThuVien/public/pages/chatbot.html" class="nav-item"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>Về trang chatbot</a>
+                <a href="#" onclick="logout();return false" class="nav-item" style="color:#f87171"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>Đăng xuất</a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="admin-content">
+            <!-- Header -->
+            <div class="admin-header">
+                <div>
+                    <h1>Dashboard</h1>
+                    <p class="text-sm text-gray-500 mt-1">Tổng quan hệ thống Chatbot Thư viện</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <img id="dashAdminAvatar" src="" alt="" class="w-10 h-10 rounded-full border-2 border-sky-200">
+                    <div class="hidden sm:block">
+                        <p id="dashAdminName" class="text-sm font-semibold text-gray-700"></p>
+                        <p id="dashAdminRole" class="text-xs text-gray-500">Quản trị viên</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="stat-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="stat-number" id="statQuestions">0</p>
+                            <p class="stat-label">Câu hỏi</p>
+                        </div>
+                        <div class="w-12 h-12 bg-sky-100 rounded-xl flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="stat-number" id="statCategories">0</p>
+                            <p class="stat-label">Danh mục</p>
+                        </div>
+                        <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="stat-number" id="statSessions">0</p>
+                            <p class="stat-label">Phiên chat</p>
+                        </div>
+                        <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="stat-number" id="statUnanswered">0</p>
+                            <p class="stat-label">Chưa trả lời</p>
+                        </div>
+                        <div class="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+                <h2 class="text-lg font-semibold mb-4">Thao tác nhanh</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <a href="questions.html" class="flex items-center gap-3 p-4 bg-sky-50 rounded-lg hover:bg-sky-100 transition">
+                        <div class="w-10 h-10 bg-sky-600 rounded-lg flex items-center justify-center text-white">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                        </div>
+                        <div>
+                            <p class="font-medium text-sm">Thêm câu hỏi</p>
+                            <p class="text-xs text-gray-500">Thêm Q&A mới cho chatbot</p>
+                        </div>
+                    </a>
+                    <a href="datasets.html" class="flex items-center gap-3 p-4 bg-green-50 rounded-lg hover:bg-green-100 transition">
+                        <div class="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center text-white">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                        </div>
+                        <div>
+                            <p class="font-medium text-sm">Tải dữ liệu</p>
+                            <p class="text-xs text-gray-500">Import Word, PDF</p>
+                        </div>
+                    </a>
+                    <a href="settings.html" class="flex items-center gap-3 p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition">
+                        <div class="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center text-white">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                        </div>
+                        <div>
+                            <p class="font-medium text-sm">Giao diện</p>
+                            <p class="text-xs text-gray-500">Tùy chỉnh màu sắc chatbot</p>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Recent Messages -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 class="text-lg font-semibold mb-4">Tổng tin nhắn gần đây</h2>
+                <p class="text-3xl font-bold text-sky-700" id="statMessages">0</p>
+                <p class="text-sm text-gray-500 mt-1">tin nhắn từ người dùng</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/DuAnChatbotThuVien/public/assets/js/admin.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadAdminPage('dashboard');
+            loadDashboardStats();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<?php
+/**
+ * Entry Point - Chatbot Thư Viện
+ * CELRAS TVU
+ */
+
+// Autoload
+spl_autoload_register(function ($class) {
+    $paths = [
+        __DIR__ . '/../app/core/',
+        __DIR__ . '/../app/controllers/',
+        __DIR__ . '/../app/models/',
+        __DIR__ . '/../app/config/',
+    ];
+    foreach ($paths as $path) {
+        $file = $path . $class . '.php';
+        if (file_exists($file)) {
+            require_once $file;
+            return;
+        }
+    }
+});
+
+// Load config
+require_once __DIR__ . '/../app/config/config.php';
+require_once __DIR__ . '/../app/helpers/functions.php';
+
+// Start session
+session_start();
+
+// CORS headers for API
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
+// Initialize App (Router)
+$app = new App();
