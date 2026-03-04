@@ -21,6 +21,12 @@ spl_autoload_register(function ($class) {
     }
 });
 
+// Composer autoload (cho smalot/pdfparser)
+$composerAutoload = __DIR__ . '/../vendor/autoload.php';
+if (file_exists($composerAutoload)) {
+    require_once $composerAutoload;
+}
+
 // Load config
 require_once __DIR__ . '/../app/config/config.php';
 require_once __DIR__ . '/../app/helpers/functions.php';

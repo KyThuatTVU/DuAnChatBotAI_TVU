@@ -222,7 +222,7 @@ class AdminController extends BaseController
     // ==================== UPLOAD DATASET ====================
 
     /**
-     * POST /api/admin/upload - Upload file Word/PDF
+     * POST /api/admin/upload - Upload file Word và tự động tạo Q&A
      */
     public function upload()
     {
@@ -237,14 +237,24 @@ class AdminController extends BaseController
         }
 
         $file = $_FILES['file'];
-        $allowedTypes = [
-            'application/pdf' => 'pdf',
-            'application/msword' => 'word',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'word',
-        ];
 
-        if (!isset($allowedTypes[$file['type']])) {
-            $this->json(['error' => 'Chỉ chấp nhận file Word (.doc, .docx) hoặc PDF'], 400);
+        // Kiểm tra extension (đáng tin hơn MIME type do trình duyệt gửi)
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $allowedExtensions = ['doc', 'docx'];
+
+        if (!in_array($ext, $allowedExtensions)) {
+            $this->json(['error' => 'Chỉ chấp nhận file Word (.doc, .docx)'], 400);
+        }
+
+        // Kiểm tra MIME type bổ sung (cho phép cả application/octet-stream vì một số trình duyệt gửi sai)
+        $allowedMimes = [
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/octet-stream',
+            'application/zip',
+        ];
+        if (!empty($file['type']) && !in_array($file['type'], $allowedMimes)) {
+            $this->json(['error' => 'File không đúng định dạng Word (.doc, .docx). MIME: ' . $file['type']], 400);
         }
 
         if ($file['size'] > MAX_FILE_SIZE) {
@@ -264,18 +274,625 @@ class AdminController extends BaseController
             $this->json(['error' => 'Lỗi khi lưu file'], 500);
         }
 
-        // Lưu vào database
+        $fileType = 'word';
+
+        // Kiểm tra ZipArchive cho .docx (trước khi insert vào DB)
+        if ($ext === 'docx' && !class_exists('ZipArchive')) {
+            $this->json(['error' => 'Server chưa bật extension ZIP. Vui lòng bật extension=zip trong php.ini và restart Apache.'], 500);
+        }
+
+        // Lưu dataset vào database (status = processing)
         $db = Database::getInstance()->getConnection();
         $stmt = $db->prepare(
-            "INSERT INTO datasets (file_name, file_path, file_type, file_size, uploaded_by) VALUES (?, ?, ?, ?, ?)"
+            "INSERT INTO datasets (file_name, file_path, file_type, file_size, status, uploaded_by) VALUES (?, ?, ?, ?, 'processing', ?)"
         );
-        $stmt->execute([$file['name'], $filePath, $allowedTypes[$file['type']], $file['size'], $adminId]);
+        $stmt->execute([$file['name'], $filePath, $fileType, $file['size'], $adminId]);
+        $datasetId = $db->lastInsertId();
 
-        $this->json([
-            'success' => true,
-            'id' => $db->lastInsertId(),
-            'message' => 'File đã được tải lên. Hệ thống sẽ xử lý và import câu hỏi.',
-        ], 201);
+        try {
+            // Trích xuất text từ Word
+            $text = $this->extractTextFromWord($filePath);
+
+            if (empty(trim($text))) {
+                $this->updateDatasetStatus($db, $datasetId, 'failed', 'Không thể đọc nội dung file.');
+                $errorHint = ($ext === 'doc')
+                    ? 'Không thể đọc nội dung file .doc. Hãy thử lưu lại thành .docx rồi upload lại.'
+                    : 'Không thể đọc nội dung file. Vui lòng kiểm tra file Word có chứa text.';
+                $this->json([
+                    'success' => false,
+                    'error' => $errorHint,
+                ], 400);
+            }
+
+            // Tự động tạo Q&A từ nội dung văn bản
+            $qaPairs = $this->autoGenerateQA($text);
+
+            if (empty($qaPairs)) {
+                $this->updateDatasetStatus($db, $datasetId, 'failed', 'Không tạo được câu hỏi từ nội dung file.');
+                $this->json([
+                    'success' => false,
+                    'error' => 'Không tạo được câu hỏi nào từ nội dung file. File có thể quá ngắn hoặc không có đủ nội dung.',
+                ], 400);
+            }
+
+            // Lưu Q&A vào database
+            $importCount = $this->importQAPairs($db, $qaPairs, $datasetId, $adminId, $fileType);
+
+            // Cập nhật dataset status
+            $this->updateDatasetStatus($db, $datasetId, 'completed', null, $importCount);
+
+            $this->json([
+                'success' => true,
+                'id' => $datasetId,
+                'total_questions' => $importCount,
+                'questions' => $qaPairs,
+                'message' => "Đã tự động tạo {$importCount} câu hỏi từ file. Bạn có thể chỉnh sửa tại trang Quản lý câu hỏi.",
+            ], 201);
+
+        } catch (\Exception $e) {
+            $errorMsg = $e->getMessage();
+            $this->updateDatasetStatus($db, $datasetId, 'failed', $errorMsg);
+            $this->json([
+                'success' => false,
+                'error' => 'Lỗi khi xử lý file: ' . $errorMsg,
+            ], 500);
+        }
+    }
+
+    // ==================== TEXT EXTRACTION ====================
+
+    /**
+     * Trích xuất text từ file Word (.docx / .doc)
+     */
+    private function extractTextFromWord(string $filePath): string
+    {
+        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+
+        if ($ext === 'docx') {
+            return $this->extractTextFromDocx($filePath);
+        }
+
+        // Fallback: .doc (binary OLE2) — trích xuất text
+        return $this->extractTextFromDoc($filePath);
+    }
+
+    /**
+     * Đọc nội dung .doc (OLE2 binary format)
+     * Sử dụng nhiều phương pháp để tối ưu kết quả
+     */
+    private function extractTextFromDoc(string $filePath): string
+    {
+        $content = file_get_contents($filePath);
+        if ($content === false || strlen($content) < 512) return '';
+
+        // Phương pháp 1: Trích xuất text từ OLE2 compound document
+        $text = $this->extractOLE2Text($content);
+
+        // Phương pháp 2: Nếu OLE2 ko đủ, thử UTF-16LE decode
+        if (mb_strlen(trim($text)) < 30 && function_exists('mb_convert_encoding')) {
+            $utf16 = @mb_convert_encoding($content, 'UTF-8', 'UTF-16LE');
+            if ($utf16) {
+                $text2 = '';
+                // Tìm các chuỗi text có ý nghĩa (>= 4 ký tự liên tiếp)
+                if (preg_match_all('/[\x20-\x7E\x{00C0}-\x{1EF9}]{4,}/u', $utf16, $matches)) {
+                    $text2 = implode("\n", $matches[0]);
+                }
+                if (mb_strlen($text2) > mb_strlen($text)) {
+                    $text = $text2;
+                }
+            }
+        }
+
+        // Phương pháp 3: Fallback - tìm chuỗi ASCII/UTF-8 trong binary
+        if (mb_strlen(trim($text)) < 30) {
+            $text3 = '';
+            if (preg_match_all('/[\x20-\x7E\x{00C0}-\x{1EF9}]{6,}/u', $content, $matches)) {
+                // Lọc bỏ các chuỗi binary/metadata
+                $filtered = array_filter($matches[0], function($s) {
+                    // Bỏ các chuỗi chỉ có ký tự đặc biệt hoặc quá nhiều ký tự lạ
+                    $alphaRatio = preg_match_all('/[\p{L}\d]/u', $s) / max(mb_strlen($s), 1);
+                    return $alphaRatio > 0.5 && mb_strlen($s) >= 6;
+                });
+                $text3 = implode("\n", $filtered);
+            }
+            if (mb_strlen($text3) > mb_strlen($text)) {
+                $text = $text3;
+            }
+        }
+
+        return $text;
+    }
+
+    /**
+     * Trích xuất text từ OLE2 compound binary format
+     * .doc file lưu text trong streams có thể đọc được
+     */
+    private function extractOLE2Text(string $data): string
+    {
+        // Xác nhận OLE2 magic bytes: D0 CF 11 E0
+        if (substr($data, 0, 4) !== "\xD0\xCF\x11\xE0") {
+            return '';
+        }
+
+        $text = '';
+
+        // Tìm text content: .doc lưu text dạng ANSI hoặc Unicode
+        // Đọc từ byte offset 0x200 trở đi (sau header) để tìm text stream
+        $len = strlen($data);
+        $pos = 0x200; // Skip OLE2 header
+        $chunk = '';
+
+        while ($pos < $len) {
+            $byte = ord($data[$pos]);
+
+            // Readable ASCII/Latin characters
+            if (($byte >= 0x20 && $byte <= 0x7E) || $byte === 0x0A || $byte === 0x0D || $byte === 0x09) {
+                $chunk .= chr($byte);
+            }
+            // Vietnamese UTF-8 chars (2-3 byte sequences)
+            elseif ($byte >= 0xC0 && $byte <= 0xEF && $pos + 1 < $len) {
+                $seqLen = ($byte >= 0xE0) ? 3 : 2;
+                if ($pos + $seqLen <= $len) {
+                    $seq = substr($data, $pos, $seqLen);
+                    $decoded = @mb_convert_encoding($seq, 'UTF-8', 'UTF-8');
+                    if ($decoded && mb_strlen($decoded) === 1) {
+                        $chunk .= $decoded;
+                        $pos += $seqLen - 1;
+                    } else {
+                        if (mb_strlen(trim($chunk)) >= 5) {
+                            $text .= trim($chunk) . "\n";
+                        }
+                        $chunk = '';
+                    }
+                }
+            } else {
+                // Non-text byte: flush current chunk if meaningful
+                if (mb_strlen(trim($chunk)) >= 5) {
+                    $text .= trim($chunk) . "\n";
+                }
+                $chunk = '';
+            }
+            $pos++;
+        }
+
+        // Flush remaining
+        if (mb_strlen(trim($chunk)) >= 5) {
+            $text .= trim($chunk) . "\n";
+        }
+
+        // Làm sạch: bỏ dòng trùng lặp và dòng metadata
+        $lines = explode("\n", $text);
+        $cleanLines = [];
+        $seen = [];
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) continue;
+            // Bỏ các dòng metadata thường gặp trong .doc
+            if (preg_match('/^(MSWord|Normal|Microsoft|Default|Heading|Title|Calibri|Times|Arial|\{)/i', $line)) continue;
+            if (preg_match('/^[\x00-\x1F\x7F-\x9F]+$/', $line)) continue;
+            if (mb_strlen($line) < 3) continue;
+            $hash = md5($line);
+            if (isset($seen[$hash])) continue;
+            $seen[$hash] = true;
+            $cleanLines[] = $line;
+        }
+
+        return implode("\n", $cleanLines);
+    }
+
+    /**
+     * Đọc nội dung .docx (XML-based) - giữ cấu trúc đoạn
+     */
+    private function extractTextFromDocx(string $filePath): string
+    {
+        $zip = new \ZipArchive();
+        if ($zip->open($filePath) !== true) {
+            throw new \Exception('Không thể mở file .docx');
+        }
+
+        $content = $zip->getFromName('word/document.xml');
+        $zip->close();
+
+        if ($content === false) {
+            throw new \Exception('File .docx không hợp lệ');
+        }
+
+        // Parse XML để giữ cấu trúc paragraph
+        $xml = simplexml_load_string($content);
+        if ($xml === false) {
+            // Fallback: strip tags
+            $text = strip_tags($content);
+            return html_entity_decode($text, ENT_QUOTES, 'UTF-8');
+        }
+
+        $namespaces = $xml->getNamespaces(true);
+        $wns = $namespaces['w'] ?? 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+
+        $text = '';
+        $body = $xml->children($wns)->body;
+        if (!$body) {
+            $text = strip_tags($content);
+            return html_entity_decode($text, ENT_QUOTES, 'UTF-8');
+        }
+
+        foreach ($body->children($wns) as $element) {
+            if ($element->getName() === 'p') {
+                $paraText = $this->extractDocxParagraph($element, $wns);
+                if (!empty($paraText)) {
+                    $text .= $paraText . "\n";
+                }
+            } elseif ($element->getName() === 'tbl') {
+                // Xử lý bảng
+                foreach ($element->children($wns) as $row) {
+                    if ($row->getName() === 'tr') {
+                        $cells = [];
+                        foreach ($row->children($wns) as $cell) {
+                            if ($cell->getName() === 'tc') {
+                                $cellText = '';
+                                foreach ($cell->children($wns) as $p) {
+                                    if ($p->getName() === 'p') {
+                                        $cellText .= $this->extractDocxParagraph($p, $wns) . ' ';
+                                    }
+                                }
+                                $cells[] = trim($cellText);
+                            }
+                        }
+                        if (!empty(array_filter($cells))) {
+                            $text .= implode(' | ', $cells) . "\n";
+                        }
+                    }
+                }
+            }
+        }
+
+        return html_entity_decode($text, ENT_QUOTES, 'UTF-8');
+    }
+
+    /**
+     * Trích xuất text từ 1 paragraph element trong docx XML
+     */
+    private function extractDocxParagraph($pElement, string $wns): string
+    {
+        $runs = '';
+        foreach ($pElement->children($wns) as $child) {
+            if ($child->getName() === 'r') {
+                $t = $child->children($wns)->t;
+                if ($t !== null) {
+                    $runs .= (string) $t;
+                }
+            } elseif ($child->getName() === 'hyperlink') {
+                foreach ($child->children($wns) as $hRun) {
+                    if ($hRun->getName() === 'r') {
+                        $t = $hRun->children($wns)->t;
+                        if ($t !== null) {
+                            $runs .= (string) $t;
+                        }
+                    }
+                }
+            }
+        }
+        return trim($runs);
+    }
+
+    // ==================== AUTO GENERATE Q&A ====================
+
+    /**
+     * Tự động tạo Q&A từ văn bản tiếng Việt
+     * Phân tích cấu trúc: Chương, Điều, Mục, heading, paragraph
+     */
+    private function autoGenerateQA(string $text): array
+    {
+        $pairs = [];
+
+        // Normalize
+        $text = str_replace(["\r\n", "\r"], "\n", $text);
+        $text = preg_replace('/\n{3,}/', "\n\n", $text);
+
+        // === Bước 1: Thử parse Q&A có sẵn trong file (Q:/A: format) ===
+        $existingQA = $this->parseExistingQA($text);
+        if (!empty($existingQA)) {
+            return $existingQA;
+        }
+
+        // === Bước 2: Phát hiện cấu trúc văn bản pháp luật (Điều, Chương, Mục) ===
+        $legalQA = $this->parseLegalStructure($text);
+        if (!empty($legalQA)) {
+            return $legalQA;
+        }
+
+        // === Bước 3: Phát hiện heading + nội dung (I., II., 1., 2.) ===
+        $headingQA = $this->parseHeadingStructure($text);
+        if (!empty($headingQA)) {
+            return $headingQA;
+        }
+
+        // === Bước 4: Fallback - chia đoạn và tạo Q&A từ paragraph ===
+        $paragraphQA = $this->parseParagraphStructure($text);
+        return $paragraphQA;
+    }
+
+    /**
+     * Parse Q&A có sẵn trong file (Q:/A:, Hỏi:/Đáp:)
+     */
+    private function parseExistingQA(string $text): array
+    {
+        $pairs = [];
+        $qPattern = '(?:Q|Hỏi|Câu\s*hỏi|Question)\s*[:：]\s*';
+        $aPattern = '(?:A|Đáp|Trả\s*lời|Đáp\s*án|Answer)\s*[:：]\s*';
+        $fullPattern = '/(' . $qPattern . ')(.*?)(' . $aPattern . ')(.*?)(?=(?:' . $qPattern . ')|\z)/isu';
+
+        if (preg_match_all($fullPattern, $text, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $question = trim($match[2]);
+                $answer = trim($match[4]);
+                if (mb_strlen($question) >= 3 && mb_strlen($answer) >= 3) {
+                    $pairs[] = ['question' => $question, 'answer' => $answer];
+                }
+            }
+        }
+        return $pairs;
+    }
+
+    /**
+     * Parse cấu trúc văn bản pháp luật: Chương/Điều/Khoản
+     * VD: "Điều 5. Quy định giờ mở cửa" → Q: "Quy định giờ mở cửa như thế nào?"
+     */
+    private function parseLegalStructure(string $text): array
+    {
+        $pairs = [];
+
+        // Pattern: "Điều X. Tiêu đề" hoặc "Điều X: Tiêu đề"
+        $pattern = '/^\s*(Điều\s+\d+[.:]?)\s*(.+?)$/mu';
+
+        if (!preg_match_all($pattern, $text, $matches, PREG_OFFSET_CAPTURE)) {
+            return [];
+        }
+
+        // Nếu có ít nhất 2 Điều, coi như là văn bản pháp luật
+        if (count($matches[0]) < 2) {
+            return [];
+        }
+
+        for ($i = 0; $i < count($matches[0]); $i++) {
+            $dieuLabel = trim($matches[1][$i][0]); // "Điều 5."
+            $dieuTitle = trim($matches[2][$i][0]); // "Quy định giờ mở cửa"
+            $startPos = $matches[0][$i][1] + strlen($matches[0][$i][0]);
+
+            // Lấy nội dung đến Điều tiếp theo hoặc hết file
+            if ($i + 1 < count($matches[0])) {
+                $endPos = $matches[0][$i + 1][1];
+            } else {
+                $endPos = strlen($text);
+            }
+
+            $content = trim(substr($text, $startPos, $endPos - $startPos));
+
+            // Bỏ nếu nội dung quá ngắn
+            if (mb_strlen($content) < 10) continue;
+
+            // Tạo câu hỏi tự nhiên từ tiêu đề Điều
+            $question = $this->generateQuestionFromTitle($dieuTitle, $dieuLabel);
+            $answer = $dieuLabel . ' ' . $dieuTitle . "\n" . $content;
+
+            $pairs[] = [
+                'question' => $question,
+                'answer' => $answer,
+            ];
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * Parse cấu trúc heading: I., II., 1., 2., hoặc các heading dạng chữ in hoa
+     */
+    private function parseHeadingStructure(string $text): array
+    {
+        $pairs = [];
+
+        // Pattern heading dạng số La Mã hoặc số: "I. Giới thiệu", "1. Nội quy"
+        $headingPattern = '/^\s*((?:[IVXLC]+|\d+)[.):]?)\s+(.{5,80})$/mu';
+
+        if (!preg_match_all($headingPattern, $text, $matches, PREG_OFFSET_CAPTURE)) {
+            return [];
+        }
+
+        if (count($matches[0]) < 2) {
+            return [];
+        }
+
+        for ($i = 0; $i < count($matches[0]); $i++) {
+            $headingNum = trim($matches[1][$i][0]);
+            $headingTitle = trim($matches[2][$i][0]);
+            $startPos = $matches[0][$i][1] + strlen($matches[0][$i][0]);
+
+            if ($i + 1 < count($matches[0])) {
+                $endPos = $matches[0][$i + 1][1];
+            } else {
+                $endPos = strlen($text);
+            }
+
+            $content = trim(substr($text, $startPos, $endPos - $startPos));
+            if (mb_strlen($content) < 15) continue;
+
+            // Tạo câu hỏi
+            $question = $this->generateQuestionFromTitle($headingTitle);
+            $answer = $headingNum . ' ' . $headingTitle . "\n" . $content;
+
+            $pairs[] = [
+                'question' => $question,
+                'answer' => $answer,
+            ];
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * Fallback: chia paragraph và tạo Q&A
+     */
+    private function parseParagraphStructure(string $text): array
+    {
+        $pairs = [];
+        $paragraphs = preg_split('/\n\n+/', $text);
+
+        foreach ($paragraphs as $para) {
+            $para = trim($para);
+            if (mb_strlen($para) < 30) continue;
+
+            // Bỏ đoạn chỉ có số/ký tự đặc biệt
+            $cleanCheck = preg_replace('/[\d\s\W]/u', '', $para);
+            if (mb_strlen($cleanCheck) < 10) continue;
+
+            // Lấy dòng đầu tiên làm cơ sở tạo câu hỏi
+            $lines = explode("\n", $para);
+            $firstLine = trim($lines[0]);
+
+            // Nếu dòng đầu ngắn (heading), tạo Q từ nó
+            if (mb_strlen($firstLine) <= 100) {
+                $question = $this->generateQuestionFromTitle($firstLine);
+            } else {
+                // Cắt câu đầu tiên
+                $dotPos = mb_strpos($firstLine, '.');
+                if ($dotPos !== false && $dotPos < 120) {
+                    $sentence = mb_substr($firstLine, 0, $dotPos + 1);
+                } else {
+                    $sentence = mb_substr($firstLine, 0, 80);
+                }
+                $question = $this->generateQuestionFromTitle($sentence);
+            }
+
+            $pairs[] = [
+                'question' => $question,
+                'answer' => $para,
+            ];
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * Tạo câu hỏi tự nhiên từ tiêu đề/heading tiếng Việt
+     * VD: "Quy định giờ mở cửa" → "Quy định giờ mở cửa như thế nào?"
+     * VD: "Điều kiện mượn sách" → "Điều kiện mượn sách là gì?"
+     */
+    private function generateQuestionFromTitle(string $title, string $prefix = ''): string
+    {
+        // Loại bỏ số đầu, dấu chấm, dấu hai chấm
+        $clean = preg_replace('/^[\d\s.):]+/', '', $title);
+        $clean = trim($clean, ' .:;-');
+
+        if (empty($clean)) {
+            $clean = $title;
+        }
+
+        // Nếu đã là câu hỏi
+        if (preg_match('/[?？]$/', $clean)) {
+            return $clean;
+        }
+
+        $lower = mb_strtolower($clean);
+
+        // Pattern matching cho các loại nội dung khác nhau
+        $patterns = [
+            // Quy định, quy chế, quy trình
+            '/^(quy\s*(?:định|chế|trình))/' => '%s như thế nào?',
+            // Thủ tục, hướng dẫn, cách
+            '/^(thủ\s*tục|hướng\s*dẫn|cách)/' => '%s như thế nào?',
+            // Trách nhiệm, nghĩa vụ
+            '/^(trách\s*nhiệm|nghĩa\s*vụ)/' => '%s là gì?',
+            // Quyền, quyền lợi
+            '/^(quyền)/' => '%s gồm những gì?',
+            // Điều kiện, yêu cầu, tiêu chuẩn
+            '/^(điều\s*kiện|yêu\s*cầu|tiêu\s*chuẩn)/' => '%s là gì?',
+            // Mục đích, mục tiêu
+            '/^(mục\s*đích|mục\s*tiêu)/' => '%s là gì?',
+            // Phạm vi, đối tượng
+            '/^(phạm\s*vi|đối\s*tượng)/' => '%s là gì?',
+            // Thời gian, giờ, lịch
+            '/^(thời\s*gian|giờ|lịch)/' => '%s như thế nào?',
+            // Xử lý, xử phạt
+            '/^(xử\s*(?:lý|phạt))/' => '%s như thế nào?',
+            // Nội quy, nội dung
+            '/^(nội\s*quy)/' => '%s bao gồm những gì?',
+            // Tổ chức, cơ cấu
+            '/^(tổ\s*chức|cơ\s*cấu)/' => '%s như thế nào?',
+        ];
+
+        foreach ($patterns as $regex => $template) {
+            if (preg_match($regex, $lower)) {
+                return sprintf($template, $clean);
+            }
+        }
+
+        // Nếu tiêu đề chứa động từ → hỏi "như thế nào"
+        $verbPatterns = '/^(cần|phải|nên|được|có thể|không được|để)/u';
+        if (preg_match($verbPatterns, $lower)) {
+            return $clean . '?';
+        }
+
+        // Default: thêm "là gì?" hoặc "như thế nào?"
+        if (mb_strlen($clean) <= 50) {
+            return $clean . ' là gì?';
+        }
+        return $clean . '?';
+    }
+
+    /**
+     * Import danh sách Q&A vào bảng questions
+     */
+    private function importQAPairs(\PDO $db, array $qaPairs, int $datasetId, int $adminId, string $sourceType): int
+    {
+        $stmt = $db->prepare(
+            "INSERT INTO questions (question_text, answer_text, source_type, dataset_id, created_by, is_active) 
+             VALUES (?, ?, ?, ?, ?, 1)"
+        );
+
+        $count = 0;
+        foreach ($qaPairs as $qa) {
+            try {
+                $stmt->execute([
+                    $qa['question'],
+                    $qa['answer'],
+                    $sourceType,
+                    $datasetId,
+                    $adminId,
+                ]);
+                $count++;
+            } catch (\Exception $e) {
+                continue;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * Cập nhật trạng thái dataset
+     */
+    private function updateDatasetStatus(\PDO $db, int $datasetId, string $status, ?string $errorMessage = null, int $totalQuestions = 0): void
+    {
+        $stmt = $db->prepare(
+            "UPDATE datasets SET status = ?, error_message = ?, total_questions = ?, updated_at = NOW() WHERE id = ?"
+        );
+        $stmt->execute([$status, $errorMessage, $totalQuestions, $datasetId]);
+    }
+
+    /**
+     * GET /api/admin/datasets - Lấy lịch sử upload
+     */
+    public function datasets()
+    {
+        $this->requireAuth();
+        $db = Database::getInstance()->getConnection();
+        $stmt = $db->prepare(
+            "SELECT d.*, a.full_name as uploaded_by_name 
+             FROM datasets d 
+             LEFT JOIN admins a ON d.uploaded_by = a.id 
+             ORDER BY d.created_at DESC"
+        );
+        $stmt->execute();
+        $this->json(['datasets' => $stmt->fetchAll()]);
     }
 
     /**
@@ -286,9 +903,41 @@ class AdminController extends BaseController
         $this->requireAuth();
         $db = Database::getInstance()->getConnection();
         $stmt = $db->prepare(
-            "SELECT * FROM unanswered_questions ORDER BY frequency DESC, created_at DESC"
+            "SELECT * FROM unanswered_questions ORDER BY is_resolved ASC, frequency DESC, created_at DESC"
         );
         $stmt->execute();
         $this->json(['unanswered' => $stmt->fetchAll()]);
+    }
+
+    /**
+     * PUT /api/admin/resolveUnanswered/{id} - Đánh dấu đã xử lý
+     */
+    public function resolveUnanswered($id = null)
+    {
+        $adminId = $this->requireAuth();
+        if (!$id) {
+            $this->json(['error' => 'ID không hợp lệ'], 400);
+        }
+        $db = Database::getInstance()->getConnection();
+        $stmt = $db->prepare(
+            "UPDATE unanswered_questions SET is_resolved = 1, resolved_by = ?, resolved_at = NOW() WHERE id = ?"
+        );
+        $stmt->execute([$adminId, $id]);
+        $this->json(['success' => true]);
+    }
+
+    /**
+     * DELETE /api/admin/deleteUnanswered/{id} - Xóa câu hỏi chưa trả lời
+     */
+    public function deleteUnanswered($id = null)
+    {
+        $this->requireAuth();
+        if (!$id) {
+            $this->json(['error' => 'ID không hợp lệ'], 400);
+        }
+        $db = Database::getInstance()->getConnection();
+        $stmt = $db->prepare("DELETE FROM unanswered_questions WHERE id = ?");
+        $stmt->execute([$id]);
+        $this->json(['success' => true]);
     }
 }

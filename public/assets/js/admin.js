@@ -438,13 +438,24 @@ function handleFileSelect(event) {
 
 async function uploadFile(file) {
     const validTypes = [
-        'application/pdf',
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/octet-stream',
+        '',
     ];
-    
-    if (!validTypes.includes(file.type)) {
-        alert('Chỉ chấp nhận file Word (.doc, .docx) hoặc PDF');
+    const validExts = ['.doc', '.docx'];
+    const fileName = file.name.toLowerCase();
+    const ext = fileName.substring(fileName.lastIndexOf('.'));
+
+    // Kiểm tra extension trước (đáng tin hơn MIME type)
+    if (!validExts.includes(ext)) {
+        alert('Chỉ chấp nhận file Word (.doc, .docx)');
+        return;
+    }
+
+    // Nếu có MIME type, kiểm tra thêm
+    if (file.type && !validTypes.includes(file.type)) {
+        alert('File không đúng định dạng Word. Vui lòng chọn file .doc hoặc .docx');
         return;
     }
 
@@ -453,14 +464,22 @@ async function uploadFile(file) {
         return;
     }
 
+    // Hide previous result & preview
+    const resultDiv = document.getElementById('uploadResult');
+    const previewSection = document.getElementById('qaPreviewSection');
+    if (resultDiv) resultDiv.classList.add('hidden');
+    if (previewSection) previewSection.classList.add('hidden');
+
     // Show progress
     document.getElementById('uploadProgress').classList.remove('hidden');
-    document.getElementById('uploadFileName').textContent = file.name;
+    document.getElementById('uploadFileName').textContent = `Đang phân tích: ${file.name}`;
+    document.getElementById('uploadBar').style.width = '30%';
 
     const formData = new FormData();
     formData.append('file', file);
 
     try {
+        document.getElementById('uploadBar').style.width = '60%';
         const res = await fetch(`${ADMIN_API}/admin/upload`, {
             method: 'POST',
             body: formData,
@@ -470,19 +489,122 @@ async function uploadFile(file) {
         document.getElementById('uploadBar').style.width = '100%';
         
         if (data.success) {
+            document.getElementById('uploadFileName').textContent = `Hoàn thành!`;
+
+            // Show success result
+            if (resultDiv) {
+                resultDiv.classList.remove('hidden');
+                resultDiv.innerHTML = `
+                    <div class="bg-green-50 border border-green-200 rounded-xl p-4">
+                        <div class="flex items-start gap-3">
+                            <svg class="w-6 h-6 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <div>
+                                <p class="font-semibold text-green-800">${escapeHtml(data.message)}</p>
+                                <p class="text-sm text-green-600 mt-1">Bạn có thể chỉnh sửa câu hỏi và câu trả lời tại <a href="questions.html?source=word" class="underline font-semibold">Quản lý câu hỏi</a></p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Show Q&A preview
+            if (data.questions && data.questions.length > 0 && previewSection) {
+                previewSection.classList.remove('hidden');
+                const listDiv = document.getElementById('qaPreviewList');
+                listDiv.innerHTML = data.questions.map((qa, i) => `
+                    <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div class="flex items-start gap-2 mb-2">
+                            <span class="bg-sky-100 text-sky-700 text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">Q${i+1}</span>
+                            <p class="text-sm font-medium text-gray-800">${escapeHtml(qa.question)}</p>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">A</span>
+                            <p class="text-sm text-gray-600 whitespace-pre-line">${escapeHtml(qa.answer.substring(0, 200))}${qa.answer.length > 200 ? '...' : ''}</p>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
             setTimeout(() => {
-                alert(data.message || 'Tải lên thành công!');
                 document.getElementById('uploadProgress').classList.add('hidden');
                 document.getElementById('uploadBar').style.width = '0%';
-            }, 500);
+                loadDatasets();
+            }, 1500);
         } else {
-            alert(data.error || 'Lỗi khi tải lên');
-            document.getElementById('uploadProgress').classList.add('hidden');
+            document.getElementById('uploadFileName').textContent = `Lỗi xử lý`;
+            if (resultDiv) {
+                resultDiv.classList.remove('hidden');
+                resultDiv.innerHTML = `
+                    <div class="bg-red-50 border border-red-200 rounded-xl p-4">
+                        <div class="flex items-start gap-3">
+                            <svg class="w-6 h-6 text-red-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <p class="text-sm text-red-700">${escapeHtml(data.error)}</p>
+                        </div>
+                    </div>
+                `;
+            }
+            setTimeout(() => {
+                document.getElementById('uploadProgress').classList.add('hidden');
+                document.getElementById('uploadBar').style.width = '0%';
+            }, 2000);
         }
+        document.getElementById('fileInput').value = '';
     } catch (e) {
-        alert('Lỗi kết nối server');
-        document.getElementById('uploadProgress').classList.add('hidden');
+        document.getElementById('uploadFileName').textContent = 'Lỗi kết nối server';
+        setTimeout(() => {
+            document.getElementById('uploadProgress').classList.add('hidden');
+            document.getElementById('uploadBar').style.width = '0%';
+        }, 3000);
     }
+}
+
+// ==================== DATASETS HISTORY ====================
+
+async function loadDatasets() {
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/datasets`);
+        const data = await res.json();
+        const datasets = data.datasets || [];
+        renderDatasets(datasets);
+    } catch (e) {
+        console.error('Failed to load datasets:', e);
+    }
+}
+
+function renderDatasets(datasets) {
+    const tbody = document.getElementById('datasetsBody');
+    if (!tbody) return;
+
+    if (!datasets.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-400">Chưa có dữ liệu</td></tr>';
+        return;
+    }
+
+    const statusBadges = {
+        'pending': '<span class="badge badge-warning">Chờ xử lý</span>',
+        'processing': '<span class="badge badge-info">Đang xử lý</span>',
+        'completed': '<span class="badge badge-success">Hoàn thành</span>',
+        'failed': '<span class="badge badge-danger">Thất bại</span>',
+    };
+
+    tbody.innerHTML = datasets.map(d => {
+        const sizeKB = (d.file_size / 1024).toFixed(1);
+        const sizeDisplay = sizeKB > 1024 ? (sizeKB / 1024).toFixed(1) + ' MB' : sizeKB + ' KB';
+        const dateDisplay = d.created_at ? new Date(d.created_at).toLocaleString('vi-VN') : '';
+
+        return `<tr>
+            <td class="font-medium text-sm">${escapeHtml(d.file_name)}</td>
+            <td class="text-sm text-gray-500">${sizeDisplay}</td>
+            <td class="font-semibold">${d.total_questions || 0} câu</td>
+            <td>${statusBadges[d.status] || d.status}${d.error_message ? '<br><span class="text-xs text-red-500">' + escapeHtml(d.error_message) + '</span>' : ''}</td>
+            <td class="text-sm text-gray-500">${dateDisplay}</td>
+            <td>${d.status === 'completed' && d.total_questions > 0 ? '<a href="questions.html?source=word" class="text-sky-600 hover:text-sky-800 text-sm font-medium">Xem & Sửa</a>' : ''}</td>
+        </tr>`;
+    }).join('');
 }
 
 // ==================== UNANSWERED ====================
@@ -505,24 +627,70 @@ function renderUnanswered(items) {
         return;
     }
 
-    tbody.innerHTML = items.map((item, i) => `
+    tbody.innerHTML = items.map((item, i) => {
+        const safeQuestion = escapeHtml(item.question_text);
+        const dateDisplay = item.created_at ? new Date(item.created_at).toLocaleString('vi-VN') : '';
+        return `
         <tr>
             <td>${i + 1}</td>
-            <td class="font-medium">${escapeHtml(item.question_text)}</td>
+            <td class="font-medium">${safeQuestion}</td>
             <td><span class="badge badge-warning">${item.frequency} lần</span></td>
             <td>${item.is_resolved ? '<span class="badge badge-success">Đã xử lý</span>' : '<span class="badge badge-danger">Chưa xử lý</span>'}</td>
-            <td class="text-sm text-gray-500">${item.created_at}</td>
+            <td class="text-sm text-gray-500">${dateDisplay}</td>
             <td>
-                <button onclick="createAnswerForUnanswered(${escapeAttr(item.question_text)})" class="text-sky-600 hover:text-sky-800 text-sm font-medium">
-                    + Tạo trả lời
-                </button>
+                <div class="flex items-center gap-2">
+                    <button data-question-id="${item.id}" data-question-text="${safeQuestion}" onclick="createAnswerForUnanswered(this)" class="text-sky-600 hover:text-sky-800 text-sm font-medium">
+                        + Tạo trả lời
+                    </button>
+                    ${!item.is_resolved ? `<button data-id="${item.id}" onclick="resolveUnanswered(this)" class="text-green-600 hover:text-green-800 text-sm font-medium" title="Đánh dấu đã xử lý">✓</button>` : ''}
+                    <button data-id="${item.id}" onclick="deleteUnanswered(this)" class="text-red-500 hover:text-red-700 text-sm font-medium" title="Xóa">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                </div>
             </td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
 }
 
-function createAnswerForUnanswered(questionText) {
-    window.location.href = `questions.html?autoAdd=${encodeURIComponent(questionText)}`;
+function createAnswerForUnanswered(btn) {
+    const questionText = btn.getAttribute('data-question-text');
+    // Decode HTML entities back to raw text for URL encoding
+    const div = document.createElement('div');
+    div.innerHTML = questionText;
+    const rawText = div.textContent;
+    window.location.href = `questions.html?autoAdd=${encodeURIComponent(rawText)}`;
+}
+
+async function resolveUnanswered(btn) {
+    const id = btn.getAttribute('data-id');
+    if (!confirm('Đánh dấu câu hỏi này đã được xử lý?')) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/resolveUnanswered/${id}`, { method: 'PUT' });
+        const data = await res.json();
+        if (data.success) {
+            loadUnanswered();
+        } else {
+            alert(data.error || 'Lỗi khi cập nhật');
+        }
+    } catch (e) {
+        alert('Lỗi kết nối server');
+    }
+}
+
+async function deleteUnanswered(btn) {
+    const id = btn.getAttribute('data-id');
+    if (!confirm('Xóa câu hỏi chưa trả lời này?')) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/deleteUnanswered/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+            loadUnanswered();
+        } else {
+            alert(data.error || 'Lỗi khi xóa');
+        }
+    } catch (e) {
+        alert('Lỗi kết nối server');
+    }
 }
 
 // ==================== HELPERS ====================

@@ -1,0 +1,297 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+xmlns:w="urn:schemas-microsoft-com:office:word"
+xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="UTF-8">
+<meta name="ProgId" content="Word.Document">
+<meta name="Generator" content="Microsoft Word 15">
+<style>
+    body { font-family: 'Times New Roman', serif; font-size: 13pt; line-height: 1.5; margin: 2cm; }
+    h1 { font-size: 16pt; color: #1a3c7a; text-align: center; margin-bottom: 5pt; }
+    h2 { font-size: 14pt; color: #1a3c7a; text-align: center; margin-top: 0; margin-bottom: 20pt; }
+    h3 { font-size: 13pt; color: #2c5f8a; margin-top: 18pt; margin-bottom: 6pt; border-bottom: 1px solid #2c5f8a; padding-bottom: 3pt; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16pt; }
+    th { background-color: #1a3c7a; color: #ffffff; font-weight: bold; padding: 8pt 10pt; text-align: left; border: 1px solid #1a3c7a; }
+    td { padding: 8pt 10pt; border: 1px solid #cccccc; vertical-align: top; }
+    tr:nth-child(even) td { background-color: #f2f6fc; }
+    .stt { width: 5%; text-align: center; font-weight: bold; }
+    .question { width: 35%; }
+    .answer { width: 60%; }
+    .note { font-style: italic; color: #555; font-size: 11pt; margin-top: 4pt; }
+    .header-info { text-align: center; font-size: 11pt; color: #666; margin-bottom: 20pt; }
+    ul { margin-top: 4pt; margin-bottom: 4pt; padding-left: 18pt; }
+    li { margin-bottom: 3pt; }
+    .category { background-color: #e8eef7; font-weight: bold; font-size: 13pt; color: #1a3c7a; }
+    .category td { border-bottom: 2px solid #1a3c7a; }
+</style>
+</head>
+<body>
+
+<h1>BỘ CÂU HỎI - TRẢ LỜI CHO CHATBOT</h1>
+<h2>Nội dung từ Thông báo số 3356/TB-ĐHTV ngày 05/9/2025</h2>
+<p class="header-info">V/v nộp lưu chiểu luận án, luận văn, đề án sau bảo vệ tại Trung tâm Học liệu và Hỗ trợ Học thuật</p>
+
+<!-- ============================================ -->
+<h3>PHẦN 1: QUY ĐỊNH CHUNG VỀ NỘP LƯU CHIỂU</h3>
+<!-- ============================================ -->
+
+<table>
+<tr>
+    <th class="stt">STT</th>
+    <th class="question">Câu hỏi</th>
+    <th class="answer">Câu trả lời</th>
+</tr>
+
+<tr>
+    <td class="stt">1</td>
+    <td class="question">Nộp lưu chiểu luận án, luận văn, đề án là gì?</td>
+    <td class="answer">Nộp lưu chiểu là việc nộp bản điện tử hoàn chỉnh (đã được duyệt sau góp ý của Hội đồng) của luận án, luận văn hoặc đề án sau bảo vệ để lưu trữ tại Trung tâm Học liệu và Hỗ trợ Học thuật, Trường Đại học Trà Vinh, theo Thông báo số 3356/TB-ĐHTV ngày 05/9/2025.</td>
+</tr>
+
+<tr>
+    <td class="stt">2</td>
+    <td class="question">Ai phải nộp lưu chiểu luận văn, luận án, đề án?</td>
+    <td class="answer">Đối tượng thực hiện gồm: Nghiên cứu sinh và học viên cao học (gọi chung là người học) đã bảo vệ thành công luận án, luận văn, đề án tại Trường Đại học Trà Vinh.</td>
+</tr>
+
+<tr>
+    <td class="stt">3</td>
+    <td class="question">Nộp lưu chiểu luận văn, luận án bằng hình thức nào?</td>
+    <td class="answer">Hình thức nộp: Bản điện tử hoàn chỉnh đã được duyệt sau góp ý của Hội đồng, file ở định dạng PDF, gửi qua email: <b>tiepnhanlvla@tvu.edu.vn</b> (Trung tâm Học liệu và Hỗ trợ Học thuật).</td>
+</tr>
+
+<tr>
+    <td class="stt">4</td>
+    <td class="question">Gửi file nộp lưu chiểu luận văn, luận án đến email nào?</td>
+    <td class="answer">Gửi đến email: <b>tiepnhanlvla@tvu.edu.vn</b> (Trung tâm Học liệu và Hỗ trợ Học thuật, Trường Đại học Trà Vinh).</td>
+</tr>
+
+<tr>
+    <td class="stt">5</td>
+    <td class="question">File nộp lưu chiểu phải ở định dạng gì?</td>
+    <td class="answer">File nộp phải ở định dạng <b>PDF</b> và phải được lưu thành <b>một tập tin duy nhất</b> (bao gồm tất cả các phần theo hướng dẫn quy cách đính kèm).</td>
+</tr>
+
+<tr>
+    <td class="stt">6</td>
+    <td class="question">Khi nào bắt đầu nộp lưu chiểu luận văn, luận án?</td>
+    <td class="answer">Thời gian thực hiện nộp lưu chiểu: từ ngày <b>10/9/2025</b> theo Thông báo số 3356/TB-ĐHTV.</td>
+</tr>
+
+<tr>
+    <td class="stt">7</td>
+    <td class="question">Dùng email nào để gửi nộp lưu chiểu?</td>
+    <td class="answer">Người học phải sử dụng <b>địa chỉ email đã đăng ký với Nhà trường từ đầu khóa học</b>. File nộp sẽ <b>không được tiếp nhận</b> nếu thông tin email gửi nộp không trùng khớp với dữ liệu đăng ký hoặc nộp thay cho người học khác.</td>
+</tr>
+
+<tr>
+    <td class="stt">8</td>
+    <td class="question">Có được nhờ người khác nộp lưu chiểu thay không?</td>
+    <td class="answer"><b>Không được.</b> File nộp sẽ không được tiếp nhận nếu nộp thay cho người học khác. Người học phải tự gửi bằng email đã đăng ký với Nhà trường từ đầu khóa học.</td>
+</tr>
+
+</table>
+
+<!-- ============================================ -->
+<h3>PHẦN 2: QUY CÁCH EMAIL VÀ FILE ĐÍNH KÈM</h3>
+<!-- ============================================ -->
+
+<table>
+<tr>
+    <th class="stt">STT</th>
+    <th class="question">Câu hỏi</th>
+    <th class="answer">Câu trả lời</th>
+</tr>
+
+<tr>
+    <td class="stt">9</td>
+    <td class="question">Viết tiêu đề email nộp lưu chiểu như thế nào?</td>
+    <td class="answer">Tiêu đề email viết theo cấu trúc: <b>[Mã số học viên] – [Tên loại tài liệu: luận án/luận văn/đề án SBV] – [Họ và tên học viên]</b>. Viết hoa tất cả các ký tự, không dấu, có khoảng cách giữa các chữ.<br><br>Ví dụ: <b>910117001 – DE AN SBV - NGUYEN VAN A</b></td>
+</tr>
+
+<tr>
+    <td class="stt">10</td>
+    <td class="question">Đặt tên file đính kèm khi nộp lưu chiểu như thế nào?</td>
+    <td class="answer">Tên file đính kèm viết theo cấu trúc: <b>[Mã số học viên] – [Tên loại tài liệu: luận án/luận văn/đề án SBV] – [Họ và tên học viên]</b>. Viết hoa tất cả các ký tự, không dấu, có khoảng cách giữa các chữ.<br><br>Ví dụ: <b>910117001 – DE AN SBV - NGUYEN VAN A</b></td>
+</tr>
+
+<tr>
+    <td class="stt">11</td>
+    <td class="question">Cho ví dụ về cách viết tiêu đề email và tên file nộp lưu chiểu?</td>
+    <td class="answer">Ví dụ: Học viên Nguyễn Văn A, mã số 910117001, nộp đề án sau bảo vệ:<br>
+    - Tiêu đề email: <b>910117001 – DE AN SBV - NGUYEN VAN A</b><br>
+    - Tên file đính kèm: <b>910117001 – DE AN SBV - NGUYEN VAN A.pdf</b><br><br>
+    Lưu ý: Viết hoa, không dấu, có khoảng cách giữa các chữ.</td>
+</tr>
+
+<tr>
+    <td class="stt">12</td>
+    <td class="question">File nộp lưu chiểu có được chia thành nhiều file không?</td>
+    <td class="answer"><b>Không.</b> File nộp phải được lưu thành <b>một tập tin duy nhất</b> (file PDF), bao gồm đầy đủ các phần theo hướng dẫn quy cách đính kèm thông báo.</td>
+</tr>
+
+</table>
+
+<!-- ============================================ -->
+<h3>PHẦN 3: QUY CÁCH FILE LUẬN VĂN / ĐỀ ÁN THẠC SĨ</h3>
+<!-- ============================================ -->
+
+<table>
+<tr>
+    <th class="stt">STT</th>
+    <th class="question">Câu hỏi</th>
+    <th class="answer">Câu trả lời</th>
+</tr>
+
+<tr>
+    <td class="stt">13</td>
+    <td class="question">File luận văn hoặc đề án thạc sĩ nộp lưu chiểu gồm những phần nào?</td>
+    <td class="answer">File nộp phải bao gồm đầy đủ các phần theo thứ tự sau:
+    <ol>
+        <li>Trang bìa chính</li>
+        <li>Trang phụ bìa</li>
+        <li>Quyết định giao đề tài, các quyết định điều chỉnh liên quan (nếu có)</li>
+        <li>Lời cam đoan</li>
+        <li>Lời cảm ơn</li>
+        <li>Mục lục</li>
+        <li>Danh mục bảng, hình, chữ viết tắt (nếu có)</li>
+        <li>Trang tóm tắt (nếu có)</li>
+        <li>Phần nội dung luận văn/đề án</li>
+        <li>Danh mục tài liệu tham khảo</li>
+        <li>Phụ lục (nếu có)</li>
+        <li>Các biên bản liên quan</li>
+    </ol></td>
+</tr>
+
+<tr>
+    <td class="stt">14</td>
+    <td class="question">Luận văn thạc sĩ nộp lưu chiểu cần có biên bản gì?</td>
+    <td class="answer">Phần biên bản liên quan trong file luận văn/đề án thạc sĩ gồm:
+    <ul>
+        <li>Biên bản họp Hội đồng đánh giá và nhận xét của các thành viên.</li>
+        <li>Bản giải trình, chỉnh sửa luận văn/đề án sau bảo vệ.</li>
+    </ul></td>
+</tr>
+
+<tr>
+    <td class="stt">15</td>
+    <td class="question">Luận văn thạc sĩ nộp lưu chiểu có cần quyết định giao đề tài không?</td>
+    <td class="answer"><b>Có.</b> File luận văn/đề án thạc sĩ nộp lưu chiểu phải bao gồm Quyết định giao đề tài và các quyết định điều chỉnh liên quan (nếu có), xếp theo thứ tự sau trang phụ bìa.</td>
+</tr>
+
+<tr>
+    <td class="stt">16</td>
+    <td class="question">Thứ tự sắp xếp nội dung trong file luận văn thạc sĩ nộp lưu chiểu?</td>
+    <td class="answer">Thứ tự sắp xếp: Trang bìa chính → Trang phụ bìa → Quyết định giao đề tài → Lời cam đoan → Lời cảm ơn → Mục lục → Danh mục bảng/hình/chữ viết tắt → Trang tóm tắt → Nội dung luận văn/đề án → Danh mục tài liệu tham khảo → Phụ lục → Các biên bản liên quan.</td>
+</tr>
+
+</table>
+
+<!-- ============================================ -->
+<h3>PHẦN 4: QUY CÁCH FILE LUẬN ÁN TIẾN SĨ</h3>
+<!-- ============================================ -->
+
+<table>
+<tr>
+    <th class="stt">STT</th>
+    <th class="question">Câu hỏi</th>
+    <th class="answer">Câu trả lời</th>
+</tr>
+
+<tr>
+    <td class="stt">17</td>
+    <td class="question">File luận án tiến sĩ nộp lưu chiểu gồm những phần nào?</td>
+    <td class="answer">File luận án tiến sĩ nộp lưu chiểu phải bao gồm đầy đủ các phần theo thứ tự sau:
+    <ol>
+        <li>Trang bìa chính</li>
+        <li>Trang phụ bìa</li>
+        <li>Lời cam đoan</li>
+        <li>Lời cảm ơn</li>
+        <li>Mục lục</li>
+        <li>Danh mục bảng, hình, chữ viết tắt (nếu có)</li>
+        <li>Trang tóm tắt (nếu có)</li>
+        <li>Phần nội dung luận án</li>
+        <li>Danh mục tài liệu tham khảo</li>
+        <li>Phụ lục (nếu có)</li>
+        <li>Các biên bản liên quan</li>
+    </ol></td>
+</tr>
+
+<tr>
+    <td class="stt">18</td>
+    <td class="question">Luận án tiến sĩ nộp lưu chiểu cần có biên bản gì?</td>
+    <td class="answer">Phần biên bản liên quan trong file luận án tiến sĩ gồm:
+    <ul>
+        <li>Quyết định thành lập hội đồng đánh giá luận án cấp trường.</li>
+        <li>Biên bản họp đánh giá, nghị quyết hội đồng và nhận xét của các thành viên.</li>
+        <li>Bản giải trình, chỉnh sửa luận án sau bảo vệ.</li>
+    </ul></td>
+</tr>
+
+<tr>
+    <td class="stt">19</td>
+    <td class="question">Luận án tiến sĩ và luận văn thạc sĩ nộp lưu chiểu khác nhau điểm nào?</td>
+    <td class="answer">Điểm khác nhau chính:
+    <ul>
+        <li><b>Luận văn/đề án thạc sĩ:</b> Có thêm phần "Quyết định giao đề tài" (xếp sau trang phụ bìa). Biên bản gồm: Biên bản họp Hội đồng đánh giá + Bản giải trình chỉnh sửa.</li>
+        <li><b>Luận án tiến sĩ:</b> Không có phần "Quyết định giao đề tài". Biên bản gồm: Quyết định thành lập hội đồng cấp trường + Biên bản họp đánh giá, nghị quyết + Bản giải trình chỉnh sửa.</li>
+    </ul></td>
+</tr>
+
+</table>
+
+<!-- ============================================ -->
+<h3>PHẦN 5: THÔNG TIN LIÊN HỆ HỖ TRỢ</h3>
+<!-- ============================================ -->
+
+<table>
+<tr>
+    <th class="stt">STT</th>
+    <th class="question">Câu hỏi</th>
+    <th class="answer">Câu trả lời</th>
+</tr>
+
+<tr>
+    <td class="stt">20</td>
+    <td class="question">Liên hệ hỗ trợ nộp lưu chiểu luận văn, luận án ở đâu?</td>
+    <td class="answer">Liên hệ hỗ trợ tại: <b>Trung tâm Học liệu và Hỗ trợ Học thuật - Trường Đại học Trà Vinh</b><br>
+    - Email: <b>tiepnhanlvla@tvu.edu.vn</b><br>
+    - Điện thoại: <b>(0294) 3855 246 - số nội bộ 385</b><br>
+    - Địa chỉ: <b>Tòa nhà B7 - Khu I, Trường Đại học Trà Vinh</b></td>
+</tr>
+
+<tr>
+    <td class="stt">21</td>
+    <td class="question">Số điện thoại hỗ trợ nộp lưu chiểu luận văn là gì?</td>
+    <td class="answer">Số điện thoại hỗ trợ: <b>(0294) 3855 246 - số nội bộ 385</b> (Trung tâm Học liệu và Hỗ trợ Học thuật, Trường Đại học Trà Vinh).</td>
+</tr>
+
+<tr>
+    <td class="stt">22</td>
+    <td class="question">Địa chỉ nộp lưu chiểu luận văn, luận án trực tiếp ở đâu?</td>
+    <td class="answer">Địa chỉ: <b>Tòa nhà B7 - Khu I, Trường Đại học Trà Vinh</b> (Trung tâm Học liệu và Hỗ trợ Học thuật).</td>
+</tr>
+
+<tr>
+    <td class="stt">23</td>
+    <td class="question">Email nộp lưu chiểu luận văn, luận án là gì?</td>
+    <td class="answer">Email nộp lưu chiểu: <b>tiepnhanlvla@tvu.edu.vn</b> (Trung tâm Học liệu và Hỗ trợ Học thuật, Trường Đại học Trà Vinh).</td>
+</tr>
+
+<tr>
+    <td class="stt">24</td>
+    <td class="question">Thông báo nộp lưu chiểu luận văn, luận án căn cứ vào văn bản nào?</td>
+    <td class="answer">Căn cứ vào:<br>
+    - Thông báo 3630/TB-ĐHTV, ngày 01/11/2021 của Hiệu trưởng Trường Đại học Trà Vinh về việc nộp luận văn thạc sĩ, luận án tiến sĩ sau bảo vệ.<br>
+    - Thông báo số 3356/TB-ĐHTV, ngày 05/9/2025 của Hiệu trưởng Trường Đại học Trà Vinh (thay thế/bổ sung quy định mới).</td>
+</tr>
+
+</table>
+
+<br>
+<p style="text-align: center; color: #999; font-size: 10pt; margin-top: 30pt; border-top: 1px solid #ccc; padding-top: 10pt;">
+    Tài liệu được xử lý từ Thông báo số 3356/TB-ĐHTV ngày 05/9/2025 — Tổng cộng <b>24 câu hỏi</b> chia thành <b>5 nhóm chủ đề</b>
+</p>
+
+</body>
+</html>

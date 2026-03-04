@@ -51,12 +51,18 @@ class AuthController extends BaseController
             exit;
         }
 
+        // Nâng kích thước ảnh Google từ 96px lên 400px
+        $avatarUrl = $userInfo['picture'] ?? '';
+        if ($avatarUrl && strpos($avatarUrl, '=s96-c') !== false) {
+            $avatarUrl = str_replace('=s96-c', '=s400-c', $avatarUrl);
+        }
+
         // Upsert admin
         $adminId = $this->adminModel->upsertFromGoogle([
             'google_id' => $userInfo['sub'],
             'email' => $userInfo['email'],
             'full_name' => $userInfo['name'],
-            'avatar_url' => $userInfo['picture'] ?? '',
+            'avatar_url' => $avatarUrl,
         ]);
 
         // Check if admin is active
@@ -84,13 +90,23 @@ class AuthController extends BaseController
     public function check()
     {
         if (isset($_SESSION['admin_id'])) {
+            // Đọc lại avatar từ DB (đảm bảo luôn mới nhất)
+            $avatar = $_SESSION['admin_avatar'] ?? '';
+            if (empty($avatar)) {
+                $admin = $this->adminModel->getById($_SESSION['admin_id']);
+                if ($admin && !empty($admin['avatar_url'])) {
+                    $avatar = $admin['avatar_url'];
+                    $_SESSION['admin_avatar'] = $avatar;
+                }
+            }
+
             $this->json([
                 'authenticated' => true,
                 'admin' => [
                     'id' => $_SESSION['admin_id'],
                     'email' => $_SESSION['admin_email'],
                     'name' => $_SESSION['admin_name'],
-                    'avatar' => $_SESSION['admin_avatar'],
+                    'avatar' => $avatar,
                     'role' => $_SESSION['admin_role'],
                 ],
             ]);
@@ -117,6 +133,9 @@ class AuthController extends BaseController
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_POSTFIELDS => http_build_query([
                 'code' => $code,
                 'client_id' => GOOGLE_CLIENT_ID,
@@ -126,6 +145,9 @@ class AuthController extends BaseController
             ]),
         ]);
         $response = curl_exec($ch);
+        if (curl_errno($ch)) {
+            error_log('Google OAuth exchangeCode cURL error: ' . curl_error($ch));
+        }
         curl_close($ch);
         return json_decode($response, true);
     }
@@ -138,9 +160,15 @@ class AuthController extends BaseController
         $ch = curl_init('https://www.googleapis.com/oauth2/v3/userinfo');
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_HTTPHEADER => ["Authorization: Bearer $accessToken"],
         ]);
         $response = curl_exec($ch);
+        if (curl_errno($ch)) {
+            error_log('Google OAuth getUserInfo cURL error: ' . curl_error($ch));
+        }
         curl_close($ch);
         return json_decode($response, true);
     }

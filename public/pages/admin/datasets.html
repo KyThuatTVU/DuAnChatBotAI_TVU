@@ -58,7 +58,7 @@
             <!-- Admin Profile -->
             <div style="padding:14px 20px;border-top:1px solid rgba(255,255,255,.1)">
                 <div class="flex items-center gap-3">
-                    <img id="sidebarAdminAvatar" src="" alt="" class="w-9 h-9 rounded-full border-2 border-sky-400 object-cover" style="min-width:36px">
+                    <img id="sidebarAdminAvatar" src="" alt="" class="w-9 h-9 rounded-full border-2 border-sky-400 object-cover" style="min-width:36px" referrerpolicy="no-referrer" crossorigin="anonymous">
                     <div style="overflow:hidden">
                         <p id="sidebarAdminName" class="text-sm font-semibold text-white" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></p>
                         <p class="text-xs text-slate-400">Quản trị viên</p>
@@ -74,13 +74,39 @@
         <div class="admin-content">
             <div class="admin-header">
                 <div>
-                    <h1>Tải bộ dữ liệu</h1>
-                    <p class="text-sm text-gray-500 mt-1">Import câu hỏi từ file Word (.docx) hoặc PDF</p>
+                    <h1>Tải dữ liệu & Tạo câu hỏi tự động</h1>
+                    <p class="text-sm text-gray-500 mt-1">Upload file Word (.docx) — hệ thống tự động phân tích và tạo bộ câu hỏi Q&A</p>
+                </div>
+            </div>
+
+            <!-- How it works -->
+            <div class="bg-gradient-to-r from-sky-50 to-blue-50 rounded-xl border border-sky-200 p-6 mb-6">
+                <h2 class="text-base font-semibold text-sky-800 mb-3">Quy trình hoạt động</h2>
+                <div class="flex items-start gap-6">
+                    <div class="flex items-center gap-2 text-sm">
+                        <span class="w-7 h-7 bg-sky-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                        <span class="text-gray-700">Upload file Word</span>
+                    </div>
+                    <svg class="w-5 h-5 text-sky-400 flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <div class="flex items-center gap-2 text-sm">
+                        <span class="w-7 h-7 bg-sky-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                        <span class="text-gray-700">Hệ thống đọc & phân tích nội dung</span>
+                    </div>
+                    <svg class="w-5 h-5 text-sky-400 flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <div class="flex items-center gap-2 text-sm">
+                        <span class="w-7 h-7 bg-sky-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                        <span class="text-gray-700">Tự động tạo Q&A</span>
+                    </div>
+                    <svg class="w-5 h-5 text-sky-400 flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <div class="flex items-center gap-2 text-sm">
+                        <span class="w-7 h-7 bg-green-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">4</span>
+                        <span class="text-gray-700">Bạn chỉnh sửa tùy ý</span>
+                    </div>
                 </div>
             </div>
 
             <!-- Upload Area -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-6">
                 <div class="border-2 border-dashed border-gray-300 rounded-xl p-10 text-center hover:border-sky-400 transition" 
                      id="dropZone"
                      ondragover="event.preventDefault(); this.classList.add('border-sky-400','bg-sky-50')"
@@ -89,13 +115,13 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                     </svg>
-                    <p class="text-gray-500 mb-2">Kéo thả file vào đây hoặc</p>
+                    <p class="text-gray-500 mb-2">Kéo thả file Word vào đây hoặc</p>
                     <label class="btn-primary cursor-pointer inline-flex">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-                        Chọn file
-                        <input type="file" id="fileInput" class="hidden" accept=".doc,.docx,.pdf" onchange="handleFileSelect(event)">
+                        Chọn file Word
+                        <input type="file" id="fileInput" class="hidden" accept=".doc,.docx" onchange="handleFileSelect(event)">
                     </label>
-                    <p class="text-xs text-gray-400 mt-3">Hỗ trợ: .doc, .docx, .pdf (Tối đa 10MB)</p>
+                    <p class="text-xs text-gray-400 mt-3">Hỗ trợ: .doc, .docx (Tối đa 10MB)</p>
                 </div>
 
                 <!-- Upload progress -->
@@ -111,30 +137,58 @@
                         <div id="uploadBar" class="bg-sky-600 h-2 rounded-full transition-all" style="width: 0%"></div>
                     </div>
                 </div>
+
+                <!-- Upload Result -->
+                <div id="uploadResult" class="hidden mt-6"></div>
             </div>
 
-            <!-- Format Guide -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-                <h2 class="text-lg font-semibold mb-4">Hướng dẫn định dạng file</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="p-4 bg-blue-50 rounded-lg">
-                        <h3 class="font-semibold text-blue-700 mb-2">📄 File Word (.docx)</h3>
-                        <p class="text-sm text-gray-600 mb-2">Mỗi cặp Q&A viết theo định dạng:</p>
-                        <div class="bg-white p-3 rounded text-sm font-mono text-gray-700">
-                            <p><strong>Q:</strong> Câu hỏi ở đây?</p>
-                            <p><strong>A:</strong> Câu trả lời ở đây.</p>
-                            <p class="text-gray-400 mt-1">---</p>
-                            <p><strong>Q:</strong> Câu hỏi tiếp theo?</p>
-                            <p><strong>A:</strong> Câu trả lời tiếp theo.</p>
-                        </div>
+            <!-- Generated Q&A Preview -->
+            <div id="qaPreviewSection" class="hidden mb-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold">Câu hỏi đã tạo tự động</h2>
+                        <a href="questions.html?source=word" class="btn-primary text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            Chỉnh sửa tại Quản lý câu hỏi
+                        </a>
                     </div>
-                    <div class="p-4 bg-red-50 rounded-lg">
-                        <h3 class="font-semibold text-red-700 mb-2">📕 File PDF</h3>
-                        <p class="text-sm text-gray-600 mb-2">Tương tự file Word, sử dụng định dạng Q: và A:</p>
-                        <div class="bg-white p-3 rounded text-sm font-mono text-gray-700">
-                            <p><strong>Q:</strong> Thư viện mở cửa mấy giờ?</p>
-                            <p><strong>A:</strong> Thư viện mở cửa từ 7:30 - 21:00, thứ 2 đến thứ 7.</p>
+                    <div id="qaPreviewList" class="space-y-3 max-h-[500px] overflow-y-auto"></div>
+                </div>
+            </div>
+
+            <!-- Format Tips -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                <h2 class="text-lg font-semibold mb-4">Mẹo để có kết quả tốt nhất</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="p-4 bg-green-50 rounded-lg">
+                        <h3 class="font-semibold text-green-700 mb-2 text-sm">Cách 1: Văn bản có cấu trúc</h3>
+                        <div class="bg-white p-3 rounded text-xs text-gray-700 space-y-1">
+                            <p class="font-bold">Điều 1. Phạm vi áp dụng</p>
+                            <p>Nội quy này áp dụng cho...</p>
+                            <p class="font-bold mt-2">Điều 2. Giờ mở cửa</p>
+                            <p>Thư viện mở cửa từ 7h30...</p>
                         </div>
+                        <p class="text-xs text-green-600 mt-2">Hệ thống tự nhận diện Điều/Chương/Mục</p>
+                    </div>
+                    <div class="p-4 bg-blue-50 rounded-lg">
+                        <h3 class="font-semibold text-blue-700 mb-2 text-sm">Cách 2: Q&A có sẵn</h3>
+                        <div class="bg-white p-3 rounded text-xs text-gray-700 space-y-1">
+                            <p><strong>Q:</strong> Thư viện mở cửa mấy giờ?</p>
+                            <p><strong>A:</strong> Từ 7h30 đến 21h00</p>
+                            <p class="mt-2"><strong>Hỏi:</strong> Mượn sách thế nào?</p>
+                            <p><strong>Đáp:</strong> Dùng thẻ sinh viên...</p>
+                        </div>
+                        <p class="text-xs text-blue-600 mt-2">Tự nhận Q:/A:, Hỏi:/Đáp:, Câu hỏi:/Trả lời:</p>
+                    </div>
+                    <div class="p-4 bg-amber-50 rounded-lg">
+                        <h3 class="font-semibold text-amber-700 mb-2 text-sm">Cách 3: Văn bản tự do</h3>
+                        <div class="bg-white p-3 rounded text-xs text-gray-700 space-y-1">
+                            <p class="font-bold">I. Giới thiệu chung</p>
+                            <p>Trung tâm Học liệu là...</p>
+                            <p class="font-bold mt-2">II. Dịch vụ thư viện</p>
+                            <p>Cung cấp các dịch vụ...</p>
+                        </div>
+                        <p class="text-xs text-amber-600 mt-2">Nhận heading I./II./1./2. hoặc chia đoạn</p>
                     </div>
                 </div>
             </div>
@@ -146,11 +200,11 @@
                     <thead>
                         <tr>
                             <th>Tên file</th>
-                            <th>Loại</th>
                             <th>Kích thước</th>
-                            <th>Số câu hỏi</th>
+                            <th>Số câu hỏi tạo</th>
                             <th>Trạng thái</th>
                             <th>Ngày tải</th>
+                            <th>Thao tác</th>
                         </tr>
                     </thead>
                     <tbody id="datasetsBody">
@@ -165,6 +219,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             await loadAdminPage('datasets');
+            loadDatasets();
         });
     </script>
 </body>

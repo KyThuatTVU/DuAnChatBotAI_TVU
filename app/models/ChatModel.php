@@ -51,11 +51,26 @@ class ChatModel extends BaseModel
      */
     public function saveUnanswered($sessionId, $questionText)
     {
-        $stmt = $this->db->prepare(
-            "INSERT INTO unanswered_questions (session_id, question_text) VALUES (?, ?)
-             ON DUPLICATE KEY UPDATE frequency = frequency + 1"
+        // Kiểm tra xem đã có câu hỏi tương tự chưa (so sánh text)
+        $check = $this->db->prepare(
+            "SELECT id, frequency FROM unanswered_questions WHERE question_text = ? LIMIT 1"
         );
-        $stmt->execute([$sessionId, $questionText]);
+        $check->execute([$questionText]);
+        $existing = $check->fetch();
+
+        if ($existing) {
+            // Đã có → tăng frequency
+            $update = $this->db->prepare(
+                "UPDATE unanswered_questions SET frequency = frequency + 1, session_id = ?, updated_at = NOW() WHERE id = ?"
+            );
+            $update->execute([$sessionId, $existing['id']]);
+        } else {
+            // Chưa có → thêm mới
+            $insert = $this->db->prepare(
+                "INSERT INTO unanswered_questions (session_id, question_text, frequency) VALUES (?, ?, 1)"
+            );
+            $insert->execute([$sessionId, $questionText]);
+        }
     }
 
     /**
