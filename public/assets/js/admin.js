@@ -26,10 +26,19 @@ async function loadAdminPage(pageName) {
     if (!admin) return;
 
     // Điền thông tin admin vào header
+    const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(admin.name)}&background=0369a1&color=fff&rounded=true`;
+    const avatarSrc = admin.avatar || fallbackAvatar;
+
     const avatarEl = document.getElementById('dashAdminAvatar');
-    if (avatarEl) avatarEl.src = admin.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(admin.name)}&background=0369a1&color=fff&rounded=true`;
+    if (avatarEl) avatarEl.src = avatarSrc;
     const nameEl = document.getElementById('dashAdminName');
     if (nameEl) nameEl.textContent = admin.name;
+
+    // Điền thông tin admin vào sidebar
+    const sidebarAvatar = document.getElementById('sidebarAdminAvatar');
+    if (sidebarAvatar) sidebarAvatar.src = avatarSrc;
+    const sidebarName = document.getElementById('sidebarAdminName');
+    if (sidebarName) sidebarName.textContent = admin.name;
 }
 
 // ==================== DASHBOARD ====================
