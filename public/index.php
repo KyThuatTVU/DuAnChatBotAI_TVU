@@ -38,5 +38,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+// Nếu không phải API request → redirect sang trang chatbot
+if (!isset($_GET['url']) || strpos($_GET['url'], 'api') !== 0) {
+    header('Location: ' . BASE_URL . '/pages/index.html');
+    exit;
+}
+
 // Initialize App (Router)
 $app = new App();

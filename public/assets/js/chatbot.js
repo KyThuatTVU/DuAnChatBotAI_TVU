@@ -269,5 +269,5 @@ async function logout() {
     try {
         await fetch(`${API_BASE}/auth/logout`);
     } catch (e) {}
-    window.location.href = '/DuAnChatbotThuVien/public/pages/chatbot.html';
+    window.location.href = '/DuAnChatbotThuVien/public/pages/index.html';
 }
