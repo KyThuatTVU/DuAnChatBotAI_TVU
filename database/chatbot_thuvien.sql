@@ -14,16 +14,25 @@ USE chatbot_thuvien;
 -- =====================================================
 CREATE TABLE admins (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    google_id VARCHAR(255) NOT NULL UNIQUE COMMENT 'Google OAuth ID',
+    google_id VARCHAR(255) NULL UNIQUE COMMENT 'Google OAuth ID',
     email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NULL COMMENT 'Mật khẩu băm (bcrypt) – NULL nếu chỉ dùng Google',
     full_name VARCHAR(255) NOT NULL,
     avatar_url TEXT NULL COMMENT 'Ảnh đại diện từ Google',
     role ENUM('super_admin', 'admin', 'editor') NOT NULL DEFAULT 'admin' COMMENT 'Phân quyền',
     is_active TINYINT(1) NOT NULL DEFAULT 1,
+    reset_token VARCHAR(255) NULL COMMENT 'Token đặt lại mật khẩu',
+    reset_token_expiry DATETIME NULL COMMENT 'Hạn token đặt lại mật khẩu',
     last_login DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB COMMENT='Bảng quản trị viên - đăng nhập bằng Google';
+) ENGINE=InnoDB COMMENT='Bảng quản trị viên - đăng nhập bằng Google hoặc Email';
+
+-- Migration: Thêm cột password và reset_token cho bảng admins đã tồn tại
+-- ALTER TABLE admins MODIFY google_id VARCHAR(255) NULL;
+-- ALTER TABLE admins ADD COLUMN password VARCHAR(255) NULL AFTER email;
+-- ALTER TABLE admins ADD COLUMN reset_token VARCHAR(255) NULL AFTER is_active;
+-- ALTER TABLE admins ADD COLUMN reset_token_expiry DATETIME NULL AFTER reset_token;
 
 -- =====================================================
 -- 2. BẢNG DANH MỤC CÂU HỎI

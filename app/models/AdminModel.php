@@ -59,4 +59,54 @@ class AdminModel extends BaseModel
     {
         $this->update($id, ['last_login' => date('Y-m-d H:i:s')]);
     }
+
+    /**
+     * Cập nhật mật khẩu
+     */
+    public function updatePassword($id, $hashedPassword)
+    {
+        return $this->update($id, ['password' => $hashedPassword]);
+    }
+
+    /**
+     * Tạo token đặt lại mật khẩu (hết hạn sau 30 phút)
+     */
+    public function createResetToken($email)
+    {
+        $admin = $this->findByEmail($email);
+        if (!$admin) return null;
+
+        $token = bin2hex(random_bytes(32));
+        $expiry = date('Y-m-d H:i:s', strtotime('+30 minutes'));
+
+        $this->update($admin['id'], [
+            'reset_token' => $token,
+            'reset_token_expiry' => $expiry,
+        ]);
+
+        return ['token' => $token, 'admin' => $admin];
+    }
+
+    /**
+     * Tìm admin theo reset token (còn hạn)
+     */
+    public function findByResetToken($token)
+    {
+        $stmt = $this->db->prepare(
+            "SELECT * FROM {$this->table} WHERE reset_token = ? AND reset_token_expiry > NOW()"
+        );
+        $stmt->execute([$token]);
+        return $stmt->fetch();
+    }
+
+    /**
+     * Xóa reset token
+     */
+    public function clearResetToken($id)
+    {
+        return $this->update($id, [
+            'reset_token' => null,
+            'reset_token_expiry' => null,
+        ]);
+    }
 }

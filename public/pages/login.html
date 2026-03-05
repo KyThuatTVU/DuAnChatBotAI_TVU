@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Đăng nhập - CELRAS TVU Chatbot</title>
-    <!-- Tailwind CDN: viết class trực tiếp vào HTML -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -12,6 +11,11 @@
     <link rel="stylesheet" href="/DuAnChatbotThuVien/public/assets/css/loading.css">
     <style>
         body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+        .login-input { display:block; width:100%; padding:10px 14px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; color:#111827; background:#fff; outline:none; transition:border .15s; font-family:inherit; }
+        .login-input:focus { border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.12); }
+        .login-input::placeholder { color:#9ca3af; }
+        .pwd-toggle { position:absolute; right:12px; top:50%; transform:translateY(-50%); cursor:pointer; color:#9ca3af; }
+        .pwd-toggle:hover { color:#6b7280; }
     </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-sky-100 via-blue-50 to-cyan-100 flex items-center justify-center px-4">
@@ -36,34 +40,51 @@
             <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-200 rounded-full opacity-30 blur-3xl"></div>
         </div>
 
-        <!-- Card -->
-        <div class="relative bg-white rounded-2xl shadow-xl p-8 sm:p-10">
+        <!-- ========== PANEL 1: LOGIN ========== -->
+        <div id="panelLogin" class="relative bg-white rounded-2xl shadow-xl p-8 sm:p-10">
             <!-- Logo -->
             <div class="flex flex-col items-center mb-6">
-                <img
-                    src="/DuAnChatbotThuVien/public/assets/images/logo1.png"
-                    alt="CELRAS TVU Logo"
-                    class="w-20 h-20 rounded-full object-cover shadow-md mb-4"
-                    onerror="this.src='https://ui-avatars.com/api/?name=CELRAS+TVU&background=0369a1&color=fff&rounded=true&size=80'"
-                >
-                <!-- Title -->
+                <img src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="CELRAS TVU Logo"
+                     class="w-20 h-20 rounded-full object-cover shadow-md mb-4"
+                     onerror="this.src='https://ui-avatars.com/api/?name=CELRAS+TVU&background=0369a1&color=fff&rounded=true&size=80'">
                 <h1 class="text-2xl font-bold text-blue-700">CELRAS TVU</h1>
-                <p class="text-sm text-gray-500 text-center mt-1">
-                    Hệ thống quản trị Chatbot Thư viện<br>Trung tâm Học liệu và Chuyển đổi số
-                </p>
+                <p class="text-sm text-gray-500 text-center mt-1">Hệ thống quản trị Chatbot Thư viện<br>Trung tâm Học liệu và Chuyển đổi số</p>
             </div>
 
-            <!-- Error message -->
-            <div id="errorMessage" class="hidden bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4 border border-red-200">
-                <span id="errorText"></span>
+            <!-- Error / Success message -->
+            <div id="loginMessage" class="hidden text-sm p-3 rounded-lg mb-4 border"></div>
+
+            <!-- Email + Password Form -->
+            <form id="loginForm" onsubmit="handleEmailLogin(event)" class="mb-4">
+                <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">Email</label>
+                    <input type="email" id="loginEmail" class="login-input" placeholder="admin@example.com" required autocomplete="email">
+                </div>
+                <div class="mb-1 relative">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">Mật khẩu</label>
+                    <input type="password" id="loginPassword" class="login-input pr-10" placeholder="Nhập mật khẩu" required autocomplete="current-password">
+                    <span class="pwd-toggle" onclick="togglePwd('loginPassword', this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    </span>
+                </div>
+                <div class="flex justify-end mb-4">
+                    <button type="button" onclick="showPanel('panelForgot')" class="text-xs text-sky-600 hover:text-sky-800 font-medium">Quên mật khẩu?</button>
+                </div>
+                <button type="submit" id="btnLogin" class="w-full bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white font-semibold py-2.5 rounded-xl transition-colors shadow-sm text-sm">
+                    Đăng nhập
+                </button>
+            </form>
+
+            <!-- Divider -->
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex-1 h-px bg-gray-200"></div>
+                <span class="text-xs text-gray-400 font-medium">hoặc</span>
+                <div class="flex-1 h-px bg-gray-200"></div>
             </div>
 
             <!-- Google Login Button -->
-            <button
-                onclick="loginWithGoogle()"
-                class="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 font-semibold px-5 py-3 rounded-xl transition-all shadow-sm mb-6"
-            >
-                <svg width="22" height="22" viewBox="0 0 24 24">
+            <button onclick="loginWithGoogle()" class="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 font-semibold px-5 py-2.5 rounded-xl transition-all shadow-sm text-sm mb-5">
+                <svg width="20" height="20" viewBox="0 0 24 24">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
                     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
@@ -72,66 +93,280 @@
                 Đăng nhập bằng Google
             </button>
 
-            <!-- Divider -->
-            <div class="flex items-center gap-3 mb-6">
-                <div class="flex-1 h-px bg-gray-200"></div>
-                <span class="text-xs text-gray-400 font-medium">Dành cho quản trị viên</span>
-                <div class="flex-1 h-px bg-gray-200"></div>
-            </div>
-
             <!-- Info -->
-            <div class="text-left space-y-3 text-sm text-gray-500">
-                <div class="flex items-start gap-3 p-3 bg-sky-50 rounded-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-sky-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                    </svg>
-                    <span>Đăng nhập an toàn thông qua tài khoản Google. Chỉ tài khoản được phân quyền mới có thể truy cập hệ thống quản trị.</span>
-                </div>
-                <div class="flex items-start gap-3 p-3 bg-amber-50 rounded-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    <span>Nếu bạn chưa có quyền truy cập, vui lòng liên hệ quản trị viên hệ thống để được cấp quyền.</span>
-                </div>
+            <div class="flex items-start gap-3 p-3 bg-sky-50 rounded-lg text-sm text-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-sky-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <span class="text-xs">Đăng nhập bằng Email hoặc Google. Chỉ tài khoản được phân quyền mới truy cập được.</span>
             </div>
 
             <!-- Back link -->
-            <div class="mt-8">
+            <div class="mt-6">
                 <a href="/DuAnChatbotThuVien/public/pages/index.html" class="text-sm text-sky-600 hover:text-sky-800 flex items-center justify-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-                    </svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                     Quay lại trang Chatbot
                 </a>
+            </div>
+        </div>
+
+        <!-- ========== PANEL 2: FORGOT PASSWORD ========== -->
+        <div id="panelForgot" class="relative bg-white rounded-2xl shadow-xl p-8 sm:p-10 hidden">
+            <div class="flex flex-col items-center mb-6">
+                <div class="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                </div>
+                <h2 class="text-xl font-bold text-gray-800">Quên mật khẩu</h2>
+                <p class="text-sm text-gray-500 text-center mt-1">Nhập email để nhận link đặt lại mật khẩu</p>
+            </div>
+
+            <div id="forgotMessage" class="hidden text-sm p-3 rounded-lg mb-4 border"></div>
+
+            <form id="forgotForm" onsubmit="handleForgotPassword(event)">
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">Email đăng ký</label>
+                    <input type="email" id="forgotEmail" class="login-input" placeholder="admin@example.com" required autocomplete="email">
+                </div>
+                <button type="submit" id="btnForgot" class="w-full bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-semibold py-2.5 rounded-xl transition-colors shadow-sm text-sm mb-3">
+                    Gửi yêu cầu
+                </button>
+            </form>
+
+            <!-- Reset link display (shown when email can't be sent) -->
+            <div id="resetLinkBox" class="hidden bg-sky-50 border border-sky-200 rounded-lg p-3 mb-4">
+                <p class="text-xs font-semibold text-sky-700 mb-1">Link đặt lại mật khẩu:</p>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="resetLinkValue" readonly class="flex-1 text-xs bg-white border border-sky-200 rounded px-2 py-1.5 text-sky-800 font-mono">
+                    <button onclick="copyResetLink()" class="text-xs bg-sky-600 text-white px-3 py-1.5 rounded font-medium hover:bg-sky-700">Sao chép</button>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Link có hiệu lực trong 30 phút.</p>
+            </div>
+
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex-1 h-px bg-gray-200"></div>
+                <span class="text-xs text-gray-400">hoặc</span>
+                <div class="flex-1 h-px bg-gray-200"></div>
+            </div>
+
+            <button onclick="loginWithGoogle()" class="w-full flex items-center justify-center gap-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 font-medium px-4 py-2 rounded-xl transition-all text-sm mb-4">
+                <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                Đăng nhập bằng Google để đặt lại
+            </button>
+
+            <button onclick="showPanel('panelLogin')" class="w-full text-sm text-sky-600 hover:text-sky-800 flex items-center justify-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                Quay lại đăng nhập
+            </button>
+        </div>
+
+        <!-- ========== PANEL 3: RESET PASSWORD (via token) ========== -->
+        <div id="panelReset" class="relative bg-white rounded-2xl shadow-xl p-8 sm:p-10 hidden">
+            <div class="flex flex-col items-center mb-6">
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <h2 class="text-xl font-bold text-gray-800">Đặt lại mật khẩu</h2>
+                <p class="text-sm text-gray-500 text-center mt-1">Tạo mật khẩu mới cho tài khoản</p>
+            </div>
+
+            <div id="resetMessage" class="hidden text-sm p-3 rounded-lg mb-4 border"></div>
+
+            <form id="resetForm" onsubmit="handleResetPassword(event)">
+                <input type="hidden" id="resetToken">
+                <div class="mb-3 relative">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">Mật khẩu mới</label>
+                    <input type="password" id="resetNewPwd" class="login-input pr-10" placeholder="Ít nhất 6 ký tự" required minlength="6" autocomplete="new-password">
+                    <span class="pwd-toggle" onclick="togglePwd('resetNewPwd', this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    </span>
+                </div>
+                <div class="mb-4 relative">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">Xác nhận mật khẩu</label>
+                    <input type="password" id="resetConfirmPwd" class="login-input pr-10" placeholder="Nhập lại mật khẩu" required minlength="6" autocomplete="new-password">
+                    <span class="pwd-toggle" onclick="togglePwd('resetConfirmPwd', this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    </span>
+                </div>
+                <button type="submit" id="btnReset" class="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold py-2.5 rounded-xl transition-colors shadow-sm text-sm">
+                    Đặt lại mật khẩu
+                </button>
+            </form>
+
+            <div class="mt-5">
+                <button onclick="showPanel('panelLogin')" class="w-full text-sm text-sky-600 hover:text-sky-800 flex items-center justify-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                    Quay lại đăng nhập
+                </button>
             </div>
         </div>
     </div>
 
     <script src="/DuAnChatbotThuVien/public/assets/js/auth.js"></script>
     <script>
+        const API = '/DuAnChatbotThuVien/public/index.php?url=api';
+
+        // ========== Panel switching ==========
+        function showPanel(id) {
+            document.querySelectorAll('#panelLogin, #panelForgot, #panelReset').forEach(p => p.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        // ========== Toggle password visibility ==========
+        function togglePwd(inputId, toggleEl) {
+            const input = document.getElementById(inputId);
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            toggleEl.innerHTML = isPassword
+                ? '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"/></svg>'
+                : '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>';
+        }
+
+        // ========== Show message ==========
+        function showMsg(containerId, text, isError = true) {
+            const el = document.getElementById(containerId);
+            el.className = `text-sm p-3 rounded-lg mb-4 border ${isError ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`;
+            el.textContent = text;
+            el.classList.remove('hidden');
+        }
+
+        // ========== Email + Password login ==========
+        async function handleEmailLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnLogin');
+            btn.disabled = true;
+            btn.textContent = 'Đang đăng nhập...';
+
+            try {
+                const res = await fetch(`${API}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: document.getElementById('loginEmail').value.trim(),
+                        password: document.getElementById('loginPassword').value,
+                    }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showMsg('loginMessage', 'Đăng nhập thành công! Đang chuyển hướng...', false);
+                    setTimeout(() => window.location.href = '/DuAnChatbotThuVien/public/pages/admin/dashboard.html', 800);
+                } else {
+                    showMsg('loginMessage', data.error || 'Đăng nhập thất bại');
+                }
+            } catch (err) {
+                showMsg('loginMessage', 'Lỗi kết nối. Vui lòng thử lại.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Đăng nhập';
+            }
+        }
+
+        // ========== Forgot password ==========
+        async function handleForgotPassword(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnForgot');
+            btn.disabled = true;
+            btn.textContent = 'Đang xử lý...';
+
+            try {
+                const res = await fetch(`${API}/auth/forgotPassword`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: document.getElementById('forgotEmail').value.trim() }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showMsg('forgotMessage', data.message, false);
+                    if (data.reset_link) {
+                        document.getElementById('resetLinkValue').value = data.reset_link;
+                        document.getElementById('resetLinkBox').classList.remove('hidden');
+                    }
+                } else {
+                    showMsg('forgotMessage', data.error || 'Có lỗi xảy ra');
+                }
+            } catch (err) {
+                showMsg('forgotMessage', 'Lỗi kết nối. Vui lòng thử lại.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Gửi yêu cầu';
+            }
+        }
+
+        function copyResetLink() {
+            const input = document.getElementById('resetLinkValue');
+            input.select();
+            navigator.clipboard.writeText(input.value).then(() => {
+                showMsg('forgotMessage', 'Đã sao chép link!', false);
+            });
+        }
+
+        // ========== Reset password ==========
+        async function handleResetPassword(e) {
+            e.preventDefault();
+            const newPwd = document.getElementById('resetNewPwd').value;
+            const confirmPwd = document.getElementById('resetConfirmPwd').value;
+
+            if (newPwd.length < 6) {
+                showMsg('resetMessage', 'Mật khẩu phải có ít nhất 6 ký tự');
+                return;
+            }
+            if (newPwd !== confirmPwd) {
+                showMsg('resetMessage', 'Xác nhận mật khẩu không khớp');
+                return;
+            }
+
+            const btn = document.getElementById('btnReset');
+            btn.disabled = true;
+            btn.textContent = 'Đang xử lý...';
+
+            try {
+                const res = await fetch(`${API}/auth/resetPassword`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: document.getElementById('resetToken').value,
+                        new_password: newPwd,
+                        confirm_password: confirmPwd,
+                    }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showMsg('resetMessage', data.message + ' Đang chuyển...', false);
+                    setTimeout(() => showPanel('panelLogin'), 2000);
+                } else {
+                    showMsg('resetMessage', data.error || 'Có lỗi xảy ra');
+                }
+            } catch (err) {
+                showMsg('resetMessage', 'Lỗi kết nối. Vui lòng thử lại.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Đặt lại mật khẩu';
+            }
+        }
+
+        // ========== Init ==========
         document.addEventListener('DOMContentLoaded', () => {
-            // Check for error in URL
             const params = new URLSearchParams(window.location.search);
+
+            // Check reset token in URL
+            const resetToken = params.get('reset_token');
+            if (resetToken) {
+                document.getElementById('resetToken').value = resetToken;
+                showPanel('panelReset');
+            }
+
+            // Check error from Google OAuth
             const error = params.get('error');
             if (error) {
                 const errorMessages = {
                     'no_code': 'Không nhận được mã xác thực từ Google.',
                     'token_failed': 'Không thể lấy token từ Google. Vui lòng thử lại.',
                     'user_info_failed': 'Không thể lấy thông tin người dùng từ Google.',
-                    'inactive': 'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.',
+                    'inactive': 'Tài khoản của bạn đã bị vô hiệu hóa.',
                 };
-                showError(errorMessages[error] || 'Đã có lỗi xảy ra. Vui lòng thử lại.');
+                showMsg('loginMessage', errorMessages[error] || 'Đã có lỗi xảy ra.');
             }
 
             // Check if already logged in
             checkAuthAndRedirect();
         });
-
-        function showError(message) {
-            const el = document.getElementById('errorMessage');
-            document.getElementById('errorText').textContent = message;
-            el.classList.remove('hidden');
-        }
     </script>
     <script src="/DuAnChatbotThuVien/public/assets/js/loading.js"></script>
 </body>
