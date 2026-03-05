@@ -24,25 +24,16 @@ class QuestionModel extends BaseModel
      */
     public function findAnswer($userMessage)
     {
-        // 1. Tìm chính xác bằng FULLTEXT
-        $sql = "SELECT q.*, MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE) as relevance
-                FROM {$this->table} q 
-                WHERE q.is_active = 1 
-                AND MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE)
-                ORDER BY relevance DESC 
-                LIMIT 1";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$userMessage, $userMessage]);
-        $result = $stmt->fetch();
+        $messageLength = mb_strlen(trim($userMessage));
 
-        if ($result && $result['relevance'] > 0) {
-            return $result;
+        // 0. Tin nhắn quá ngắn (< 2 ký tự) → không tìm
+        if ($messageLength < 2) {
+            return false;
         }
 
-        // 2. Tìm bằng từ khóa
-        $sql = "SELECT q.* FROM {$this->table} q
-                INNER JOIN keywords k ON q.id = k.question_id
-                WHERE q.is_active = 1 AND LOWER(?) LIKE CONCAT('%', LOWER(k.keyword), '%')
+        // 1. Tìm chính xác (exact match) - so khớp toàn bộ câu hỏi
+        $sql = "SELECT * FROM {$this->table} 
+                WHERE is_active = 1 AND LOWER(TRIM(question_text)) = LOWER(TRIM(?))
                 LIMIT 1";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$userMessage]);
@@ -52,16 +43,59 @@ class QuestionModel extends BaseModel
             return $result;
         }
 
-        // 3. Tìm bằng LIKE
-        $sql = "SELECT * FROM {$this->table} 
-                WHERE is_active = 1 AND (
-                    LOWER(question_text) LIKE CONCAT('%', LOWER(?), '%')
-                    OR LOWER(?) LIKE CONCAT('%', LOWER(question_text), '%')
-                )
+        // 2. Tìm bằng FULLTEXT (chỉ khi tin nhắn đủ dài cho FULLTEXT - tối thiểu 3 ký tự)
+        if ($messageLength >= 3) {
+            $sql = "SELECT q.*, MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE) as relevance
+                    FROM {$this->table} q 
+                    WHERE q.is_active = 1 
+                    AND MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE)
+                    HAVING relevance > 0.5
+                    ORDER BY relevance DESC 
+                    LIMIT 1";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$userMessage, $userMessage]);
+            $result = $stmt->fetch();
+
+            if ($result && $result['relevance'] > 0.5) {
+                return $result;
+            }
+        }
+
+        // 3. Tìm bằng từ khóa (keyword phải >= 3 ký tự để tránh match sai)
+        $sql = "SELECT q.*, k.keyword FROM {$this->table} q
+                INNER JOIN keywords k ON q.id = k.question_id
+                WHERE q.is_active = 1 
+                AND CHAR_LENGTH(k.keyword) >= 3
+                AND LOWER(?) LIKE CONCAT('%', LOWER(k.keyword), '%')
+                ORDER BY CHAR_LENGTH(k.keyword) DESC
                 LIMIT 1";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$userMessage, $userMessage]);
-        return $stmt->fetch();
+        $stmt->execute([$userMessage]);
+        $result = $stmt->fetch();
+
+        if ($result) {
+            return $result;
+        }
+
+        // 4. Tìm bằng LIKE - chỉ khi tin nhắn đủ dài (>= 6 ký tự) để tránh match quá rộng
+        if ($messageLength >= 6) {
+            $sql = "SELECT * FROM {$this->table} 
+                    WHERE is_active = 1 AND (
+                        LOWER(question_text) LIKE CONCAT('%', LOWER(?), '%')
+                        OR LOWER(?) LIKE CONCAT('%', LOWER(question_text), '%')
+                    )
+                    LIMIT 1";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$userMessage, $userMessage]);
+            $result = $stmt->fetch();
+
+            if ($result) {
+                return $result;
+            }
+        }
+
+        // Không tìm thấy câu trả lời phù hợp
+        return false;
     }
 
     /**

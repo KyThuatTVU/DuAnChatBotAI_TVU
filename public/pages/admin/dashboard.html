@@ -7,6 +7,7 @@
     <!-- Tailwind CDN: viết class trực tiếp vào HTML -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/DuAnChatbotThuVien/public/assets/css/loading.css">
     <style>
         body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif}
         .admin-layout{min-height:100vh}
@@ -61,6 +62,19 @@
     </style>
 </head>
 <body class="bg-gray-50">
+
+    <!-- ===== PAGE LOADER ===== -->
+    <div id="page-loader">
+        <div class="loader-spinner-wrap">
+            <div class="loader-spinner"></div>
+            <img class="loader-logo-img" src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="CELRAS TVU"
+                 onerror="this.src='https://ui-avatars.com/api/?name=CELRAS+TVU&background=0369a1&color=fff&rounded=true&size=80'">
+        </div>
+        <div class="loader-brand">CELRAS TVU</div>
+        <div class="loader-tagline">Trung tâm Học liệu và Hỗ trợ Học thuật<br>Đại học Trà Vinh</div>
+        <div class="loader-dots"><span></span><span></span><span></span></div>
+        <div class="loader-bar-wrap"><div class="loader-bar"></div></div>
+    </div>
 
     <div class="admin-layout">
         <!-- Sidebar -->
@@ -203,6 +217,7 @@
         </div>
     </div>
 
+    <script src="/DuAnChatbotThuVien/public/assets/js/loading.js"></script>
     <script src="/DuAnChatbotThuVien/public/assets/js/admin.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {

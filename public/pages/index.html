@@ -16,6 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" href="/DuAnChatbotThuVien/public/assets/images/logo.png" type="image/png">
+    <link rel="stylesheet" href="/DuAnChatbotThuVien/public/assets/css/loading.css">
 
     <style>
         /* ===== Style cho các phần tử do JS inject động ===== */
@@ -75,6 +76,19 @@
 
 <body class="bg-gradient-to-br from-sky-100 via-blue-50 to-cyan-100 min-h-screen flex flex-col">
 
+    <!-- ===== PAGE LOADER ===== -->
+    <div id="page-loader">
+        <div class="loader-spinner-wrap">
+            <div class="loader-spinner"></div>
+            <img class="loader-logo-img" src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="CELRAS TVU"
+                 onerror="this.src='https://ui-avatars.com/api/?name=CELRAS+TVU&background=0369a1&color=fff&rounded=true&size=80'">
+        </div>
+        <div class="loader-brand">CELRAS TVU</div>
+        <div class="loader-tagline">Trung tâm Học liệu và Hỗ trợ Học thuật<br>Đại học Trà Vinh</div>
+        <div class="loader-dots"><span></span><span></span><span></span></div>
+        <div class="loader-bar-wrap"><div class="loader-bar"></div></div>
+    </div>
+
     <!-- ===== HEADER ===== -->
     <header class="bg-white shadow-sm fixed top-0 left-0 right-0 z-50 h-16">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 h-full flex items-center justify-between">
@@ -102,7 +116,7 @@
 
             <!-- Phải: Link trang chủ + Đăng nhập / Avatar user -->
             <div class="flex items-center gap-3">
-                <a href="#" class="text-gray-500 hover:text-gray-800 text-sm font-medium hidden sm:inline transition-colors">
+                <a href="https://celri.tvu.edu.vn/" class="text-gray-500 hover:text-gray-800 text-sm font-medium hidden sm:inline transition-colors">
                     Trở về trang chủ
                 </a>
             </div>
@@ -205,6 +219,7 @@
 
 
     <!-- ===== SCRIPTS ===== -->
+    <script src="/DuAnChatbotThuVien/public/assets/js/loading.js"></script>
     <script src="/DuAnChatbotThuVien/public/assets/js/chatbot.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
