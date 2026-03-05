@@ -124,6 +124,7 @@ async function sendMessage() {
         if (data.success) {
             sessionToken = data.session_token;
             localStorage.setItem('chat_session', sessionToken);
+            console.log('Chat response forms:', data.forms);
             appendMessage('bot', data.reply, data.forms || []);
         } else {
             appendMessage('bot', data.error || 'Đã có lỗi xảy ra. Vui lòng thử lại.');
@@ -163,21 +164,17 @@ function appendMessage(sender, text, forms = []) {
     let formsHtml = '';
     if (sender === 'bot' && forms && forms.length > 0) {
         formsHtml = `
-            <div class="mt-3 flex flex-col gap-2">
+            <div class="form-links">
                 ${forms.map(f => `
-                <a href="${escapeHtml(f.url)}" target="_blank" rel="noopener noreferrer"
-                   class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-sky-200
-                          bg-sky-50 hover:bg-sky-100 text-sky-700 text-sm font-medium transition-colors
-                          shadow-sm group">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 flex-shrink-0 text-sky-500" fill="none"
-                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <a href="${escapeHtml(f.url)}" target="_blank" rel="noopener noreferrer" class="form-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586
                                  a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
-                    <span class="flex-1">${escapeHtml(f.name)}</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-sky-400 group-hover:text-sky-600 flex-shrink-0" fill="none"
-                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <span>${escapeHtml(f.name)}</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                         style="width:14px;height:14px;flex-shrink:0;opacity:0.6">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
                     </svg>
                 </a>`).join('')}

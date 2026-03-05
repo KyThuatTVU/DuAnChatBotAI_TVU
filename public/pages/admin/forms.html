@@ -133,11 +133,10 @@
                     <div class="relative flex-1 max-w-sm">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         <input id="formSearch" type="text" placeholder="Tìm kiếm biểu mẫu..."
-                               class="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm w-full focus:outline-none focus:border-sky-400"
-                               oninput="filterForms()">
+                               class="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm w-full focus:outline-none focus:border-sky-400">
                     </div>
                 </div>
-                <button onclick="openFormModal()" class="btn-primary flex-shrink-0">
+                <button id="btnAddForm" class="btn-primary flex-shrink-0">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                     Thêm biểu mẫu
                 </button>
@@ -167,15 +166,15 @@
     </div><!-- /admin-layout -->
 
     <!-- ===== MODAL THÊM / SỬA BIỂU MẪU ===== -->
-    <div id="formModal" class="modal-overlay" onclick="if(event.target===this)closeFormModal()">
+    <div id="formModal" class="modal-overlay">
         <div class="modal">
             <div class="flex items-center justify-between mb-6">
                 <h2 id="formModalTitle" class="text-lg font-bold text-gray-800">Thêm biểu mẫu mới</h2>
-                <button onclick="closeFormModal()" class="text-gray-400 hover:text-gray-600">
+                <button id="btnCloseFormX" class="text-gray-400 hover:text-gray-600">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <form onsubmit="saveForm(event)">
+            <form id="formForm">
                 <input type="hidden" id="formId">
 
                 <div class="form-group">
@@ -211,7 +210,7 @@
                 </div>
 
                 <div class="flex gap-3 justify-end mt-6">
-                    <button type="button" onclick="closeFormModal()" class="btn-outline">Huỷ</button>
+                    <button type="button" id="btnCloseFormCancel" class="btn-outline">Huỷ</button>
                     <button type="submit" class="btn-primary">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                         Lưu biểu mẫu
@@ -222,11 +221,38 @@
     </div>
 
     <script src="/DuAnChatbotThuVien/public/assets/js/loading.js"></script>
-    <script src="/DuAnChatbotThuVien/public/assets/js/admin.js"></script>
+    <script src="/DuAnChatbotThuVien/public/assets/js/admin.js?v=20260305"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
+            // Chờ admin.js load xong
+            if (typeof loadAdminPage !== 'function') {
+                console.error('admin.js chưa load xong');
+                return;
+            }
             await loadAdminPage('forms');
-            loadForms();
+
+            if (typeof loadForms === 'function') {
+                loadForms();
+            }
+
+            // Gán sự kiện sau khi admin.js đã load
+            var btnAdd = document.getElementById('btnAddForm');
+            if (btnAdd) btnAdd.addEventListener('click', function() { openFormModal(); });
+
+            var searchInput = document.getElementById('formSearch');
+            if (searchInput) searchInput.addEventListener('input', function() { filterForms(); });
+
+            var modal = document.getElementById('formModal');
+            if (modal) modal.addEventListener('click', function(e) { if (e.target === this) closeFormModal(); });
+
+            var btnCloseX = document.getElementById('btnCloseFormX');
+            if (btnCloseX) btnCloseX.addEventListener('click', function() { closeFormModal(); });
+
+            var btnCancel = document.getElementById('btnCloseFormCancel');
+            if (btnCancel) btnCancel.addEventListener('click', function() { closeFormModal(); });
+
+            var formEl = document.getElementById('formForm');
+            if (formEl) formEl.addEventListener('submit', function(e) { saveForm(e); });
         });
     </script>
 </body>

@@ -839,6 +839,16 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// Đảm bảo các hàm forms có thể truy cập từ toàn cục
+window.loadForms      = loadForms;
+window.renderForms    = renderForms;
+window.filterForms    = filterForms;
+window.openFormModal  = openFormModal;
+window.closeFormModal = closeFormModal;
+window.editForm       = editForm;
+window.saveForm       = saveForm;
+window.deleteForm     = deleteForm;
+
 /**
  * Escape cho attribute onclick - trả về chuỗi JSON an toàn
  */
