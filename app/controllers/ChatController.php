@@ -6,12 +6,14 @@ class ChatController extends BaseController
     private $questionModel;
     private $chatModel;
     private $settingModel;
+    private $formModel;
 
     public function __construct()
     {
         $this->questionModel = $this->model('QuestionModel');
-        $this->chatModel = $this->model('ChatModel');
-        $this->settingModel = $this->model('SettingModel');
+        $this->chatModel     = $this->model('ChatModel');
+        $this->settingModel  = $this->model('SettingModel');
+        $this->formModel     = $this->model('FormModel');
     }
 
     /**
@@ -72,9 +74,15 @@ class ChatController extends BaseController
         $answer = $this->questionModel->findAnswer($message);
         $settings = $this->settingModel->getPublicSettings();
 
+        // Tìm biểu mẫu liên quan
+        $matchedForms = $this->formModel->findMatchingForms($message);
+
         if ($answer) {
             $botReply = $answer['answer_text'];
             $this->chatModel->saveMessage($session['id'], 'bot', $botReply, $answer['id'], 1.0);
+        } elseif (!empty($matchedForms)) {
+            $botReply = 'Dưới đây là biểu mẫu / giấy tờ liên quan đến yêu cầu của bạn. Vui lòng nhấn vào link để tải về hoặc điền thông tin:';
+            $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
         } else {
             $botReply = $settings['no_answer_message'];
             $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
@@ -82,10 +90,11 @@ class ChatController extends BaseController
         }
 
         $this->json([
-            'success' => true,
-            'reply' => $botReply,
+            'success'       => true,
+            'reply'         => $botReply,
+            'forms'         => $matchedForms,
             'session_token' => $session['session_token'],
-            'matched' => $answer ? true : false,
+            'matched'       => ($answer || !empty($matchedForms)) ? true : false,
         ]);
     }
 

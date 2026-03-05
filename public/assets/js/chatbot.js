@@ -124,7 +124,7 @@ async function sendMessage() {
         if (data.success) {
             sessionToken = data.session_token;
             localStorage.setItem('chat_session', sessionToken);
-            appendMessage('bot', data.reply);
+            appendMessage('bot', data.reply, data.forms || []);
         } else {
             appendMessage('bot', data.error || 'Đã có lỗi xảy ra. Vui lòng thử lại.');
         }
@@ -146,21 +146,52 @@ function sendSuggestion(btn) {
 
 /**
  * Thêm tin nhắn vào giao diện chat
+ * @param {string} sender 'user' | 'bot'
+ * @param {string} text   Nội dung tin nhắn
+ * @param {Array}  forms  Danh sách biểu mẫu kèm (chỉ dùng cho bot)
  */
-function appendMessage(sender, text) {
+function appendMessage(sender, text, forms = []) {
     const container = document.getElementById('chatMessages');
     const avatarUrl = sender === 'bot'
         ? "https://ui-avatars.com/api/?name=CELRAS&background=0369a1&color=fff&rounded=true&size=36"
         : "https://ui-avatars.com/api/?name=User&background=64748b&color=fff&rounded=true&size=36";
 
+    // Render nội dung text (safe), giữ xuống dòng
+    const safeText = escapeHtml(text).replace(/\n/g, '<br>');
+
+    // Render form links nếu có
+    let formsHtml = '';
+    if (sender === 'bot' && forms && forms.length > 0) {
+        formsHtml = `
+            <div class="mt-3 flex flex-col gap-2">
+                ${forms.map(f => `
+                <a href="${escapeHtml(f.url)}" target="_blank" rel="noopener noreferrer"
+                   class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-sky-200
+                          bg-sky-50 hover:bg-sky-100 text-sky-700 text-sm font-medium transition-colors
+                          shadow-sm group">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 flex-shrink-0 text-sky-500" fill="none"
+                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586
+                                 a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <span class="flex-1">${escapeHtml(f.name)}</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-sky-400 group-hover:text-sky-600 flex-shrink-0" fill="none"
+                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                    </svg>
+                </a>`).join('')}
+            </div>`;
+    }
+
     const msgHtml = `
         <div class="message ${sender}">
             <img src="${avatarUrl}" alt="${sender}" class="avatar">
-            <div class="bubble">${escapeHtml(text)}</div>
+            <div class="bubble">${safeText}${formsHtml}</div>
         </div>`;
     container.insertAdjacentHTML('beforeend', msgHtml);
-    
-    // Scroll to bottom 
+
+    // Scroll to bottom
     container.scrollIntoView({ behavior: 'smooth', block: 'end' });
 }
 

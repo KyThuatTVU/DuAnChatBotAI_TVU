@@ -270,6 +270,28 @@ INSERT INTO suggested_questions (question_text, linked_question_id, sort_order) 
 ('Làm thẻ thư viện ở đâu?', 3, 3),
 ('Tra cứu sách như thế nào?', 5, 4);
 
+-- =====================================================
+-- BẢNG BIỂU MẪU / GIẤY TỜ (Forms)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS forms (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL COMMENT 'Tên biểu mẫu / giấy tờ',
+    description TEXT NULL COMMENT 'Mô tả nội dung biểu mẫu',
+    url VARCHAR(1000) NOT NULL COMMENT 'Đường dẫn tới trang biểu mẫu',
+    keywords TEXT NULL COMMENT 'Từ khóa nhận diện, phân cách bằng dấu phẩy',
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_by INT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES admins(id) ON DELETE SET NULL
+) ENGINE=InnoDB COMMENT='Biểu mẫu / giấy tờ – chatbot trả về link khi hỏi';
+
+-- Dữ liệu mẫu forms
+INSERT INTO forms (name, description, url, keywords) VALUES
+('Đơn đăng ký mượn tài liệu đặc biệt', 'Mẫu đăng ký mượn tài liệu quý hiếm, luận văn, đề tài nghiên cứu', 'https://celri.tvu.edu.vn/bieu-mau', 'đơn mượn tài liệu,mẫu mượn,tài liệu đặc biệt,luận văn'),
+('Đơn đăng ký làm thẻ thư viện', 'Mẫu đăng ký làm mới hoặc gia hạn thẻ thư viện', 'https://celri.tvu.edu.vn/bieu-mau', 'làm thẻ,đăng ký thẻ,thẻ thư viện,gia hạn thẻ'),
+('Phiếu xác nhận sử dụng dịch vụ thư viện', 'Phiếu xác nhận cho sinh viên làm thủ tục tốt nghiệp', 'https://celri.tvu.edu.vn/bieu-mau', 'xác nhận thư viện,phiếu xác nhận,tốt nghiệp,thủ tục tốt nghiệp');
+
 -- Chủ đề sự kiện mẫu
 INSERT INTO event_themes (theme_name, primary_color, secondary_color, header_bg_color, welcome_message, is_active) VALUES
 ('Mặc định', '#1976D2', '#FFFFFF', '#1976D2', 'Xin chào! Tôi là trợ lý thư viện. Bạn cần tôi giúp gì?', 1),

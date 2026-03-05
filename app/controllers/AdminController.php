@@ -7,13 +7,15 @@ class AdminController extends BaseController
     private $categoryModel;
     private $chatModel;
     private $settingModel;
+    private $formModel;
 
     public function __construct()
     {
         $this->questionModel = $this->model('QuestionModel');
         $this->categoryModel = $this->model('CategoryModel');
-        $this->chatModel = $this->model('ChatModel');
-        $this->settingModel = $this->model('SettingModel');
+        $this->chatModel     = $this->model('ChatModel');
+        $this->settingModel  = $this->model('SettingModel');
+        $this->formModel     = $this->model('FormModel');
     }
 
     /**
@@ -939,5 +941,71 @@ class AdminController extends BaseController
         $stmt = $db->prepare("DELETE FROM unanswered_questions WHERE id = ?");
         $stmt->execute([$id]);
         $this->json(['success' => true]);
+    }
+
+    // ==================== FORMS (BIỂU MẪU) ====================
+
+    /**
+     * GET  /api/admin/forms        – Lấy danh sách biểu mẫu
+     * POST /api/admin/forms        – Tạo biểu mẫu mới
+     */
+    public function forms()
+    {
+        $adminId = $this->requireAuth();
+
+        if ($this->getMethod() === 'POST') {
+            $input = $this->getJsonInput();
+            if (empty($input['name']) || empty($input['url'])) {
+                $this->json(['error' => 'Tên và URL là bắt buộc'], 400);
+            }
+            $id = $this->formModel->create([
+                'name'        => sanitize($input['name']),
+                'description' => sanitize($input['description'] ?? ''),
+                'url'         => trim($input['url']),
+                'keywords'    => sanitize($input['keywords'] ?? ''),
+                'is_active'   => $input['is_active'] ?? 1,
+                'created_by'  => $adminId,
+            ]);
+            $this->json(['success' => true, 'id' => $id], 201);
+        }
+
+        $forms = $this->formModel->getAll();
+        $this->json(['forms' => $forms]);
+    }
+
+    /**
+     * GET    /api/admin/form/{id}  – Chi tiết
+     * PUT    /api/admin/form/{id}  – Cập nhật
+     * DELETE /api/admin/form/{id}  – Xóa
+     */
+    public function form($id = null)
+    {
+        $this->requireAuth();
+        if (!$id) {
+            $this->json(['error' => 'ID không hợp lệ'], 400);
+        }
+
+        if ($this->getMethod() === 'DELETE') {
+            $this->formModel->delete($id);
+            $this->json(['success' => true]);
+        }
+
+        if ($this->getMethod() === 'PUT') {
+            $input = $this->getJsonInput();
+            if (empty($input['name']) || empty($input['url'])) {
+                $this->json(['error' => 'Tên và URL là bắt buộc'], 400);
+            }
+            $this->formModel->update($id, [
+                'name'        => sanitize($input['name']),
+                'description' => sanitize($input['description'] ?? ''),
+                'url'         => trim($input['url']),
+                'keywords'    => sanitize($input['keywords'] ?? ''),
+                'is_active'   => $input['is_active'] ?? 1,
+            ]);
+            $this->json(['success' => true]);
+        }
+
+        $form = $this->formModel->getById($id);
+        $this->json(['form' => $form]);
     }
 }

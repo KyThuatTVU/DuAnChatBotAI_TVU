@@ -695,6 +695,143 @@ async function deleteUnanswered(btn) {
 
 // ==================== HELPERS ====================
 
+// ==================== FORMS (BIỂU MẪU / GIẤY TỜ) ====================
+
+let allForms = [];
+
+async function loadForms() {
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/forms`);
+        const data = await res.json();
+        allForms = data.forms || [];
+        renderForms(allForms);
+    } catch (e) {
+        console.error('Failed to load forms:', e);
+    }
+}
+
+function renderForms(forms) {
+    const tbody = document.getElementById('formsBody');
+    if (!tbody) return;
+    if (!forms.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-10 text-gray-400">Chưa có biểu mẫu nào. Nhấn "+ Thêm biểu mẫu" để bắt đầu.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = forms.map((f, i) => `
+        <tr>
+            <td class="text-gray-500 text-center">${i + 1}</td>
+            <td>
+                <div class="font-medium text-sm">${escapeHtml(f.name)}</div>
+                <div class="text-xs text-gray-400 mt-0.5">${escapeHtml((f.description || '').substring(0, 70))}${(f.description || '').length > 70 ? '…' : ''}</div>
+            </td>
+            <td class="max-w-xs">
+                <a href="${escapeHtml(f.url)}" target="_blank" rel="noopener"
+                   class="text-sky-600 hover:underline text-xs break-all">${escapeHtml(f.url.substring(0, 60))}${f.url.length > 60 ? '…' : ''}</a>
+            </td>
+            <td class="text-xs text-gray-500">${escapeHtml(f.keywords || '—')}</td>
+            <td class="text-center">${f.is_active
+                ? '<span class="badge badge-success">Hoạt động</span>'
+                : '<span class="badge badge-danger">Tắt</span>'}</td>
+            <td>
+                <div class="flex items-center gap-2 justify-end">
+                    <button onclick="editForm(${f.id})" class="text-sky-600 hover:text-sky-800" title="Sửa">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    </button>
+                    <button onclick="deleteForm(${f.id})" class="text-red-500 hover:text-red-700" title="Xóa">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function filterForms() {
+    const q = document.getElementById('formSearch').value.toLowerCase();
+    const filtered = allForms.filter(f =>
+        f.name.toLowerCase().includes(q) ||
+        (f.description || '').toLowerCase().includes(q) ||
+        (f.keywords || '').toLowerCase().includes(q)
+    );
+    renderForms(filtered);
+}
+
+function openFormModal() {
+    document.getElementById('formModalTitle').textContent = 'Thêm biểu mẫu mới';
+    document.getElementById('formId').value = '';
+    document.getElementById('formName').value = '';
+    document.getElementById('formDesc').value = '';
+    document.getElementById('formUrl').value = '';
+    document.getElementById('formKeywords').value = '';
+    document.getElementById('formActive').checked = true;
+    document.getElementById('formModal').classList.add('active');
+}
+
+function closeFormModal() {
+    document.getElementById('formModal').classList.remove('active');
+}
+
+async function editForm(id) {
+    const form = allForms.find(f => f.id === id);
+    if (!form) return;
+    document.getElementById('formModalTitle').textContent = 'Sửa biểu mẫu';
+    document.getElementById('formId').value = form.id;
+    document.getElementById('formName').value = form.name;
+    document.getElementById('formDesc').value = form.description || '';
+    document.getElementById('formUrl').value = form.url;
+    document.getElementById('formKeywords').value = form.keywords || '';
+    document.getElementById('formActive').checked = form.is_active == 1;
+    document.getElementById('formModal').classList.add('active');
+}
+
+async function saveForm(event) {
+    event.preventDefault();
+    const id = document.getElementById('formId').value;
+    const payload = {
+        name:        document.getElementById('formName').value.trim(),
+        description: document.getElementById('formDesc').value.trim(),
+        url:         document.getElementById('formUrl').value.trim(),
+        keywords:    document.getElementById('formKeywords').value.trim(),
+        is_active:   document.getElementById('formActive').checked ? 1 : 0,
+    };
+    if (!payload.name || !payload.url) {
+        alert('Tên biểu mẫu và URL là bắt buộc');
+        return;
+    }
+    try {
+        const url    = id ? `${ADMIN_API}/admin/form/${id}` : `${ADMIN_API}/admin/forms`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeFormModal();
+            loadForms();
+        } else {
+            alert(data.error || 'Lỗi khi lưu');
+        }
+    } catch (e) {
+        alert('Lỗi kết nối server');
+    }
+}
+
+async function deleteForm(id) {
+    if (!confirm('Xóa biểu mẫu này?')) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/form/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) loadForms();
+        else alert(data.error || 'Lỗi khi xóa');
+    } catch (e) {
+        alert('Lỗi kết nối server');
+    }
+}
+
+// ==================== HELPERS ====================
+
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
