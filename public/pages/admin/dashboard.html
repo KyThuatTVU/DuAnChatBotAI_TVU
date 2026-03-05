@@ -230,11 +230,74 @@
                 </div>
             </div>
 
-            <!-- Recent Messages -->
+            <!-- Hướng dẫn sử dụng hệ thống -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 class="text-lg font-semibold mb-4">Tổng tin nhắn gần đây</h2>
-                <p class="text-3xl font-bold text-sky-700" id="statMessages">0</p>
-                <p class="text-sm text-gray-500 mt-1">tin nhắn từ người dùng</p>
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="w-10 h-10 bg-sky-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-800">Hướng dẫn sử dụng hệ thống</h2>
+                        <p class="text-xs text-gray-500">Các bước quản trị Chatbot CELRAS TVU</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Bước 1 -->
+                    <div class="flex gap-3 p-4 bg-sky-50 rounded-xl border border-sky-100">
+                        <div class="w-8 h-8 bg-sky-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">1</div>
+                        <div>
+                            <p class="font-semibold text-sm text-gray-800 mb-1">Quản lý câu hỏi</p>
+                            <p class="text-xs text-gray-500 leading-relaxed">Vào <strong>Quản lý câu hỏi</strong> để thêm, sửa, xóa các cặp câu hỏi – câu trả lời. Chatbot sẽ dựa vào dữ liệu này để phản hồi người dùng.</p>
+                        </div>
+                    </div>
+                    <!-- Bước 2 -->
+                    <div class="flex gap-3 p-4 bg-green-50 rounded-xl border border-green-100">
+                        <div class="w-8 h-8 bg-green-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">2</div>
+                        <div>
+                            <p class="font-semibold text-sm text-gray-800 mb-1">Phân loại danh mục</p>
+                            <p class="text-xs text-gray-500 leading-relaxed">Tạo các <strong>Danh mục</strong> để nhóm câu hỏi theo chủ đề (mượn trả sách, thẻ thư viện, WiFi…), giúp chatbot gợi ý chính xác hơn.</p>
+                        </div>
+                    </div>
+                    <!-- Bước 3 -->
+                    <div class="flex gap-3 p-4 bg-purple-50 rounded-xl border border-purple-100">
+                        <div class="w-8 h-8 bg-purple-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">3</div>
+                        <div>
+                            <p class="font-semibold text-sm text-gray-800 mb-1">Tải dữ liệu hàng loạt</p>
+                            <p class="text-xs text-gray-500 leading-relaxed">Dùng trang <strong>Tải dữ liệu</strong> để import file Word/PDF chứa nhiều câu hỏi. Hệ thống tự động trích xuất và lưu vào CSDL.</p>
+                        </div>
+                    </div>
+                    <!-- Bước 4 -->
+                    <div class="flex gap-3 p-4 bg-amber-50 rounded-xl border border-amber-100">
+                        <div class="w-8 h-8 bg-amber-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">4</div>
+                        <div>
+                            <p class="font-semibold text-sm text-gray-800 mb-1">Biểu mẫu & Giấy tờ</p>
+                            <p class="text-xs text-gray-500 leading-relaxed">Thêm link các <strong>biểu mẫu</strong> (phiếu mượn sách, đơn xin cấp thẻ…). Khi người dùng hỏi, chatbot sẽ gửi link tải về.</p>
+                        </div>
+                    </div>
+                    <!-- Bước 5 -->
+                    <div class="flex gap-3 p-4 bg-rose-50 rounded-xl border border-rose-100">
+                        <div class="w-8 h-8 bg-rose-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">5</div>
+                        <div>
+                            <p class="font-semibold text-sm text-gray-800 mb-1">Xử lý câu chưa trả lời</p>
+                            <p class="text-xs text-gray-500 leading-relaxed">Mục <strong>Chưa trả lời</strong> liệt kê các câu hỏi mà chatbot chưa tìm được câu trả lời. Hãy bổ sung để cải thiện chất lượng.</p>
+                        </div>
+                    </div>
+                    <!-- Bước 6 -->
+                    <div class="flex gap-3 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                        <div class="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">6</div>
+                        <div>
+                            <p class="font-semibold text-sm text-gray-800 mb-1">Tùy chỉnh giao diện</p>
+                            <p class="text-xs text-gray-500 leading-relaxed">Vào <strong>Cài đặt giao diện</strong> để thay đổi tên chatbot, ảnh đại diện, màu sắc, tin nhắn chào mừng và các gợi ý hiển thị.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lưu ý -->
+                <div class="mt-5 p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-start gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <p class="text-xs text-gray-600 leading-relaxed"><strong class="text-gray-800">Lưu ý:</strong> Sau khi thêm/sửa dữ liệu, chatbot sẽ tự động cập nhật ngay. Hãy kiểm tra bằng cách mở trang chatbot và gửi thử câu hỏi để đảm bảo câu trả lời chính xác.</p>
+                </div>
             </div>
         </div>
     </div>
