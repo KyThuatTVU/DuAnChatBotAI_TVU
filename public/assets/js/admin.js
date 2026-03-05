@@ -5,6 +5,52 @@
 
 const ADMIN_API = '/DuAnChatbotThuVien/public/index.php?url=api';
 
+// ==================== MOBILE SIDEBAR TOGGLE ====================
+
+/**
+ * Bật/tắt sidebar trên mobile
+ */
+function toggleSidebar() {
+    const sidebar = document.getElementById('adminSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (!sidebar) return;
+    
+    const isOpen = sidebar.classList.contains('open');
+    if (isOpen) {
+        sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('active');
+        document.body.style.overflow = '';
+    } else {
+        sidebar.classList.add('open');
+        if (overlay) overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+/**
+ * Đóng sidebar khi click vào nav link trên mobile
+ */
+function closeSidebarOnMobile() {
+    if (window.innerWidth <= 768) {
+        const sidebar = document.getElementById('adminSidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        if (sidebar) sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+}
+
+// Khi resize, nếu về desktop thì reset sidebar
+window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) {
+        const sidebar = document.getElementById('adminSidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        if (sidebar) sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+});
+
 /**
  * Load trang admin - check auth và điền thông tin admin
  * (Sidebar đã được nhúng trực tiếp vào HTML, không cần fetch)
@@ -83,15 +129,15 @@ function renderQuestions(questions) {
 
     tbody.innerHTML = questions.map((q, i) => `
         <tr>
-            <td class="text-gray-500">${i + 1}</td>
-            <td>
+            <td data-label="#" class="text-gray-500">${i + 1}</td>
+            <td data-label="Câu hỏi">
                 <div class="font-medium text-sm">${escapeHtml(q.question_text.substring(0, 80))}${q.question_text.length > 80 ? '...' : ''}</div>
                 <div class="text-xs text-gray-400 mt-1">${escapeHtml(q.answer_text.substring(0, 60))}...</div>
             </td>
-            <td><span class="badge badge-info">${q.category_name || 'Chưa phân loại'}</span></td>
-            <td><span class="badge ${q.source_type === 'manual' ? 'badge-success' : 'badge-warning'}">${q.source_type === 'manual' ? 'Nhập tay' : q.source_type.toUpperCase()}</span></td>
-            <td>${q.is_active ? '<span class="badge badge-success">Hoạt động</span>' : '<span class="badge badge-danger">Tắt</span>'}</td>
-            <td>
+            <td data-label="Danh mục"><span class="badge badge-info">${q.category_name || 'Chưa phân loại'}</span></td>
+            <td data-label="Nguồn"><span class="badge ${q.source_type === 'manual' ? 'badge-success' : 'badge-warning'}">${q.source_type === 'manual' ? 'Nhập tay' : q.source_type.toUpperCase()}</span></td>
+            <td data-label="Trạng thái">${q.is_active ? '<span class="badge badge-success">Hoạt động</span>' : '<span class="badge badge-danger">Tắt</span>'}</td>
+            <td data-label="Thao tác">
                 <div class="flex items-center gap-2">
                     <button onclick="editQuestion(${q.id})" class="text-sky-600 hover:text-sky-800" title="Sửa">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
@@ -597,12 +643,12 @@ function renderDatasets(datasets) {
         const dateDisplay = d.created_at ? new Date(d.created_at).toLocaleString('vi-VN') : '';
 
         return `<tr>
-            <td class="font-medium text-sm">${escapeHtml(d.file_name)}</td>
-            <td class="text-sm text-gray-500">${sizeDisplay}</td>
-            <td class="font-semibold">${d.total_questions || 0} câu</td>
-            <td>${statusBadges[d.status] || d.status}${d.error_message ? '<br><span class="text-xs text-red-500">' + escapeHtml(d.error_message) + '</span>' : ''}</td>
-            <td class="text-sm text-gray-500">${dateDisplay}</td>
-            <td>${d.status === 'completed' && d.total_questions > 0 ? '<a href="questions.html?source=word" class="text-sky-600 hover:text-sky-800 text-sm font-medium">Xem & Sửa</a>' : ''}</td>
+            <td data-label="Tên file" class="font-medium text-sm">${escapeHtml(d.file_name)}</td>
+            <td data-label="Kích thước" class="text-sm text-gray-500">${sizeDisplay}</td>
+            <td data-label="Số câu hỏi" class="font-semibold">${d.total_questions || 0} câu</td>
+            <td data-label="Trạng thái">${statusBadges[d.status] || d.status}${d.error_message ? '<br><span class="text-xs text-red-500">' + escapeHtml(d.error_message) + '</span>' : ''}</td>
+            <td data-label="Ngày tải" class="text-sm text-gray-500">${dateDisplay}</td>
+            <td data-label="Thao tác">${d.status === 'completed' && d.total_questions > 0 ? '<a href="questions.html?source=word" class="text-sky-600 hover:text-sky-800 text-sm font-medium">Xem & Sửa</a>' : ''}</td>
         </tr>`;
     }).join('');
 }
@@ -632,14 +678,14 @@ function renderUnanswered(items) {
         const dateDisplay = item.created_at ? new Date(item.created_at).toLocaleString('vi-VN') : '';
         return `
         <tr>
-            <td>${i + 1}</td>
-            <td class="font-medium">${safeQuestion}</td>
-            <td><span class="badge badge-warning">${item.frequency} lần</span></td>
-            <td>${item.is_resolved ? '<span class="badge badge-success">Đã xử lý</span>' : '<span class="badge badge-danger">Chưa xử lý</span>'}</td>
-            <td class="text-sm text-gray-500">${dateDisplay}</td>
-            <td>
-                <div class="flex items-center gap-2">
-                    <button data-question-id="${item.id}" data-question-text="${safeQuestion}" onclick="createAnswerForUnanswered(this)" class="text-sky-600 hover:text-sky-800 text-sm font-medium">
+            <td data-label="#">${i + 1}</td>
+            <td data-label="Câu hỏi" class="font-medium">${safeQuestion}</td>
+            <td data-label="Số lần hỏi"><span class="badge badge-warning">${item.frequency} lần</span></td>
+            <td data-label="Trạng thái">${item.is_resolved ? '<span class="badge badge-success">Đã xử lý</span>' : '<span class="badge badge-danger">Chưa xử lý</span>'}</td>
+            <td data-label="Ngày" class="text-sm text-gray-500">${dateDisplay}</td>
+            <td data-label="Thao tác">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <button data-question-id="${item.id}" data-question-text="${safeQuestion}" onclick="createAnswerForUnanswered(this)" class="text-sky-600 hover:text-sky-800 text-sm font-medium whitespace-nowrap">
                         + Tạo trả lời
                     </button>
                     ${!item.is_resolved ? `<button data-id="${item.id}" onclick="resolveUnanswered(this)" class="text-green-600 hover:text-green-800 text-sm font-medium" title="Đánh dấu đã xử lý">✓</button>` : ''}
@@ -719,20 +765,20 @@ function renderForms(forms) {
     }
     tbody.innerHTML = forms.map((f, i) => `
         <tr>
-            <td class="text-gray-500 text-center">${i + 1}</td>
-            <td>
+            <td data-label="#" class="text-gray-500 text-center">${i + 1}</td>
+            <td data-label="Biểu mẫu">
                 <div class="font-medium text-sm">${escapeHtml(f.name)}</div>
                 <div class="text-xs text-gray-400 mt-0.5">${escapeHtml((f.description || '').substring(0, 70))}${(f.description || '').length > 70 ? '…' : ''}</div>
             </td>
-            <td class="max-w-xs">
+            <td data-label="Link">
                 <a href="${escapeHtml(f.url)}" target="_blank" rel="noopener"
-                   class="text-sky-600 hover:underline text-xs break-all">${escapeHtml(f.url.substring(0, 60))}${f.url.length > 60 ? '…' : ''}</a>
+                   class="text-sky-600 hover:underline text-xs break-all">${escapeHtml(f.url.substring(0, 50))}${f.url.length > 50 ? '…' : ''}</a>
             </td>
-            <td class="text-xs text-gray-500">${escapeHtml(f.keywords || '—')}</td>
-            <td class="text-center">${f.is_active
+            <td data-label="Từ khóa" class="text-xs text-gray-500">${escapeHtml(f.keywords || '—')}</td>
+            <td data-label="Trạng thái" class="text-center">${f.is_active
                 ? '<span class="badge badge-success">Hoạt động</span>'
                 : '<span class="badge badge-danger">Tắt</span>'}</td>
-            <td>
+            <td data-label="Thao tác">
                 <div class="flex items-center gap-2 justify-end">
                     <button onclick="editForm(${f.id})" class="text-sky-600 hover:text-sky-800" title="Sửa">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>

@@ -1,0 +1,195 @@
+/* ============================================================
+   ADMIN MOBILE RESPONSIVE – CELRAS TVU Chatbot
+   Chuyển table -> card layout trên mobile, tinh gọn giao diện
+   ============================================================ */
+
+/* ---- Sidebar & Top Bar (áp dụng transition cho tất cả admin) ---- */
+.admin-sidebar {
+    transition: transform .3s cubic-bezier(.4,0,.2,1);
+}
+
+/* ---- Mobile card layout cho data-table ---- */
+@media (max-width: 768px) {
+
+    /* --- Layout --- */
+    .admin-content {
+        margin-left: 0 !important;
+        padding: 12px !important;
+        padding-top: 68px !important;
+    }
+    .admin-sidebar {
+        transform: translateX(-100%);
+    }
+    .admin-sidebar.open {
+        transform: translateX(0);
+    }
+    .mobile-topbar {
+        display: flex !important;
+    }
+    .sidebar-overlay.active {
+        display: block;
+    }
+
+    /* --- Header --- */
+    .admin-header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 10px !important;
+        margin-bottom: 16px !important;
+    }
+    .admin-header h1 {
+        font-size: 17px !important;
+    }
+
+    /* --- Stat cards (Dashboard) --- */
+    .stat-card {
+        padding: 14px !important;
+    }
+    .stat-number {
+        font-size: 22px !important;
+    }
+
+    /* --- Data Table → Card Layout --- */
+    .data-table {
+        border: none !important;
+    }
+    .data-table thead {
+        display: none !important;
+    }
+    .data-table tbody tr {
+        display: block !important;
+        background: #fff;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 12px;
+        padding: 14px !important;
+        margin-bottom: 10px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .data-table tbody tr:hover {
+        background: #fff !important;
+    }
+    .data-table tbody td {
+        display: flex !important;
+        align-items: flex-start;
+        padding: 4px 0 !important;
+        border: none !important;
+        font-size: 13px !important;
+        gap: 8px;
+    }
+    .data-table tbody td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        font-size: 11px;
+        color: #6b7280;
+        text-transform: uppercase;
+        flex-shrink: 0;
+        min-width: 80px;
+        padding-top: 2px;
+        letter-spacing: 0.02em;
+    }
+    /* Ẩn cột # trên mobile */
+    .data-table tbody td[data-label="#"] {
+        display: none !important;
+    }
+    /* Cột thao tác: full width */
+    .data-table tbody td[data-label="Thao tác"],
+    .data-table tbody td[data-label=""] {
+        border-top: 1px solid #f1f5f9;
+        padding-top: 10px !important;
+        margin-top: 4px;
+        justify-content: flex-end;
+    }
+    .data-table tbody td[data-label="Thao tác"]::before,
+    .data-table tbody td[data-label=""]::before {
+        display: none;
+    }
+
+    /* --- Buttons: nhỏ gọn --- */
+    .btn-primary {
+        font-size: 13px !important;
+        padding: 7px 14px !important;
+    }
+    .btn-outline {
+        font-size: 13px !important;
+        padding: 7px 14px !important;
+    }
+
+    /* --- Modal --- */
+    .modal {
+        padding: 20px !important;
+        border-radius: 14px !important;
+        max-height: 85vh !important;
+    }
+    .modal-overlay {
+        padding: 10px !important;
+    }
+
+    /* --- Form groups --- */
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        font-size: 16px !important; /* Tránh iOS zoom on focus */
+    }
+
+    /* --- Quick actions (Dashboard) --- */
+    .admin-content .grid.sm\:grid-cols-3 {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* --- Filter bar gọn --- */
+    .bg-white.rounded-xl .flex.flex-col.sm\:flex-row {
+        gap: 8px !important;
+    }
+
+    /* --- Categories grid --- */
+    #categoriesGrid {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* --- Settings: single column --- */
+    .grid.lg\:grid-cols-2 {
+        grid-template-columns: 1fr !important;
+    }
+    .color-picker-group {
+        flex-wrap: wrap !important;
+    }
+
+    /* --- Overflow on tables container --- */
+    .overflow-x-auto {
+        overflow-x: visible !important;
+    }
+
+    /* --- Upload area (Datasets) --- */
+    #dropZone {
+        padding: 24px 16px !important;
+    }
+
+    /* --- Quy trình hoạt động --- */
+    .bg-gradient-to-r .flex {
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+    .bg-gradient-to-r .flex > svg {
+        display: none !important;
+    }
+
+    /* --- Forms toolbar --- */
+    .flex.items-center.justify-between.gap-4.mb-4.flex-wrap {
+        flex-direction: column;
+        align-items: stretch !important;
+    }
+    .flex.items-center.justify-between.gap-4.mb-4.flex-wrap .flex-1 {
+        max-width: none !important;
+    }
+    .flex.items-center.justify-between.gap-4.mb-4.flex-wrap .relative.flex-1.max-w-sm {
+        max-width: none !important;
+    }
+}
+
+/* ---- Stat cards grid 2 cols on mobile ---- */
+@media (max-width: 640px) {
+    .grid.sm\:grid-cols-2.lg\:grid-cols-4 {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+    }
+}

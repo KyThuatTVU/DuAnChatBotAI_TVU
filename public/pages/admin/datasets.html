@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/DuAnChatbotThuVien/public/assets/css/loading.css">
+    <link rel="stylesheet" href="/DuAnChatbotThuVien/public/assets/css/admin-mobile.css">
     <style>
         body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif}
         .admin-layout{min-height:100vh}
@@ -35,7 +36,18 @@
         .badge-yellow,.badge-warning{background:#fef9c3;color:#a16207}
         .badge-red,.badge-danger{background:#fee2e2;color:#dc2626}
         .badge-blue,.badge-info{background:#dbeafe;color:#1d4ed8}
-        @media(max-width:768px){.admin-content{margin-left:0;padding:16px}.admin-sidebar{transform:translateX(-100%)}}
+        .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:35}
+        .sidebar-overlay.active{display:block}
+        .mobile-topbar{display:none}
+        @media(max-width:768px){
+            .admin-content{margin-left:0;padding:16px;padding-top:72px}
+            .admin-sidebar{transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1)}
+            .admin-sidebar.open{transform:translateX(0)}
+            .mobile-topbar{display:flex;position:fixed;top:0;left:0;right:0;height:56px;background:#fff;border-bottom:1px solid #e5e7eb;z-index:30;align-items:center;padding:0 16px;gap:12px}
+            .admin-header h1{font-size:16px}
+            .data-table{font-size:13px}
+            .data-table thead th,.data-table tbody td{padding:10px 8px}
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -54,6 +66,15 @@
     </div>
 
     <div class="admin-layout">
+        <!-- Mobile Top Bar -->
+        <div class="mobile-topbar">
+            <button onclick="toggleSidebar()" class="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 transition-colors text-gray-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+            <span class="font-semibold text-gray-800 text-sm truncate">Tải dữ liệu</span>
+        </div>
+        <!-- Mobile Overlay -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
         <aside class="admin-sidebar" id="adminSidebar">
             <div class="sidebar-logo">
                 <a href="/DuAnChatbotThuVien/public/pages/index.html" class="flex items-center gap-2" style="text-decoration:none">
@@ -89,30 +110,30 @@
         <div class="admin-content">
             <div class="admin-header">
                 <div>
-                    <h1>Tải dữ liệu & Tạo câu hỏi tự động</h1>
-                    <p class="text-sm text-gray-500 mt-1">Upload file Word (.docx) — hệ thống tự động phân tích và tạo bộ câu hỏi Q&A</p>
+                    <h1 class="text-base sm:text-xl">Tải dữ liệu & Tạo câu hỏi tự động</h1>
+                    <p class="text-sm text-gray-500 mt-1 hidden sm:block">Upload file Word (.docx) — hệ thống tự động phân tích và tạo bộ câu hỏi Q&A</p>
                 </div>
             </div>
 
             <!-- How it works -->
             <div class="bg-gradient-to-r from-sky-50 to-blue-50 rounded-xl border border-sky-200 p-6 mb-6">
                 <h2 class="text-base font-semibold text-sky-800 mb-3">Quy trình hoạt động</h2>
-                <div class="flex items-start gap-6">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6">
                     <div class="flex items-center gap-2 text-sm">
                         <span class="w-7 h-7 bg-sky-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
                         <span class="text-gray-700">Upload file Word</span>
                     </div>
-                    <svg class="w-5 h-5 text-sky-400 flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <svg class="w-5 h-5 text-sky-400 flex-shrink-0 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     <div class="flex items-center gap-2 text-sm">
                         <span class="w-7 h-7 bg-sky-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
                         <span class="text-gray-700">Hệ thống đọc & phân tích nội dung</span>
                     </div>
-                    <svg class="w-5 h-5 text-sky-400 flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <svg class="w-5 h-5 text-sky-400 flex-shrink-0 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     <div class="flex items-center gap-2 text-sm">
                         <span class="w-7 h-7 bg-sky-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
                         <span class="text-gray-700">Tự động tạo Q&A</span>
                     </div>
-                    <svg class="w-5 h-5 text-sky-400 flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <svg class="w-5 h-5 text-sky-400 flex-shrink-0 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     <div class="flex items-center gap-2 text-sm">
                         <span class="w-7 h-7 bg-green-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">4</span>
                         <span class="text-gray-700">Bạn chỉnh sửa tùy ý</span>
@@ -121,16 +142,16 @@
             </div>
 
             <!-- Upload Area -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-6">
-                <div class="border-2 border-dashed border-gray-300 rounded-xl p-10 text-center hover:border-sky-400 transition" 
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-8 mb-6">
+                <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 sm:p-10 text-center hover:border-sky-400 transition" 
                      id="dropZone"
                      ondragover="event.preventDefault(); this.classList.add('border-sky-400','bg-sky-50')"
                      ondragleave="this.classList.remove('border-sky-400','bg-sky-50')"
                      ondrop="handleDrop(event)">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-3 sm:mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                     </svg>
-                    <p class="text-gray-500 mb-2">Kéo thả file Word vào đây hoặc</p>
+                    <p class="text-gray-500 mb-2 text-sm sm:text-base">Kéo thả file Word vào đây hoặc</p>
                     <label class="btn-primary cursor-pointer inline-flex">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                         Chọn file Word
@@ -172,9 +193,9 @@
             </div>
 
             <!-- Format Tips -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-                <h2 class="text-lg font-semibold mb-4">Mẹo để có kết quả tốt nhất</h2>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 mb-6">
+                <h2 class="text-base sm:text-lg font-semibold mb-4">Mẹo để có kết quả tốt nhất</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <div class="p-4 bg-green-50 rounded-lg">
                         <h3 class="font-semibold text-green-700 mb-2 text-sm">Cách 1: Văn bản có cấu trúc</h3>
                         <div class="bg-white p-3 rounded text-xs text-gray-700 space-y-1">
@@ -211,6 +232,7 @@
             <!-- Upload History -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 class="text-lg font-semibold mb-4">Lịch sử tải lên</h2>
+                <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -226,6 +248,7 @@
                         <tr><td colspan="6" class="text-center py-4 text-gray-400">Chưa có dữ liệu</td></tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     </div>

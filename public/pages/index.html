@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>CELRAS TVU Chatbot - Trung tâm Học liệu và Chuyển đổi số</title>
 
     <!-- Tailwind CDN: viết class trực tiếp vào HTML, có hiệu lực ngay, không cần build -->
@@ -41,6 +41,18 @@
             font-size: 14px; line-height: 1.6;
         }
 
+        /* Mobile: bong bóng chat rộng hơn */
+        @media (max-width: 640px) {
+            .message.bot .bubble, .message.user .bubble {
+                max-width: 85%;
+                font-size: 13px;
+                padding: 9px 12px;
+            }
+            .message .avatar { width: 28px; height: 28px; }
+            .message { gap: 8px; margin-bottom: 12px; }
+            .form-link { padding: 8px 12px; font-size: 12px; }
+        }
+
         /* Typing indicator */
         .typing-indicator { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
         .typing-indicator span {
@@ -66,6 +78,23 @@
             backdrop-filter: blur(4px);
         }
         .suggestion-chip:hover { background: #e0f2fe; border-color: #7dd3fc; }
+
+        /* Mobile: gợi ý cuộn ngang nếu nhiều */
+        @media (max-width: 640px) {
+            .suggestion-chip {
+                padding: 7px 13px;
+                font-size: 12px;
+                white-space: nowrap;
+            }
+            #suggestionsContainer {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 4px;
+                justify-content: flex-start;
+            }
+            #suggestionsContainer::-webkit-scrollbar { display: none; }
+        }
 
         /* Form links trong bubble */
         .form-links { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -107,15 +136,16 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 h-full flex items-center justify-between">
 
             <!-- Trái: Logo + Tên thương hiệu + Nút tạo chat mới -->
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 sm:gap-3">
                 <a href="/DuAnChatbotThuVien/public/pages/index.html" class="flex items-center gap-2">
                     <img
                         src="../assets/images/logo2.png"
                         alt="CELRAS TVU"
-                        class="w-9 h-9 rounded-full object-cover">
-                    <span class="font-bold text-blue-700 text-base hidden sm:inline">CELRAS TVU Chatbot</span>
+                        class="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover">
+                    <span class="font-bold text-blue-700 text-sm sm:text-base hidden sm:inline">CELRAS TVU Chatbot</span>
                 </a>
                 <span class="text-gray-300 hidden sm:inline text-lg">|</span>
+                <!-- Desktop: nút có text -->
                 <button
                     onclick="startNewChat()"
                     class="hidden sm:inline-flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors shadow-sm"
@@ -125,12 +155,29 @@
                     </svg>
                     Đoạn chat mới
                 </button>
+                <!-- Mobile: nút icon nhỏ -->
+                <button
+                    onclick="startNewChat()"
+                    class="sm:hidden flex items-center justify-center w-9 h-9 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white rounded-full transition-colors shadow-sm"
+                    title="Đoạn chat mới"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                </button>
             </div>
 
-            <!-- Phải: Link trang chủ + Đăng nhập / Avatar user -->
-            <div class="flex items-center gap-3">
+            <!-- Phải: Link trang chủ -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <!-- Desktop -->
                 <a href="https://celri.tvu.edu.vn/" class="text-gray-500 hover:text-gray-800 text-sm font-medium hidden sm:inline transition-colors">
                     Trở về trang chủ
+                </a>
+                <!-- Mobile: icon -->
+                <a href="https://celri.tvu.edu.vn/" class="sm:hidden flex items-center justify-center w-9 h-9 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors" title="Trở về trang chủ">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1"/>
+                    </svg>
                 </a>
             </div>
 
@@ -146,14 +193,14 @@
             <div class="max-w-3xl mx-auto">
 
                 <!-- Khối chào mừng -->
-                <div id="welcomeBlock" class="flex flex-col items-center text-center py-10 sm:py-16">
+                <div id="welcomeBlock" class="flex flex-col items-center text-center py-8 sm:py-16">
                     <img
                         id="botAvatarImg"
                         src="../assets/images/logo1.png"
                         alt="CELRAS Bot"
-                        class="w-24 h-24 rounded-full object-cover shadow-xl mb-5 border-4 border-white"
+                        class="w-16 h-16 sm:w-24 sm:h-24 rounded-full object-cover shadow-xl mb-4 sm:mb-5 border-4 border-white"
                     >
-                    <h2 id="greetingText" class="text-blue-600 font-bold text-xl sm:text-2xl mb-3">
+                    <h2 id="greetingText" class="text-blue-600 font-bold text-lg sm:text-2xl mb-2 sm:mb-3">
                         CELRAS TVU xin chào! 👋
                     </h2>
                     <p class="text-gray-500 text-sm sm:text-base leading-relaxed max-w-lg">
@@ -215,16 +262,16 @@
 
 
     <!-- ===== FOOTER ===== -->
-    <footer class="bg-blue-900 text-white py-8 px-6">
-        <div class="max-w-5xl mx-auto text-center space-y-3">
+    <footer class="bg-blue-900 text-white py-5 sm:py-8 px-4 sm:px-6">
+        <div class="max-w-5xl mx-auto text-center space-y-2 sm:space-y-3">
 
             <!-- Dòng 1 -->
-            <p class="font-semibold uppercase tracking-wide text-blue-200">
+            <p class="font-semibold uppercase tracking-wide text-blue-200 text-xs sm:text-base leading-relaxed">
                 TRUNG TÂM HỌC LIỆU VÀ HỖ TRỢ HỌC THUẬT, ĐẠI HỌC TRÀ VINH.
             </p>
 
             <!-- Dòng 2 -->
-            <p class="text-blue-100">
+            <p class="text-blue-100 text-xs sm:text-base">
                 Tel. (02943) 855 246 - 102. Email: celras@tvu.edu.vn
             </p>
         </div>
