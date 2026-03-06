@@ -87,6 +87,10 @@ class ChatController extends BaseController
             } else {
                 $botReply = $answer['answer_text'];
             }
+
+            // Loại bỏ câu hỏi bị lồng ở đầu câu trả lời (nếu có)
+            $botReply = $this->stripEmbeddedQuestion($botReply, $message);
+
             $this->chatModel->saveMessage($session['id'], 'bot', $botReply, $answer['id'], 1.0);
         } elseif (!empty($matchedForms)) {
             $botReply = $lang === 'en'
@@ -177,5 +181,35 @@ class ChatController extends BaseController
         }
         $messages = $this->chatModel->getMessages($session['id']);
         $this->json(['messages' => $messages]);
+    }
+
+    /**
+     * Loại bỏ câu hỏi bị lồng ở đầu câu trả lời
+     * VD: "18. Phòng Tài liệu Nội sinh nằm ở đâu?\nPhòng Tài liệu..." → "Phòng Tài liệu..."
+     */
+    private function stripEmbeddedQuestion(string $answer, string $question): string
+    {
+        $lines = explode("\n", $answer);
+        if (count($lines) < 2) return $answer;
+
+        $firstLine = trim($lines[0]);
+
+        // Loại bỏ số thứ tự đầu dòng để so sánh
+        $cleanFirst = preg_replace('/^\s*\d+[\s.):;\-]+\s*/', '', $firstLine);
+        $cleanQuestion = preg_replace('/^\s*\d+[\s.):;\-]+\s*/', '', trim($question));
+
+        // Bỏ dấu ? cuối để so sánh
+        $cleanFirst = rtrim($cleanFirst, '? ');
+        $cleanQuestion = rtrim($cleanQuestion, '? ');
+
+        // Nếu dòng đầu chứa câu hỏi → xóa dòng đầu
+        if (mb_strtolower($cleanFirst) === mb_strtolower($cleanQuestion) ||
+            mb_strpos(mb_strtolower($firstLine), mb_strtolower($cleanQuestion)) !== false) {
+            array_shift($lines);
+            $result = trim(implode("\n", $lines));
+            return !empty($result) ? $result : $answer;
+        }
+
+        return $answer;
     }
 }

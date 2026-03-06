@@ -935,7 +935,7 @@ class AdminController extends BaseController
 
             // Tạo câu hỏi tự nhiên từ tiêu đề Điều
             $question = $this->generateQuestionFromTitle($dieuTitle, $dieuLabel);
-            $answer = $dieuLabel . ' ' . $dieuTitle . "\n" . $content;
+            $answer = $content;
 
             $pairs[] = [
                 'question' => $question,
@@ -980,7 +980,7 @@ class AdminController extends BaseController
 
             // Tạo câu hỏi
             $question = $this->generateQuestionFromTitle($headingTitle);
-            $answer = $headingNum . ' ' . $headingTitle . "\n" . $content;
+            $answer = $content;
 
             $pairs[] = [
                 'question' => $question,

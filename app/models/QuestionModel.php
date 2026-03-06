@@ -20,7 +20,7 @@ class QuestionModel extends BaseModel
     }
 
     /**
-     * Tìm câu trả lời phù hợp nhất (FULLTEXT search)
+     * Tìm câu trả lời phù hợp nhất (FULLTEXT search + kiểm tra ngữ cảnh)
      */
     public function findAnswer($userMessage)
     {
@@ -51,13 +51,30 @@ class QuestionModel extends BaseModel
                     AND MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE)
                     HAVING relevance > 0.5
                     ORDER BY relevance DESC 
-                    LIMIT 1";
+                    LIMIT 5";
             $stmt = $this->db->prepare($sql);
             $stmt->execute([$userMessage, $userMessage]);
-            $result = $stmt->fetch();
+            $results = $stmt->fetchAll();
 
-            if ($result && $result['relevance'] > 0.5) {
-                return $result;
+            if (!empty($results)) {
+                // Kiểm tra từ khóa nội dung: ưu tiên câu hỏi có chứa từ chủ đề
+                $contentWords = $this->extractContentWords($userMessage);
+                
+                if (!empty($contentWords)) {
+                    // Tìm kết quả có từ khóa nội dung trùng khớp
+                    foreach ($results as $r) {
+                        $questionLower = mb_strtolower($r['question_text']);
+                        foreach ($contentWords as $word) {
+                            if (mb_strpos($questionLower, $word) !== false) {
+                                return $r;
+                            }
+                        }
+                    }
+                    // Không có kết quả nào khớp từ chủ đề → bỏ qua FULLTEXT
+                } else {
+                    // Không có từ nội dung đặc biệt → dùng kết quả relevance cao nhất
+                    return $results[0];
+                }
             }
         }
 
@@ -113,6 +130,51 @@ class QuestionModel extends BaseModel
 
         // Không tìm thấy câu trả lời phù hợp
         return false;
+    }
+
+    /**
+     * Trích xuất từ khóa nội dung (loại bỏ stop words tiếng Việt)
+     * Giữ lại các từ chủ đề quan trọng để so sánh ngữ cảnh
+     */
+    private function extractContentWords(string $message): array
+    {
+        $stopWords = [
+            // Từ hỏi
+            'gì', 'nào', 'đâu', 'sao', 'không', 'có', 'bao', 'nhiêu', 'mấy',
+            'thế', 'nào', 'làm', 'thế', 'nào', 'bằng',
+            // Từ nối / chức năng
+            'là', 'và', 'của', 'cho', 'với', 'trong', 'ngoài', 'trên', 'dưới',
+            'từ', 'đến', 'được', 'bị', 'để', 'rằng', 'mà', 'thì', 'cũng',
+            'đã', 'sẽ', 'đang', 'vẫn', 'còn', 'nếu', 'khi', 'hay', 'hoặc',
+            'này', 'kia', 'đó', 'ấy', 'nọ',
+            // Đại từ
+            'tôi', 'mình', 'bạn', 'em', 'anh', 'chị',
+            // Từ phổ biến khác
+            'các', 'những', 'một', 'hai', 'ba', 'mỗi', 'tất', 'cả',
+            'rất', 'quá', 'lắm', 'nhất', 'hơn',
+            'xin', 'vui', 'lòng', 'ơi', 'nhé', 'nha', 'ạ', 'hả',
+            'muốn', 'cần', 'phải', 'nên', 'thể',
+            'hỏi', 'biết', 'cho', 'hãy',
+            // Dấu câu và ký tự đặc biệt
+            'lâu', 'bao lâu',
+        ];
+
+        $message = mb_strtolower(trim($message));
+        // Loại bỏ dấu câu
+        $message = preg_replace('/[?!.,;:]+/u', '', $message);
+
+        // Tách từ
+        $words = preg_split('/\s+/u', $message);
+
+        $contentWords = [];
+        foreach ($words as $word) {
+            $word = trim($word);
+            if (mb_strlen($word) < 2) continue;
+            if (in_array($word, $stopWords)) continue;
+            $contentWords[] = $word;
+        }
+
+        return $contentWords;
     }
 
     /**

@@ -151,7 +151,7 @@ function renderSuggestions(suggestions) {
     if (!container) return;
 
     container.innerHTML = suggestions.map(s =>
-        `<button class="suggestion-chip" onclick="sendSuggestion(this)">${escapeHtml(s.question_text)}</button>`
+        `<button class="suggestion-chip" onclick="sendSuggestion(this)">${escapeHtml(stripLeadingNumber(s.question_text))}</button>`
     ).join('');
 }
 
@@ -239,8 +239,8 @@ function sendSuggestion(btn) {
 function appendMessage(sender, text, forms = []) {
     const container = document.getElementById('chatMessages');
     const avatarUrl = sender === 'bot'
-        ? "https://ui-avatars.com/api/?name=CELRAS&background=0369a1&color=fff&rounded=true&size=36"
-        : "https://ui-avatars.com/api/?name=User&background=64748b&color=fff&rounded=true&size=36";
+        ? "/DuAnChatbotThuVien/public/assets/images/logo1.png"
+        : "/DuAnChatbotThuVien/public/assets/images/US.jpg";
 
     // Render nội dung text (safe), giữ xuống dòng
     const safeText = escapeHtml(text).replace(/\n/g, '<br>');
@@ -287,7 +287,7 @@ function showTypingIndicator() {
     const typingLabel = (typeof t === 'function') ? t('typing') : 'Đang trả lời';
     const html = `
         <div class="message bot" id="typingIndicator">
-            <img src="https://ui-avatars.com/api/?name=CELRAS&background=0369a1&color=fff&rounded=true&size=36" alt="bot" class="avatar">
+            <img src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="bot" class="avatar">
             <div class="bubble">
                 <div class="typing-wrapper">
                     <div class="typing-indicator">
@@ -384,6 +384,17 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+/**
+ * Loại bỏ số thứ tự đầu câu hỏi
+ * VD: "1. Thư viện mở cửa..." → "Thư viện mở cửa..."
+ *     "2) Cách mượn sách" → "Cách mượn sách"
+ *     "10: Quy định" → "Quy định"
+ */
+function stripLeadingNumber(text) {
+    if (!text) return text;
+    return text.replace(/^\s*\d+[\s.):;-]+\s*/, '');
 }
 
 // ===== DANH MỤC CÂU HỎI (SIDEBAR) =====
@@ -525,9 +536,9 @@ async function openCategory(categoryId, itemEl) {
                     </div>`;
             } else {
                 questionsDiv.innerHTML = data.questions.map(q =>
-                    `<div class="cat-question-item" onclick="askCategoryQuestion(this)" data-question="${escapeHtml(q.question_text)}" data-question-vi="${escapeHtml(q.question_text)}"${q.question_text_en ? ` data-question-en="${escapeHtml(q.question_text_en)}"` : ''}>
+                    `<div class="cat-question-item" onclick="askCategoryQuestion(this)" data-question="${escapeHtml(stripLeadingNumber(q.question_text))}" data-question-vi="${escapeHtml(stripLeadingNumber(q.question_text))}"${q.question_text_en ? ` data-question-en="${escapeHtml(stripLeadingNumber(q.question_text_en))}"` : ''}>
                         <span class="q-dot"></span>
-                        <span class="q-text">${escapeHtml(q.question_text)}</span>
+                        <span class="q-text">${escapeHtml(stripLeadingNumber(q.question_text))}</span>
                     </div>`
                 ).join('');
             }

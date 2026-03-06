@@ -6,98 +6,74 @@
     <title>Biểu mẫu / Giấy tờ - CELRAS TVU Admin</title>
     <link rel="icon" type="image/png" href="../assets/images/logo2.png">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/DuAnChatbotThuVien/public/assets/css/loading.css">
     <link rel="stylesheet" href="/DuAnChatbotThuVien/public/assets/css/admin-mobile.css">
     <style>
         body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif}
-        .admin-layout{min-height:100vh}
-        .admin-sidebar{width:240px;background:#1e293b;color:#fff;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;z-index:40;display:flex;flex-direction:column}
-        .admin-content{margin-left:240px;padding:32px;min-height:100vh}
-        .admin-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
-        .admin-header h1{font-size:22px;font-weight:700;color:#111827}
-        .sidebar-logo{padding:20px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:8px}
-        .sidebar-logo span{font-weight:700;font-size:15px;color:#fff}
-        .nav-item{display:flex;align-items:center;gap:12px;padding:10px 20px;color:#94a3b8;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;text-decoration:none}
-        .nav-item:hover{background:rgba(255,255,255,.08);color:#f1f5f9}
-        .nav-item.active{background:rgba(14,165,233,.2);color:#38bdf8;border-right:3px solid #38bdf8}
+        .nav-item{display:flex;align-items:center;gap:12px;padding:10px 16px;color:#94a3b8;font-size:13.5px;font-weight:500;cursor:pointer;transition:all .2s;text-decoration:none;border-radius:10px}
+        .nav-item:hover{background:rgba(255,255,255,.06);color:#e2e8f0}
+        .nav-item.active{background:rgba(14,165,233,.12);color:#38bdf8;font-weight:600}
         .nav-item svg{width:18px;height:18px;flex-shrink:0}
-        .sidebar-logout{padding:16px 20px;border-top:1px solid rgba(255,255,255,.1);margin-top:auto}
-        .btn-primary{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;background:#0369a1;color:#fff;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:background .15s}
-        .btn-primary:hover{background:#0284c7}
-        .btn-outline{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
-        .btn-outline:hover{background:#f9fafb}
-        .data-table{width:100%;border-collapse:collapse;font-size:14px}
-        .data-table thead th{background:#f8fafc;padding:11px 14px;text-align:left;font-size:12px;font-weight:600;text-transform:uppercase;color:#64748b;border-bottom:1px solid #e2e8f0}
-        .data-table tbody tr{border-bottom:1px solid #f1f5f9;transition:background .1s}
-        .data-table tbody tr:hover{background:#f8fafc}
-        .data-table tbody td{padding:12px 14px;color:#374151;vertical-align:top}
-        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;padding:16px}
-        .modal-overlay.active{display:flex}
-        .modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
-        .form-group{margin-bottom:18px}
-        .form-group label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px}
-        .form-group input,.form-group select,.form-group textarea{display:block;width:100%;padding:9px 13px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;color:#111827;background:#fff;outline:none;transition:border .15s;font-family:inherit}
-        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,.12)}
-        .toggle-switch{position:relative;display:inline-block;width:46px;height:26px}
-        .toggle-switch input{opacity:0;width:0;height:0}
-        .toggle-slider{position:absolute;cursor:pointer;inset:0;background:#d1d5db;border-radius:26px;transition:.25s}
-        .toggle-slider:before{content:'';position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.25s}
-        .toggle-switch input:checked+.toggle-slider{background:#0ea5e9}
-        .toggle-switch input:checked+.toggle-slider:before{transform:translateX(20px)}
-        .badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:9999px;font-size:12px;font-weight:600}
-        .badge-success{background:#dcfce7;color:#15803d}
-        .badge-danger{background:#fee2e2;color:#dc2626}
-        .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:35}
+        .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:35;backdrop-filter:blur(4px)}
         .sidebar-overlay.active{display:block}
         .mobile-topbar{display:none}
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px)}
+        .modal-overlay.active{display:flex}
+        .data-table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+        .data-table thead th{padding:14px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;border-bottom:2px solid #e2e8f0;letter-spacing:.05em;background:linear-gradient(180deg,#f8fafc,#f1f5f9)}
+        .data-table tbody tr{transition:all .15s}
+        .data-table tbody tr:hover{background:#f0f9ff}
+        .data-table tbody td{padding:14px 16px;color:#374151;vertical-align:top;border-bottom:1px solid #f1f5f9}
+        .badge{display:inline-flex;align-items:center;padding:4px 12px;border-radius:9999px;font-size:12px;font-weight:600}
+        .badge-green,.badge-success{background:#dcfce7;color:#15803d}
+        .badge-yellow,.badge-warning{background:#fef9c3;color:#a16207}
+        .badge-red,.badge-danger{background:#fee2e2;color:#dc2626}
+        .badge-blue,.badge-info{background:#dbeafe;color:#1d4ed8}
+        .form-group{margin-bottom:18px}
+        .form-group label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px}
+        .form-group input,.form-group select,.form-group textarea{display:block;width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:12px;font-size:14px;color:#111827;background:#fafbfc;outline:none;transition:all .2s;font-family:inherit}
+        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:#0ea5e9;box-shadow:0 0 0 4px rgba(14,165,233,.1);background:#fff}
+        .toggle-switch{position:relative;display:inline-block;width:48px;height:28px}
+        .toggle-switch input{opacity:0;width:0;height:0}
+        .toggle-slider{position:absolute;cursor:pointer;inset:0;background:#d1d5db;border-radius:28px;transition:.3s}
+        .toggle-slider:before{content:'';position:absolute;height:22px;width:22px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+        .toggle-switch input:checked+.toggle-slider{background:linear-gradient(135deg,#0ea5e9,#6366f1)}
+        .toggle-switch input:checked+.toggle-slider:before{transform:translateX(20px)}
         @media(max-width:768px){
-            .admin-content{margin-left:0;padding:16px;padding-top:72px}
             .admin-sidebar{transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1)}
             .admin-sidebar.open{transform:translateX(0)}
-            .mobile-topbar{display:flex;position:fixed;top:0;left:0;right:0;height:56px;background:#fff;border-bottom:1px solid #e5e7eb;z-index:30;align-items:center;padding:0 16px;gap:12px}
-            .admin-header h1{font-size:18px}
-            .admin-header{flex-direction:column;align-items:flex-start;gap:12px}
-            .data-table{font-size:13px}
-            .data-table thead th,.data-table tbody td{padding:10px 8px}
-            .modal{padding:20px;margin:8px}
         }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-gradient-to-br from-gray-50 via-slate-50 to-sky-50/30">
 
     <!-- ===== PAGE LOADER ===== -->
     <div id="page-loader">
-        <div class="loader-spinner-wrap">
-            <div class="loader-spinner"></div>
-            <img class="loader-logo-img" src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="CELRAS TVU"
-                 onerror="this.src='https://ui-avatars.com/api/?name=CELRAS+TVU&background=0369a1&color=fff&rounded=true&size=80'">
-        </div>
-        <div class="loader-brand">CELRAS TVU</div>
-        <div class="loader-tagline">Trung tâm Học liệu và Hỗ trợ Học thuật<br>Đại học Trà Vinh</div>
-        <div class="loader-dots"><span></span><span></span><span></span></div>
-        <div class="loader-bar-wrap"><div class="loader-bar"></div></div>
+        <div class="loader-spinner-wrap"><div class="loader-spinner"></div><img class="loader-logo-img" src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="CELRAS TVU" onerror="this.src='/DuAnChatbotThuVien/public/assets/images/logo2.png'"></div>
+        <div class="loader-brand">CELRAS TVU</div><div class="loader-tagline">Trung tâm Học liệu và Hỗ trợ Học thuật<br>Đại học Trà Vinh</div>
+        <div class="loader-dots"><span></span><span></span><span></span></div><div class="loader-bar-wrap"><div class="loader-bar"></div></div>
     </div>
 
-    <div class="admin-layout">
+    <div class="min-h-screen">
         <!-- Mobile Top Bar -->
-        <div class="mobile-topbar">
-            <button onclick="toggleSidebar()" class="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 transition-colors text-gray-600">
+        <div class="mobile-topbar fixed top-0 left-0 right-0 h-14 bg-white/80 backdrop-blur-lg border-b border-gray-200/60 z-30 items-center px-4 gap-3">
+            <button onclick="toggleSidebar()" class="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-100 transition-colors text-gray-600">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
-            <span class="font-semibold text-gray-800 text-sm truncate">Biểu mẫu / Giấy tờ</span>
+            <span class="font-bold text-gray-800 text-sm truncate">Biểu mẫu / Giấy tờ</span>
         </div>
-        <!-- Mobile Overlay -->
         <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
         <!-- Sidebar -->
-        <aside class="admin-sidebar" id="adminSidebar">
-            <div class="sidebar-logo">
-                <a href="/DuAnChatbotThuVien/public/pages/index.html" class="flex items-center gap-2" style="text-decoration:none">
-                    <img src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="Logo" class="w-8 h-8 rounded-full object-cover" onerror="this.src='https://ui-avatars.com/api/?name=CELRAS&background=0369a1&color=fff&rounded=true&size=36'">
-                    <span>CELRAS TVU</span>
+        <aside class="admin-sidebar w-60 fixed top-0 left-0 h-screen overflow-y-auto z-40 flex flex-col bg-gradient-to-b from-slate-800 to-slate-900" id="adminSidebar">
+            <div class="px-5 py-5 border-b border-white/10 mb-2">
+                <a href="/DuAnChatbotThuVien/public/pages/index.html" class="flex items-center gap-2.5 no-underline">
+                    <img src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="Logo" class="w-9 h-9 rounded-full object-cover ring-2 ring-sky-400/30" onerror="this.src='/DuAnChatbotThuVien/public/assets/images/logo2.png'">
+                    <span class="font-bold text-[15px] text-white tracking-tight">CELRAS TVU</span>
                 </a>
             </div>
-            <nav class="flex flex-col mt-1 flex-1">
+            <nav class="flex flex-col flex-1 px-3 space-y-0.5">
                 <a href="dashboard.html" class="nav-item" data-page="dashboard"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1"/></svg>Dashboard</a>
                 <a href="questions.html" class="nav-item" data-page="questions"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Quản lý câu hỏi</a>
                 <a href="categories.html" class="nav-item" data-page="categories"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>Danh mục</a>
@@ -106,177 +82,133 @@
                 <a href="settings.html" class="nav-item" data-page="settings"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Cài đặt giao diện</a>
                 <a href="unanswered.html" class="nav-item" data-page="unanswered"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>Chưa trả lời</a>
             </nav>
-            <!-- Admin Profile -->
-            <div style="padding:14px 20px;border-top:1px solid rgba(255,255,255,.1)">
+            <div class="px-5 py-3.5 border-t border-white/10">
                 <div class="flex items-center gap-3">
-                    <img id="sidebarAdminAvatar" src="" alt="" class="w-9 h-9 rounded-full border-2 border-sky-400 object-cover" style="min-width:36px" referrerpolicy="no-referrer" crossorigin="anonymous">
-                    <div style="overflow:hidden">
-                        <p id="sidebarAdminName" class="text-sm font-semibold text-white" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></p>
-                        <p class="text-xs text-slate-400">Quản trị viên</p>
-                    </div>
+                    <img id="sidebarAdminAvatar" src="" alt="" class="w-9 h-9 rounded-full border-2 border-sky-400/50 object-cover flex-shrink-0" referrerpolicy="no-referrer" crossorigin="anonymous">
+                    <div class="overflow-hidden"><p id="sidebarAdminName" class="text-sm font-semibold text-white truncate"></p><p class="text-xs text-slate-400">Quản trị viên</p></div>
                 </div>
             </div>
-            <div class="sidebar-logout flex flex-col gap-1">
+            <div class="px-3 pb-4 pt-2 border-t border-white/10 space-y-0.5">
                 <a href="/DuAnChatbotThuVien/public/pages/index.html" class="nav-item"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>Về trang chatbot</a>
                 <a href="#" onclick="logout();return false" class="nav-item" style="color:#f87171"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>Đăng xuất</a>
             </div>
         </aside>
 
         <!-- Main Content -->
-        <div class="admin-content">
+        <div class="admin-content ml-60 p-8 min-h-screen">
             <!-- Header -->
-            <div class="admin-header">
+            <div class="admin-header flex items-center justify-between mb-8">
                 <div>
-                    <h1>Biểu mẫu / Giấy tờ</h1>
-                    <p class="text-sm text-gray-500 mt-1">Quản lý danh sách biểu mẫu – chatbot tự động đưa ra link khi người dùng hỏi</p>
+                    <h1 class="text-2xl font-extrabold text-gray-900">Biểu mẫu / Giấy tờ</h1>
+                    <p class="text-sm text-gray-500 mt-1">Quản lý biểu mẫu, đơn từ và giấy tờ liên quan</p>
                 </div>
-                <div class="flex items-center gap-3">
-                    <img id="dashAdminAvatar" src="" alt="" class="w-10 h-10 rounded-full border-2 border-sky-200" referrerpolicy="no-referrer" crossorigin="anonymous">
-                    <div class="hidden sm:block">
-                        <p id="dashAdminName" class="text-sm font-semibold text-gray-700"></p>
-                        <p class="text-xs text-gray-500">Quản trị viên</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Info Banner -->
-            <div class="bg-sky-50 border border-sky-200 rounded-xl p-4 mb-6 flex items-start gap-3">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-sky-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <div class="text-sm text-sky-800">
-                    <strong>Cách hoạt động:</strong> Khi người dùng nhắn tin hỏi về biểu mẫu hoặc giấy tờ, chatbot sẽ so khớp
-                    <strong>Từ khóa</strong> của từng biểu mẫu với nội dung câu hỏi và tự động hiển thị link tải về trong hộp chat.
-                    Nhập nhiều từ khóa cách nhau bằng dấu phẩy để tăng độ chính xác.
-                </div>
-            </div>
-
-            <!-- Toolbar -->
-            <div class="flex items-center justify-between gap-4 mb-4 flex-wrap">
-                <div class="flex items-center gap-2 flex-1 min-w-0">
-                    <div class="relative flex-1 max-w-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                        <input id="formSearch" type="text" placeholder="Tìm kiếm biểu mẫu..."
-                               class="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm w-full focus:outline-none focus:border-sky-400">
-                    </div>
-                </div>
-                <button id="btnAddForm" class="btn-primary flex-shrink-0">
+                <button id="btnAddForm" onclick="openFormModal()" class="btn-primary inline-flex items-center gap-2 bg-gradient-to-r from-sky-500 to-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-sky-500/25 hover:shadow-xl hover:shadow-sky-500/30 hover:-translate-y-0.5 transition-all duration-300">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                     Thêm biểu mẫu
                 </button>
             </div>
 
-            <!-- Table -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <!-- Info Banner -->
+            <div class="bg-gradient-to-r from-sky-50 to-blue-50 rounded-2xl border border-sky-200/60 p-5 mb-6 flex items-start gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-sky-400 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md shadow-sky-500/20">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <p class="text-sm font-semibold text-gray-800 mb-0.5">Hướng dẫn</p>
+                    <p class="text-xs text-gray-600 leading-relaxed">Thêm các biểu mẫu, đơn từ với link tải về. Khi người dùng hỏi chatbot về biểu mẫu, chatbot sẽ gửi link tải về tương ứng. Có thể thêm <strong>từ khóa</strong> để tăng độ chính xác nhận diện.</p>
+                </div>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-lg overflow-hidden mb-6">
+                <div class="h-1 bg-gradient-to-r from-sky-400 to-blue-500"></div>
+                <div class="p-4 flex items-center gap-4">
+                    <div class="flex-1 relative">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input type="text" id="formSearch" placeholder="Tìm kiếm biểu mẫu..." onkeyup="filterForms()" class="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-gray-700 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition-all placeholder-gray-400">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Forms Table -->
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-lg overflow-hidden">
+                <div class="h-1 bg-gradient-to-r from-indigo-400 to-violet-500"></div>
                 <div class="overflow-x-auto">
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th class="text-center w-10">#</th>
+                                <th class="w-8">#</th>
                                 <th>Tên biểu mẫu</th>
-                                <th>Link tải về</th>
-                                <th>Từ khóa chatbot</th>
-                                <th class="text-center">Trạng thái</th>
-                                <th class="text-right">Thao tác</th>
+                                <th>Mô tả</th>
+                                <th>Từ khóa</th>
+                                <th>Trạng thái</th>
+                                <th class="w-28 text-center">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody id="formsBody">
-                            <tr><td colspan="6" class="text-center py-10 text-gray-400">Đang tải...</td></tr>
+                            <tr><td colspan="6" class="text-center py-12 text-gray-400"><div class="flex flex-col items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg><span>Đang tải dữ liệu...</span></div></td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
-        </div><!-- /admin-content -->
-    </div><!-- /admin-layout -->
+        </div>
+    </div>
 
-    <!-- ===== MODAL THÊM / SỬA BIỂU MẪU ===== -->
-    <div id="formModal" class="modal-overlay">
-        <div class="modal">
-            <div class="flex items-center justify-between mb-6">
-                <h2 id="formModalTitle" class="text-lg font-bold text-gray-800">Thêm biểu mẫu mới</h2>
-                <button id="btnCloseFormX" class="text-gray-400 hover:text-gray-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-            <form id="formForm">
-                <input type="hidden" id="formId">
-
-                <div class="form-group">
-                    <label for="formName">Tên biểu mẫu / giấy tờ <span class="text-red-500">*</span></label>
-                    <input type="text" id="formName" placeholder="VD: Đơn đăng ký mượn tài liệu đặc biệt" required>
+    <!-- Form Modal -->
+    <div class="modal-overlay" id="formModal">
+        <div class="modal bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+            <div class="h-1 bg-gradient-to-r from-sky-400 to-blue-600"></div>
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 id="formModalTitle" class="text-lg font-bold text-gray-900">Thêm biểu mẫu</h3>
+                    <button id="btnCloseFormX" onclick="closeFormModal()" class="w-9 h-9 rounded-xl hover:bg-gray-100 transition-colors flex items-center justify-center text-gray-400 hover:text-gray-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
                 </div>
-
-                <div class="form-group">
-                    <label for="formDesc">Mô tả (tuỳ chọn)</label>
-                    <textarea id="formDesc" rows="2" placeholder="Mô tả ngắn về biểu mẫu này..."></textarea>
-                </div>
-
-                <div class="form-group">
-                    <label for="formUrl">Link trang biểu mẫu <span class="text-red-500">*</span></label>
-                    <input type="url" id="formUrl" placeholder="https://celri.tvu.edu.vn/bieu-mau" required>
-                    <p class="text-xs text-gray-400 mt-1">Đường dẫn sẽ được hiển thị trong chatbot để người dùng bấm vào tải về.</p>
-                </div>
-
-                <div class="form-group">
-                    <label for="formKeywords">Từ khóa nhận diện</label>
-                    <input type="text" id="formKeywords" placeholder="VD: đơn mượn tài liệu, mẫu mượn, luận văn">
-                    <p class="text-xs text-gray-400 mt-1">Các từ khóa cách nhau bằng dấu phẩy. Chatbot khớp từ khóa này với câu hỏi của người dùng.</p>
-                </div>
-
-                <div class="form-group">
-                    <div class="flex items-center gap-3">
+                <form id="formForm" onsubmit="saveForm(event)">
+                    <input type="hidden" id="formId">
+                    <div class="form-group">
+                        <label>Tên biểu mẫu <span class="text-red-500">*</span></label>
+                        <input type="text" id="formName" required placeholder="VD: Đơn xin cấp thẻ thư viện">
+                    </div>
+                    <div class="form-group">
+                        <label>Mô tả</label>
+                        <textarea id="formDesc" rows="3" placeholder="Mô tả ngắn về biểu mẫu..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>URL tải về <span class="text-red-500">*</span></label>
+                        <input type="url" id="formUrl" required placeholder="https://example.com/form.pdf">
+                    </div>
+                    <div class="form-group">
+                        <label>Từ khóa</label>
+                        <input type="text" id="formKeywords" placeholder="VD: thẻ thư viện, đơn xin, cấp thẻ">
+                        <p class="text-xs text-gray-400 mt-1.5">Các từ khóa cách nhau bằng dấu phẩy, giúp chatbot nhận diện chính xác hơn</p>
+                    </div>
+                    <div class="flex items-center gap-3 mb-4">
                         <label class="toggle-switch">
                             <input type="checkbox" id="formActive" checked>
                             <span class="toggle-slider"></span>
                         </label>
-                        <span class="text-sm text-gray-600">Kích hoạt (chatbot hiển thị biểu mẫu này)</span>
+                        <span class="text-sm font-medium text-gray-600">Kích hoạt</span>
                     </div>
-                </div>
-
-                <div class="flex gap-3 justify-end mt-6">
-                    <button type="button" id="btnCloseFormCancel" class="btn-outline">Huỷ</button>
-                    <button type="submit" class="btn-primary">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                        Lưu biểu mẫu
-                    </button>
-                </div>
-            </form>
+                    <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
+                        <button type="button" id="btnCloseFormCancel" onclick="closeFormModal()" class="btn-outline px-5 py-2.5 rounded-xl text-sm font-semibold border-2 border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all duration-300">Hủy</button>
+                        <button type="submit" class="btn-primary inline-flex items-center gap-2 bg-gradient-to-r from-sky-500 to-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-sky-500/25 hover:shadow-xl transition-all duration-300">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            Lưu
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
     <script src="/DuAnChatbotThuVien/public/assets/js/loading.js"></script>
-    <script src="/DuAnChatbotThuVien/public/assets/js/admin.js?v=20260305"></script>
+    <script src="/DuAnChatbotThuVien/public/assets/js/admin.js?v=20260306c"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            // Chờ admin.js load xong
-            if (typeof loadAdminPage !== 'function') {
-                console.error('admin.js chưa load xong');
-                return;
-            }
             await loadAdminPage('forms');
-
-            if (typeof loadForms === 'function') {
-                loadForms();
-            }
-
-            // Gán sự kiện sau khi admin.js đã load
-            var btnAdd = document.getElementById('btnAddForm');
-            if (btnAdd) btnAdd.addEventListener('click', function() { openFormModal(); });
-
-            var searchInput = document.getElementById('formSearch');
-            if (searchInput) searchInput.addEventListener('input', function() { filterForms(); });
-
-            var modal = document.getElementById('formModal');
-            if (modal) modal.addEventListener('click', function(e) { if (e.target === this) closeFormModal(); });
-
-            var btnCloseX = document.getElementById('btnCloseFormX');
-            if (btnCloseX) btnCloseX.addEventListener('click', function() { closeFormModal(); });
-
-            var btnCancel = document.getElementById('btnCloseFormCancel');
-            if (btnCancel) btnCancel.addEventListener('click', function() { closeFormModal(); });
-
-            var formEl = document.getElementById('formForm');
-            if (formEl) formEl.addEventListener('submit', function(e) { saveForm(e); });
+            loadForms();
         });
     </script>
 </body>

@@ -72,7 +72,7 @@ async function loadAdminPage(pageName) {
     if (!admin) return;
 
     // Điền thông tin admin vào header
-    const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(admin.name)}&background=0369a1&color=fff&rounded=true`;
+    const fallbackAvatar = '/DuAnChatbotThuVien/public/assets/images/US.jpg';
     const avatarSrc = admin.avatar || fallbackAvatar;
 
     const avatarEl = document.getElementById('dashAdminAvatar');
@@ -476,28 +476,38 @@ function renderThemes(themes) {
     if (!container) return;
 
     if (!themes.length) {
-        container.innerHTML = '<p class="text-gray-400 text-sm">Chưa có chủ đề</p>';
+        container.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">Chưa có chủ đề nào</p>';
         return;
     }
+
+    // Emoji map for theme keys
+    const themeEmojis = {
+        'mac-dinh': '🏠', 'tet': '🧧', 'trung-thu': '🌕', 'halloween': '🎃',
+        'giang-sinh': '🎄', '8-3': '🌸', '20-10': '🌹', '20-11': '📚',
+        '30-4': '🇻🇳', '1-5': '👷', '2-9': '🎆'
+    };
 
     container.innerHTML = themes.map(t => {
         const isActive = parseInt(t.is_active) === 1;
         const isDefault = t.theme_key === 'mac-dinh';
+        const emoji = themeEmojis[t.theme_key] || '🎨';
+        const safeName = escapeHtml(t.theme_name);
+
         return `
-        <div class="flex items-center gap-3 p-3 rounded-xl border ${isActive ? 'border-sky-300 bg-sky-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'} transition-all" style="min-height:56px;">
-            <div class="w-9 h-9 rounded-full flex-shrink-0" style="background: ${escapeHtml(t.primary_color)}; box-shadow: 0 3px 10px ${escapeHtml(t.primary_color)}40; border: 2px solid #fff;"></div>
+        <div class="theme-card ${isActive ? 'active' : ''}">
+            <div class="theme-orb" style="background:linear-gradient(135deg, ${escapeHtml(t.primary_color)}, ${escapeHtml(t.secondary_color || t.primary_color)})">
+                <span style="position:relative;z-index:1">${emoji}</span>
+            </div>
             <div class="flex-1 min-w-0">
-                <p class="font-semibold text-sm truncate">${escapeHtml(t.theme_name)}</p>
-                <p class="text-xs text-gray-500">${t.start_date ? t.start_date + ' → ' + (t.end_date || '∞') : 'Không giới hạn'}</p>
+                <p class="font-bold text-sm truncate text-gray-800">${safeName}</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">${t.start_date ? t.start_date + ' → ' + (t.end_date || '∞') : 'Không giới hạn thời gian'}</p>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
                 ${isActive
-                    ? '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-700 border border-sky-200">Đang dùng</span>'
-                    : `<button onclick="activateTheme(${t.id})" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 hover:bg-sky-100 hover:text-sky-700 border border-gray-200 hover:border-sky-200 transition-all cursor-pointer" title="Bật chủ đề này">Tắt</button>`
+                    ? '<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-100 to-blue-100 text-sky-700 border border-sky-200" style="box-shadow:0 2px 8px rgba(14,165,233,.15)"><span class="w-1.5 h-1.5 bg-sky-500 rounded-full animate-pulse"></span>Đang dùng</span>'
+                    : '<button onclick="activateTheme(' + t.id + ')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gray-50 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 border border-gray-200 hover:border-emerald-200 transition-all cursor-pointer" title="Bật chủ đề này"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>Bật</button>'
                 }
-                ${!isDefault ? `<button onclick="deleteTheme(${t.id}, '${escapeHtml(t.theme_name)}')" class="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all" title="Xóa">
-                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                </button>` : ''}
+                ${!isDefault ? '<button onclick="deleteTheme(' + t.id + ', ' + escapeAttr(t.theme_name) + ')" class="w-8 h-8 flex items-center justify-center rounded-xl text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all" title="Xóa chủ đề"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>' : ''}
             </div>
         </div>`;
     }).join('');

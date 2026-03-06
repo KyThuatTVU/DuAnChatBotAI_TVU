@@ -4,85 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - CELRAS TVU Admin</title>
-    <!-- Logo trên tab -->
-<link rel="icon" type="image/png" href="../assets/images/logo2.png">
-    <!-- Tailwind CDN: viết class trực tiếp vào HTML -->
+    <link rel="icon" type="image/png" href="../assets/images/logo2.png">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/DuAnChatbotThuVien/public/assets/css/loading.css">
     <link rel="stylesheet" href="/DuAnChatbotThuVien/public/assets/css/admin-mobile.css">
     <style>
         body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif}
-        .admin-layout{min-height:100vh}
-        .admin-sidebar{width:240px;background:#1e293b;color:#fff;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;z-index:40;display:flex;flex-direction:column}
-        .admin-content{margin-left:240px;padding:32px;min-height:100vh}
-        .admin-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
-        .admin-header h1{font-size:22px;font-weight:700;color:#111827}
-        .sidebar-logo{padding:20px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:8px}
-        .sidebar-logo span{font-weight:700;font-size:15px;color:#fff}
-        .nav-item{display:flex;align-items:center;gap:12px;padding:10px 20px;color:#94a3b8;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;text-decoration:none}
-        .nav-item:hover{background:rgba(255,255,255,.08);color:#f1f5f9}
-        .nav-item.active{background:rgba(14,165,233,.2);color:#38bdf8;border-right:3px solid #38bdf8}
+        .nav-item{display:flex;align-items:center;gap:12px;padding:10px 16px;color:#94a3b8;font-size:13.5px;font-weight:500;cursor:pointer;transition:all .2s;text-decoration:none;border-radius:10px}
+        .nav-item:hover{background:rgba(255,255,255,.06);color:#e2e8f0}
+        .nav-item.active{background:rgba(14,165,233,.12);color:#38bdf8;font-weight:600}
         .nav-item svg{width:18px;height:18px;flex-shrink:0}
-        .nav-section{padding:16px 20px 6px;font-size:11px;font-weight:600;text-transform:uppercase;color:#475569;letter-spacing:.08em}
-        .sidebar-logout{padding:16px 20px;border-top:1px solid rgba(255,255,255,.1);margin-top:auto}
-        .stat-card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.08);border:1px solid #e5e7eb}
-        .stat-number{font-size:28px;font-weight:700;color:#111827}
-        .stat-label{font-size:13px;color:#6b7280;margin-top:2px}
-        .btn-primary{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;background:#0369a1;color:#fff;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:background .15s}
-        .btn-primary:hover{background:#0284c7}
-        .btn-outline{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
-        .btn-outline:hover{background:#f9fafb}
-        .btn-danger{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#fee2e2;color:#dc2626;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:none}
-        .btn-danger:hover{background:#fecaca}
-        .data-table{width:100%;border-collapse:collapse;font-size:14px}
-        .data-table thead th{background:#f8fafc;padding:11px 14px;text-align:left;font-size:12px;font-weight:600;text-transform:uppercase;color:#64748b;border-bottom:1px solid #e2e8f0}
-        .data-table tbody tr{border-bottom:1px solid #f1f5f9;transition:background .1s}
-        .data-table tbody tr:hover{background:#f8fafc}
-        .data-table tbody td{padding:12px 14px;color:#374151;vertical-align:top}
-        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;padding:16px}
-        .modal-overlay.active{display:flex}
-        .modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
-        .form-group{margin-bottom:18px}
-        .form-group label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px}
-        .form-group input,.form-group select,.form-group textarea{display:block;width:100%;padding:9px 13px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;color:#111827;background:#fff;outline:none;transition:border .15s;font-family:inherit}
-        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,.12)}
-        .toggle-switch{position:relative;display:inline-block;width:46px;height:26px}
-        .toggle-switch input{opacity:0;width:0;height:0}
-        .toggle-slider{position:absolute;cursor:pointer;inset:0;background:#d1d5db;border-radius:26px;transition:.25s}
-        .toggle-slider:before{content:'';position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.25s}
-        .toggle-switch input:checked+.toggle-slider{background:#0ea5e9}
-        .toggle-switch input:checked+.toggle-slider:before{transform:translateX(20px)}
-        .color-picker-group{display:flex;align-items:center;gap:8px}
-        .color-picker-group input[type="color"]{width:36px;height:36px;border:1px solid #e5e7eb;border-radius:6px;padding:2px;cursor:pointer}
-        .color-picker-group input[type="text"]{width:90px;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-family:monospace}
-        .badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:9999px;font-size:12px;font-weight:600}
-        .badge-green,.badge-success{background:#dcfce7;color:#15803d}
-        .badge-yellow,.badge-warning{background:#fef9c3;color:#a16207}
-        .badge-red,.badge-danger{background:#fee2e2;color:#dc2626}
-        .badge-blue,.badge-info{background:#dbeafe;color:#1d4ed8}
-        .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:35}
+        .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:35;backdrop-filter:blur(4px)}
         .sidebar-overlay.active{display:block}
         .mobile-topbar{display:none}
         @media(max-width:768px){
-            .admin-content{margin-left:0;padding:16px;padding-top:72px}
             .admin-sidebar{transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1)}
             .admin-sidebar.open{transform:translateX(0)}
-            .mobile-topbar{display:flex;position:fixed;top:0;left:0;right:0;height:56px;background:#fff;border-bottom:1px solid #e5e7eb;z-index:30;align-items:center;padding:0 16px;gap:12px}
-            .admin-header h1{font-size:18px}
-            .stat-number{font-size:22px}
-            .stat-card{padding:16px}
         }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-gradient-to-br from-gray-50 via-slate-50 to-sky-50/30">
 
     <!-- ===== PAGE LOADER ===== -->
     <div id="page-loader">
         <div class="loader-spinner-wrap">
             <div class="loader-spinner"></div>
             <img class="loader-logo-img" src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="CELRAS TVU"
-                 onerror="this.src='https://ui-avatars.com/api/?name=CELRAS+TVU&background=0369a1&color=fff&rounded=true&size=80'">
+                 onerror="this.src='/DuAnChatbotThuVien/public/assets/images/logo2.png'">
         </div>
         <div class="loader-brand">CELRAS TVU</div>
         <div class="loader-tagline">Trung tâm Học liệu và Hỗ trợ Học thuật<br>Đại học Trà Vinh</div>
@@ -90,25 +39,26 @@
         <div class="loader-bar-wrap"><div class="loader-bar"></div></div>
     </div>
 
-    <div class="admin-layout">
+    <div class="min-h-screen">
         <!-- Mobile Top Bar -->
-        <div class="mobile-topbar">
-            <button onclick="toggleSidebar()" class="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 transition-colors text-gray-600">
+        <div class="mobile-topbar fixed top-0 left-0 right-0 h-14 bg-white/80 backdrop-blur-lg border-b border-gray-200/60 z-30 items-center px-4 gap-3">
+            <button onclick="toggleSidebar()" class="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-100 transition-colors text-gray-600">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
-            <span class="font-semibold text-gray-800 text-sm truncate">Dashboard</span>
+            <span class="font-bold text-gray-800 text-sm truncate">Dashboard</span>
         </div>
         <!-- Mobile Overlay -->
         <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
         <!-- Sidebar -->
-        <aside class="admin-sidebar" id="adminSidebar">
-            <div class="sidebar-logo">
-                <a href="/DuAnChatbotThuVien/public/pages/index.html" class="flex items-center gap-2" style="text-decoration:none">
-                    <img src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="Logo" class="w-8 h-8 rounded-full object-cover" onerror="this.src='https://ui-avatars.com/api/?name=CELRAS&background=0369a1&color=fff&rounded=true&size=36'">
-                    <span>CELRAS TVU</span>
+        <aside class="admin-sidebar w-60 fixed top-0 left-0 h-screen overflow-y-auto z-40 flex flex-col bg-gradient-to-b from-slate-800 to-slate-900" id="adminSidebar">
+            <div class="px-5 py-5 border-b border-white/10 mb-2">
+                <a href="/DuAnChatbotThuVien/public/pages/index.html" class="flex items-center gap-2.5 no-underline">
+                    <img src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="Logo" class="w-9 h-9 rounded-full object-cover ring-2 ring-sky-400/30" onerror="this.src='/DuAnChatbotThuVien/public/assets/images/logo2.png'">
+                    <span class="font-bold text-[15px] text-white tracking-tight">CELRAS TVU</span>
                 </a>
             </div>
-            <nav class="flex flex-col mt-1 flex-1">
+            <nav class="flex flex-col flex-1 px-3 space-y-0.5">
                 <a href="dashboard.html" class="nav-item active" data-page="dashboard"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1"/></svg>Dashboard</a>
                 <a href="questions.html" class="nav-item" data-page="questions"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Quản lý câu hỏi</a>
                 <a href="categories.html" class="nav-item" data-page="categories"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>Danh mục</a>
@@ -117,32 +67,31 @@
                 <a href="settings.html" class="nav-item" data-page="settings"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Cài đặt giao diện</a>
                 <a href="unanswered.html" class="nav-item" data-page="unanswered"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>Chưa trả lời</a>
             </nav>
-            <!-- Admin Profile -->
-            <div style="padding:14px 20px;border-top:1px solid rgba(255,255,255,.1)">
+            <div class="px-5 py-3.5 border-t border-white/10">
                 <div class="flex items-center gap-3">
-                    <img id="sidebarAdminAvatar" src="" alt="" class="w-9 h-9 rounded-full border-2 border-sky-400 object-cover" style="min-width:36px" referrerpolicy="no-referrer" crossorigin="anonymous">
-                    <div style="overflow:hidden">
-                        <p id="sidebarAdminName" class="text-sm font-semibold text-white" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></p>
+                    <img id="sidebarAdminAvatar" src="" alt="" class="w-9 h-9 rounded-full border-2 border-sky-400/50 object-cover flex-shrink-0" referrerpolicy="no-referrer" crossorigin="anonymous">
+                    <div class="overflow-hidden">
+                        <p id="sidebarAdminName" class="text-sm font-semibold text-white truncate"></p>
                         <p class="text-xs text-slate-400">Quản trị viên</p>
                     </div>
                 </div>
             </div>
-            <div class="sidebar-logout flex flex-col gap-1">
+            <div class="px-3 pb-4 pt-2 border-t border-white/10 space-y-0.5">
                 <a href="/DuAnChatbotThuVien/public/pages/index.html" class="nav-item"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>Về trang chatbot</a>
                 <a href="#" onclick="logout();return false" class="nav-item" style="color:#f87171"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>Đăng xuất</a>
             </div>
         </aside>
 
         <!-- Main Content -->
-        <div class="admin-content">
+        <div class="admin-content ml-60 p-8 min-h-screen">
             <!-- Header -->
-            <div class="admin-header">
+            <div class="admin-header flex items-center justify-between mb-8">
                 <div>
-                    <h1>Dashboard</h1>
+                    <h1 class="text-2xl font-extrabold text-gray-900">Dashboard</h1>
                     <p class="text-sm text-gray-500 mt-1">Tổng quan hệ thống Chatbot Thư viện</p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <img id="dashAdminAvatar" src="" alt="" class="w-10 h-10 rounded-full border-2 border-sky-200" referrerpolicy="no-referrer" crossorigin="anonymous">
+                    <img id="dashAdminAvatar" src="" alt="" class="w-11 h-11 rounded-full ring-2 ring-sky-200 shadow-lg" referrerpolicy="no-referrer" crossorigin="anonymous">
                     <div class="hidden sm:block">
                         <p id="dashAdminName" class="text-sm font-semibold text-gray-700"></p>
                         <p id="dashAdminRole" class="text-xs text-gray-500">Quản trị viên</p>
@@ -152,160 +101,175 @@
 
             <!-- Stats Grid -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <div class="stat-card">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="stat-number" id="statQuestions">0</p>
-                            <p class="stat-label">Câu hỏi</p>
-                        </div>
-                        <div class="w-12 h-12 bg-sky-100 rounded-xl flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        </div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="stat-number" id="statCategories">0</p>
-                            <p class="stat-label">Danh mục</p>
-                        </div>
-                        <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>
+                <!-- Câu hỏi -->
+                <div class="stat-card bg-white rounded-2xl border border-gray-100 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden group">
+                    <div class="h-1 bg-gradient-to-r from-sky-400 to-blue-500"></div>
+                    <div class="p-5">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="stat-number text-3xl font-extrabold text-gray-900" id="statQuestions">0</p>
+                                <p class="text-sm text-gray-500 mt-1 font-medium">Câu hỏi</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-sky-400 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-sky-500/25 group-hover:scale-110 transition-transform duration-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="stat-card">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="stat-number" id="statSessions">0</p>
-                            <p class="stat-label">Phiên chat</p>
-                        </div>
-                        <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                <!-- Danh mục -->
+                <div class="stat-card bg-white rounded-2xl border border-gray-100 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden group">
+                    <div class="h-1 bg-gradient-to-r from-emerald-400 to-green-500"></div>
+                    <div class="p-5">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="stat-number text-3xl font-extrabold text-gray-900" id="statCategories">0</p>
+                                <p class="text-sm text-gray-500 mt-1 font-medium">Danh mục</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-emerald-400 to-green-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:scale-110 transition-transform duration-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="stat-card">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="stat-number" id="statUnanswered">0</p>
-                            <p class="stat-label">Chưa trả lời</p>
+                <!-- Phiên chat -->
+                <div class="stat-card bg-white rounded-2xl border border-gray-100 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden group">
+                    <div class="h-1 bg-gradient-to-r from-violet-400 to-purple-500"></div>
+                    <div class="p-5">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="stat-number text-3xl font-extrabold text-gray-900" id="statSessions">0</p>
+                                <p class="text-sm text-gray-500 mt-1 font-medium">Phiên chat</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-violet-400 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/25 group-hover:scale-110 transition-transform duration-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                            </div>
                         </div>
-                        <div class="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                    </div>
+                </div>
+                <!-- Chưa trả lời -->
+                <div class="stat-card bg-white rounded-2xl border border-gray-100 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden group">
+                    <div class="h-1 bg-gradient-to-r from-amber-400 to-orange-500"></div>
+                    <div class="p-5">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="stat-number text-3xl font-extrabold text-gray-900" id="statUnanswered">0</p>
+                                <p class="text-sm text-gray-500 mt-1 font-medium">Chưa trả lời</p>
+                            </div>
+                            <div class="w-14 h-14 bg-gradient-to-br from-amber-400 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/25 group-hover:scale-110 transition-transform duration-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Quick Actions -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-                <h2 class="text-lg font-semibold mb-4">Thao tác nhanh</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <a href="questions.html" class="flex items-center gap-3 p-4 bg-sky-50 rounded-lg hover:bg-sky-100 transition">
-                        <div class="w-10 h-10 bg-sky-600 rounded-lg flex items-center justify-center text-white">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-                        </div>
-                        <div>
-                            <p class="font-medium text-sm">Thêm câu hỏi</p>
-                            <p class="text-xs text-gray-500">Thêm Q&A mới cho chatbot</p>
-                        </div>
-                    </a>
-                    <a href="datasets.html" class="flex items-center gap-3 p-4 bg-green-50 rounded-lg hover:bg-green-100 transition">
-                        <div class="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center text-white">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-                        </div>
-                        <div>
-                            <p class="font-medium text-sm">Tải dữ liệu</p>
-                            <p class="text-xs text-gray-500">Import Word, PDF</p>
-                        </div>
-                    </a>
-                    <a href="settings.html" class="flex items-center gap-3 p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition">
-                        <div class="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center text-white">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
-                        </div>
-                        <div>
-                            <p class="font-medium text-sm">Giao diện</p>
-                            <p class="text-xs text-gray-500">Tùy chỉnh màu sắc chatbot</p>
-                        </div>
-                    </a>
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-lg overflow-hidden mb-8">
+                <div class="h-1 bg-gradient-to-r from-violet-500 to-purple-500"></div>
+                <div class="p-6">
+                    <h2 class="text-lg font-bold text-gray-900 mb-5">Thao tác nhanh</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <a href="questions.html" class="group flex items-center gap-4 p-4 bg-gradient-to-br from-sky-50 to-blue-50 rounded-xl border border-sky-100/60 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 no-underline">
+                            <div class="w-12 h-12 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-sky-500/30 group-hover:scale-110 transition-transform duration-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-sm text-gray-800">Thêm câu hỏi</p>
+                                <p class="text-xs text-gray-500 mt-0.5">Thêm Q&A mới cho chatbot</p>
+                            </div>
+                        </a>
+                        <a href="datasets.html" class="group flex items-center gap-4 p-4 bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl border border-emerald-100/60 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 no-underline">
+                            <div class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/30 group-hover:scale-110 transition-transform duration-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-sm text-gray-800">Tải dữ liệu</p>
+                                <p class="text-xs text-gray-500 mt-0.5">Import Word, PDF</p>
+                            </div>
+                        </a>
+                        <a href="settings.html" class="group flex items-center gap-4 p-4 bg-gradient-to-br from-violet-50 to-purple-50 rounded-xl border border-violet-100/60 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 no-underline">
+                            <div class="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/30 group-hover:scale-110 transition-transform duration-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-sm text-gray-800">Giao diện</p>
+                                <p class="text-xs text-gray-500 mt-0.5">Tùy chỉnh màu sắc chatbot</p>
+                            </div>
+                        </a>
+                    </div>
                 </div>
             </div>
 
-            <!-- Hướng dẫn sử dụng hệ thống -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div class="flex items-center gap-3 mb-5">
-                    <div class="w-10 h-10 bg-sky-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <!-- Hướng dẫn sử dụng -->
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-lg overflow-hidden">
+                <div class="h-1 bg-gradient-to-r from-sky-400 to-cyan-400"></div>
+                <div class="p-6">
+                    <div class="flex items-center gap-3.5 mb-6">
+                        <div class="w-11 h-11 bg-gradient-to-br from-sky-400 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-sky-500/25">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-900">Hướng dẫn sử dụng hệ thống</h2>
+                            <p class="text-xs text-gray-500">Các bước quản trị Chatbot CELRAS TVU</p>
+                        </div>
                     </div>
-                    <div>
-                        <h2 class="text-lg font-semibold text-gray-800">Hướng dẫn sử dụng hệ thống</h2>
-                        <p class="text-xs text-gray-500">Các bước quản trị Chatbot CELRAS TVU</p>
-                    </div>
-                </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <!-- Bước 1 -->
-                    <div class="flex gap-3 p-4 bg-sky-50 rounded-xl border border-sky-100">
-                        <div class="w-8 h-8 bg-sky-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">1</div>
-                        <div>
-                            <p class="font-semibold text-sm text-gray-800 mb-1">Quản lý câu hỏi</p>
-                            <p class="text-xs text-gray-500 leading-relaxed">Vào <strong>Quản lý câu hỏi</strong> để thêm, sửa, xóa các cặp câu hỏi – câu trả lời. Chatbot sẽ dựa vào dữ liệu này để phản hồi người dùng.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="flex gap-3 p-4 bg-gradient-to-br from-sky-50 to-blue-50/50 rounded-xl border border-sky-100/50 hover:shadow-md transition-all duration-300">
+                            <div class="w-8 h-8 bg-gradient-to-br from-sky-500 to-blue-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-md">1</div>
+                            <div>
+                                <p class="font-semibold text-sm text-gray-800 mb-1">Quản lý câu hỏi</p>
+                                <p class="text-xs text-gray-500 leading-relaxed">Vào <strong>Quản lý câu hỏi</strong> để thêm, sửa, xóa các cặp câu hỏi – câu trả lời.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 p-4 bg-gradient-to-br from-emerald-50 to-green-50/50 rounded-xl border border-emerald-100/50 hover:shadow-md transition-all duration-300">
+                            <div class="w-8 h-8 bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-md">2</div>
+                            <div>
+                                <p class="font-semibold text-sm text-gray-800 mb-1">Phân loại danh mục</p>
+                                <p class="text-xs text-gray-500 leading-relaxed">Tạo <strong>Danh mục</strong> để nhóm câu hỏi theo chủ đề, giúp chatbot gợi ý chính xác.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 p-4 bg-gradient-to-br from-violet-50 to-purple-50/50 rounded-xl border border-violet-100/50 hover:shadow-md transition-all duration-300">
+                            <div class="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-md">3</div>
+                            <div>
+                                <p class="font-semibold text-sm text-gray-800 mb-1">Tải dữ liệu hàng loạt</p>
+                                <p class="text-xs text-gray-500 leading-relaxed">Dùng <strong>Tải dữ liệu</strong> để import file Word/PDF chứa nhiều câu hỏi.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 p-4 bg-gradient-to-br from-amber-50 to-orange-50/50 rounded-xl border border-amber-100/50 hover:shadow-md transition-all duration-300">
+                            <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-md">4</div>
+                            <div>
+                                <p class="font-semibold text-sm text-gray-800 mb-1">Biểu mẫu & Giấy tờ</p>
+                                <p class="text-xs text-gray-500 leading-relaxed">Thêm link <strong>biểu mẫu</strong>. Chatbot sẽ gửi link tải về khi người dùng hỏi.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 p-4 bg-gradient-to-br from-rose-50 to-pink-50/50 rounded-xl border border-rose-100/50 hover:shadow-md transition-all duration-300">
+                            <div class="w-8 h-8 bg-gradient-to-br from-rose-500 to-pink-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-md">5</div>
+                            <div>
+                                <p class="font-semibold text-sm text-gray-800 mb-1">Xử lý câu chưa trả lời</p>
+                                <p class="text-xs text-gray-500 leading-relaxed">Mục <strong>Chưa trả lời</strong> liệt kê các câu chatbot chưa có câu trả lời.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 p-4 bg-gradient-to-br from-indigo-50 to-blue-50/50 rounded-xl border border-indigo-100/50 hover:shadow-md transition-all duration-300">
+                            <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-blue-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-md">6</div>
+                            <div>
+                                <p class="font-semibold text-sm text-gray-800 mb-1">Tùy chỉnh giao diện</p>
+                                <p class="text-xs text-gray-500 leading-relaxed">Vào <strong>Cài đặt giao diện</strong> để thay đổi màu sắc, tin nhắn chào mừng.</p>
+                            </div>
                         </div>
                     </div>
-                    <!-- Bước 2 -->
-                    <div class="flex gap-3 p-4 bg-green-50 rounded-xl border border-green-100">
-                        <div class="w-8 h-8 bg-green-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">2</div>
-                        <div>
-                            <p class="font-semibold text-sm text-gray-800 mb-1">Phân loại danh mục</p>
-                            <p class="text-xs text-gray-500 leading-relaxed">Tạo các <strong>Danh mục</strong> để nhóm câu hỏi theo chủ đề (mượn trả sách, thẻ thư viện, WiFi…), giúp chatbot gợi ý chính xác hơn.</p>
-                        </div>
-                    </div>
-                    <!-- Bước 3 -->
-                    <div class="flex gap-3 p-4 bg-purple-50 rounded-xl border border-purple-100">
-                        <div class="w-8 h-8 bg-purple-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">3</div>
-                        <div>
-                            <p class="font-semibold text-sm text-gray-800 mb-1">Tải dữ liệu hàng loạt</p>
-                            <p class="text-xs text-gray-500 leading-relaxed">Dùng trang <strong>Tải dữ liệu</strong> để import file Word/PDF chứa nhiều câu hỏi. Hệ thống tự động trích xuất và lưu vào CSDL.</p>
-                        </div>
-                    </div>
-                    <!-- Bước 4 -->
-                    <div class="flex gap-3 p-4 bg-amber-50 rounded-xl border border-amber-100">
-                        <div class="w-8 h-8 bg-amber-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">4</div>
-                        <div>
-                            <p class="font-semibold text-sm text-gray-800 mb-1">Biểu mẫu & Giấy tờ</p>
-                            <p class="text-xs text-gray-500 leading-relaxed">Thêm link các <strong>biểu mẫu</strong> (phiếu mượn sách, đơn xin cấp thẻ…). Khi người dùng hỏi, chatbot sẽ gửi link tải về.</p>
-                        </div>
-                    </div>
-                    <!-- Bước 5 -->
-                    <div class="flex gap-3 p-4 bg-rose-50 rounded-xl border border-rose-100">
-                        <div class="w-8 h-8 bg-rose-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">5</div>
-                        <div>
-                            <p class="font-semibold text-sm text-gray-800 mb-1">Xử lý câu chưa trả lời</p>
-                            <p class="text-xs text-gray-500 leading-relaxed">Mục <strong>Chưa trả lời</strong> liệt kê các câu hỏi mà chatbot chưa tìm được câu trả lời. Hãy bổ sung để cải thiện chất lượng.</p>
-                        </div>
-                    </div>
-                    <!-- Bước 6 -->
-                    <div class="flex gap-3 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-                        <div class="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">6</div>
-                        <div>
-                            <p class="font-semibold text-sm text-gray-800 mb-1">Tùy chỉnh giao diện</p>
-                            <p class="text-xs text-gray-500 leading-relaxed">Vào <strong>Cài đặt giao diện</strong> để thay đổi tên chatbot, ảnh đại diện, màu sắc, tin nhắn chào mừng và các gợi ý hiển thị.</p>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Lưu ý -->
-                <div class="mt-5 p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-start gap-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <p class="text-xs text-gray-600 leading-relaxed"><strong class="text-gray-800">Lưu ý:</strong> Sau khi thêm/sửa dữ liệu, chatbot sẽ tự động cập nhật ngay. Hãy kiểm tra bằng cách mở trang chatbot và gửi thử câu hỏi để đảm bảo câu trả lời chính xác.</p>
+                    <div class="mt-5 p-4 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl border border-amber-200/50 flex items-start gap-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <p class="text-xs text-gray-600 leading-relaxed"><strong class="text-gray-800">Lưu ý:</strong> Sau khi thêm/sửa dữ liệu, chatbot sẽ tự động cập nhật ngay. Hãy kiểm tra bằng cách mở trang chatbot và gửi thử câu hỏi.</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <script src="/DuAnChatbotThuVien/public/assets/js/loading.js"></script>
-    <script src="/DuAnChatbotThuVien/public/assets/js/admin.js?v=20260305"></script>
+    <script src="/DuAnChatbotThuVien/public/assets/js/admin.js?v=20260306c"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             await loadAdminPage('dashboard');
