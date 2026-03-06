@@ -83,7 +83,14 @@ class SettingModel extends BaseModel
              ORDER BY id DESC LIMIT 1"
         );
         $stmt->execute();
-        return $stmt->fetch();
+        $theme = $stmt->fetch();
+        
+        // Parse decorations JSON nếu có
+        if ($theme && !empty($theme['decorations'])) {
+            $theme['decorations'] = json_decode($theme['decorations'], true) ?: [];
+        }
+        
+        return $theme;
     }
 
     /**

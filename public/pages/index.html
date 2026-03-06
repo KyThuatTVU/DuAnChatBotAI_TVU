@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CELRAS TVU Chatbot - Trung tâm Học liệu và Chuyển đổi số</title>
+    <!-- Logo trên tab -->
+<link rel="icon" type="image/png" href="../assets/images/logo2.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -15,6 +17,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" href="/DuAnChatbotThuVien/public/assets/images/logo.png" type="image/png">
+    <link rel="stylesheet" href="/DuAnChatbotThuVien/public/assets/css/event-themes.css">
 
     <style>
         body {
@@ -50,18 +53,39 @@
         }
 
         /* Typing */
-        .typing-indicator { display: flex; gap: 5px; align-items: center; padding: 4px 0; }
+        .typing-indicator { display: flex; gap: 6px; align-items: center; padding: 6px 0; }
         .typing-indicator span {
-            display: inline-block; width: 7px; height: 7px;
+            display: inline-block; width: 8px; height: 8px;
             border-radius: 50%; background: #38bdf8;
-            animation: tw-bounce 1.2s infinite;
+            animation: tw-bounce 1.4s infinite ease-in-out;
+            box-shadow: 0 0 4px rgba(56, 189, 248, 0.4);
         }
         .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
         .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
         @keyframes tw-bounce {
-            0%, 80%, 100% { transform: translateY(0); }
-            40%           { transform: translateY(-6px); }
+            0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+            40%           { transform: translateY(-8px); opacity: 1; }
         }
+        .typing-wrapper {
+            display: flex; align-items: center; gap: 10px;
+        }
+        .typing-text {
+            font-size: 13px; color: #64748b; font-style: italic;
+            animation: typing-fade 1.8s infinite ease-in-out;
+        }
+        @keyframes typing-fade {
+            0%, 100% { opacity: 0.5; }
+            50%      { opacity: 1; }
+        }
+        #typingIndicator {
+            animation: typing-slide-in 0.3s ease-out;
+        }
+        @keyframes typing-slide-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        body.dark .typing-indicator span { background: #7dd3fc; box-shadow: 0 0 6px rgba(125,211,252,0.5); }
+        body.dark .typing-text { color: #94a3b8; }
 
         /* Suggestion chip */
         .suggestion-chip {
@@ -624,7 +648,7 @@ box-shadow: 0 -3px 15px rgba(14,116,176,0.08);">
         style="color:#0369a1; letter-spacing:0.5px;">
 
             <span data-i18n="footer_org">
-                Trung tâm Học liệu & Hỗ trợ Học thuật — ĐH Trà Vinh
+                Trung tâm Học liệu và Hỗ trợ Học thuật — ĐH Trà Vinh
             </span>
 
             <span class="mx-2 font-bold" style="color:#38bdf8;">|</span>
@@ -650,7 +674,7 @@ box-shadow: 0 -3px 15px rgba(14,116,176,0.08);">
                 welcome_title: 'CELRAS TVU xin chào!',
                 welcome_desc: 'Bạn đang kết nối với <strong style="color:#0369a1" class="font-semibold">CELRAS TVU Chatbot</strong> – trợ lý ảo của Trung tâm Học liệu <br> và Hỗ trợ Học thuật, Đại học Trà Vinh. Nếu có thắc mắc về thư viện, tài liệu <br> hoặc dịch vụ số,... đừng ngần ngại đặt câu hỏi để được hỗ trợ ngay nhé!',
                 input_placeholder: 'Nhập câu hỏi của bạn...',
-                footer_org: 'Trung tâm Học liệu & Hỗ trợ Học thuật — ĐH Trà Vinh',
+                footer_org: 'Trung tâm Học liệu và Hỗ trợ Học thuật — ĐH Trà Vinh',
                 questions: 'câu hỏi',
                 loading: 'Đang tải...',
                 no_questions: 'Chưa có câu hỏi nào.',
@@ -660,6 +684,7 @@ box-shadow: 0 -3px 15px rgba(14,116,176,0.08);">
                 cannot_connect: 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.',
                 chatbot_disabled: 'Chatbot hiện đang tạm ngưng hoạt động.',
                 come_back_later: 'Vui lòng quay lại sau.',
+                typing: 'Đang trả lời',
                 sidebar_title: 'Danh mục',
                 home: 'Trang chủ',
                 toggle_theme: 'Chuyển chế độ sáng/tối',
@@ -682,6 +707,7 @@ box-shadow: 0 -3px 15px rgba(14,116,176,0.08);">
                 cannot_connect: 'Cannot connect to server. Please check your network.',
                 chatbot_disabled: 'Chatbot is currently unavailable.',
                 come_back_later: 'Please come back later.',
+                typing: 'Replying',
                 sidebar_title: 'Categories',
                 home: 'Home',
                 toggle_theme: 'Toggle dark/light mode',
@@ -720,7 +746,7 @@ box-shadow: 0 -3px 15px rgba(14,116,176,0.08);">
         window.translateCatName = translateCatName;
     </script>
 
-    <script src="/DuAnChatbotThuVien/public/assets/js/chatbot.js?v=15"></script>
+    <script src="/DuAnChatbotThuVien/public/assets/js/chatbot.js?v=16"></script>
     <script>
         // ===== DARK MODE =====
         function toggleTheme() {

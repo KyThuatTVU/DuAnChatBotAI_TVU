@@ -140,6 +140,7 @@ CREATE TABLE chatbot_settings (
 CREATE TABLE event_themes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     theme_name VARCHAR(255) NOT NULL COMMENT 'Tên chủ đề (VD: Tết, Noel, Khai giảng...)',
+    theme_key VARCHAR(50) NULL COMMENT 'CSS class key (vd: tet, halloween...)',
     primary_color VARCHAR(20) NOT NULL DEFAULT '#1976D2' COMMENT 'Màu chính',
     secondary_color VARCHAR(20) NOT NULL DEFAULT '#FFFFFF' COMMENT 'Màu phụ',
     header_bg_color VARCHAR(20) NOT NULL DEFAULT '#1976D2' COMMENT 'Màu nền header',
@@ -149,6 +150,8 @@ CREATE TABLE event_themes (
     button_color VARCHAR(20) NOT NULL DEFAULT '#1976D2' COMMENT 'Màu nút chatbot',
     font_family VARCHAR(100) NULL DEFAULT 'Roboto, sans-serif',
     bot_avatar_url TEXT NULL COMMENT 'Ảnh avatar chatbot',
+    decorations TEXT NULL COMMENT 'Emoji/ký tự trang trí (JSON array)',
+    banner_text VARCHAR(500) NULL COMMENT 'Nội dung banner sự kiện',
     welcome_message TEXT NULL COMMENT 'Tin nhắn chào mừng',
     start_date DATE NULL COMMENT 'Ngày bắt đầu áp dụng',
     end_date DATE NULL COMMENT 'Ngày kết thúc áp dụng',
@@ -301,8 +304,16 @@ INSERT INTO forms (name, description, url, keywords) VALUES
 ('Đơn đăng ký làm thẻ thư viện', 'Mẫu đăng ký làm mới hoặc gia hạn thẻ thư viện', 'https://celri.tvu.edu.vn/bieu-mau', 'làm thẻ,đăng ký thẻ,thẻ thư viện,gia hạn thẻ'),
 ('Phiếu xác nhận sử dụng dịch vụ thư viện', 'Phiếu xác nhận cho sinh viên làm thủ tục tốt nghiệp', 'https://celri.tvu.edu.vn/bieu-mau', 'xác nhận thư viện,phiếu xác nhận,tốt nghiệp,thủ tục tốt nghiệp');
 
--- Chủ đề sự kiện mẫu
-INSERT INTO event_themes (theme_name, primary_color, secondary_color, header_bg_color, welcome_message, is_active) VALUES
-('Mặc định', '#1976D2', '#FFFFFF', '#1976D2', 'Xin chào! Tôi là trợ lý thư viện. Bạn cần tôi giúp gì?', 1),
-('Tết Nguyên Đán', '#D32F2F', '#FFD700', '#D32F2F', '🎊 Chúc mừng năm mới! Tôi là trợ lý thư viện. Bạn cần tôi giúp gì?', 0),
-('Khai giảng', '#388E3C', '#FFFFFF', '#388E3C', '📚 Chào mừng năm học mới! Tôi là trợ lý thư viện. Bạn cần tôi giúp gì?', 0);
+-- Chủ đề sự kiện
+INSERT INTO event_themes (theme_name, theme_key, primary_color, secondary_color, header_bg_color, welcome_message, decorations, banner_text, is_active) VALUES
+('Mặc định', 'mac-dinh', '#1976D2', '#FFFFFF', '#1976D2', 'Xin chào! Tôi là trợ lý thư viện. Bạn cần tôi giúp gì?', NULL, NULL, 1),
+('Tết Nguyên Đán', 'tet', '#c0392b', '#FFD700', '#c0392b', '🎊 Chúc mừng năm mới! Chúc bạn năm mới vạn sự như ý! Tôi là trợ lý thư viện, bạn cần giúp gì?', '["🧧","🌸","🎆","🎋","🏮","🎊","🌺","🧨","🎇","🎉"]', '🧧 Chúc Mừng Năm Mới — Happy New Year! 🎊', 0),
+('Tết Trung Thu', 'trung-thu', '#6b21a8', '#fbbf24', '#6b21a8', '🌕 Chào mừng Tết Trung Thu! Tôi là trợ lý thư viện, bạn cần giúp gì?', '["🏮","🌕","🐰","🥮","⭐","🎑","🌙","🏮","✨","🎋"]', '🏮 Vui Tết Trung Thu — Happy Mid-Autumn! 🌕', 0),
+('Halloween', 'halloween', '#e67e22', '#1a1a2e', '#d35400', '🎃 Happy Halloween! Tôi là trợ lý thư viện, bạn cần giúp gì?', '["🎃","👻","🦇","🕷️","💀","🕸️","🧙","🌙","⚡","🔮"]', '🎃 Happy Halloween — Lễ Hội Ma Quái! 👻', 0),
+('Giáng Sinh', 'giang-sinh', '#c62828', '#2e7d32', '#c62828', '🎄 Merry Christmas! Giáng sinh an lành! Tôi là trợ lý thư viện, bạn cần giúp gì?', '["❄️","🎄","🎅","⛄","🎁","🌟","🔔","❄️","✨","🎄"]', '🎄 Merry Christmas — Giáng Sinh An Lành! 🎅', 0),
+('Quốc tế Phụ nữ 8/3', '8-3', '#db2777', '#fce7f3', '#db2777', '🌹 Chúc mừng ngày Quốc tế Phụ nữ 8/3! Tôi là trợ lý thư viện, bạn cần giúp gì?', '["🌹","💐","🌸","🌺","💕","🎀","🌷","💖","🌼","✨"]', '🌹 Chúc Mừng Ngày Quốc Tế Phụ Nữ 8/3 💐', 0),
+('Phụ nữ Việt Nam 20/10', '20-10', '#7c3aed', '#ec4899', '#7c3aed', '🌺 Chúc mừng ngày Phụ nữ Việt Nam 20/10! Tôi là trợ lý thư viện, bạn cần giúp gì?', '["🌺","💜","🎀","🌸","💐","🌹","✨","🎊","💕","🌷"]', '🌺 Chúc Mừng Ngày Phụ Nữ Việt Nam 20/10 💜', 0),
+('Nhà giáo Việt Nam 20/11', '20-11', '#1e40af', '#eab308', '#1e40af', '📚 Chúc mừng ngày Nhà giáo Việt Nam 20/11! Tôi là trợ lý thư viện, bạn cần giúp gì?', '["📚","✏️","🎓","📖","🏫","📝","🎒","📕","🌟","💐"]', '📚 Chúc Mừng Ngày Nhà Giáo Việt Nam 20/11 🎓', 0),
+('Giải phóng miền Nam 30/4', '30-4', '#b91c1c', '#eab308', '#b91c1c', '🇻🇳 Kỷ niệm ngày Giải phóng miền Nam 30/4! Tôi là trợ lý thư viện, bạn cần giúp gì?', '["🇻🇳","⭐","🎆","🎉","🎊","🏴","✨","🎇","🌟","🎗️"]', '🇻🇳 Kỷ Niệm Ngày Giải Phóng Miền Nam 30/4 ⭐', 0),
+('Quốc tế Lao động 1/5', '1-5', '#991b1b', '#FFFFFF', '#991b1b', '✊ Chúc mừng ngày Quốc tế Lao động 1/5! Tôi là trợ lý thư viện, bạn cần giúp gì?', '["✊","⚒️","🌟","💪","🎉","🏗️","⭐","🎊","🛠️","✨"]', '✊ Chúc Mừng Ngày Quốc Tế Lao Động 1/5 🌟', 0),
+('Quốc khánh 2/9', '2-9', '#dc2626', '#eab308', '#991b1b', '🇻🇳 Chúc mừng ngày Quốc khánh 2/9! Tôi là trợ lý thư viện, bạn cần giúp gì?', '["🇻🇳","⭐","🎆","🎇","🎉","🎊","✨","🌟","🎗️","🏴"]', '🇻🇳 Chúc Mừng Ngày Quốc Khánh 2/9 — Độc Lập Tự Do ⭐', 0);

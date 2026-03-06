@@ -25,6 +25,11 @@ async function initChatbot() {
                 applySettings(data.settings);
             }
 
+            // Áp dụng theme sự kiện
+            if (data.theme && data.theme.theme_key && data.theme.theme_key !== 'mac-dinh') {
+                applyEventTheme(data.theme);
+            }
+
             // Hiển thị câu hỏi gợi ý
             if (data.suggestions && data.suggestions.length > 0) {
                 renderSuggestions(data.suggestions);
@@ -77,6 +82,68 @@ function applySettings(settings) {
 }
 
 /**
+ * Áp dụng chủ đề sự kiện (theme 3D)
+ */
+function applyEventTheme(theme) {
+    if (!theme || !theme.theme_key || theme.theme_key === 'mac-dinh') return;
+
+    const themeClass = 'theme-' + theme.theme_key;
+
+    // Xóa các theme class cũ (nếu có)
+    document.body.className = document.body.className
+        .replace(/\btheme-[\w-]+\b/g, '')
+        .trim();
+
+    // Thêm theme class
+    document.body.classList.add(themeClass);
+
+    // Thêm decorations (emoji bay)
+    const decorations = theme.decorations;
+    if (decorations && Array.isArray(decorations) && decorations.length > 0) {
+        // Xóa decorations cũ nếu có
+        const oldDeco = document.getElementById('themeDecorations');
+        if (oldDeco) oldDeco.remove();
+
+        const decoContainer = document.createElement('div');
+        decoContainer.id = 'themeDecorations';
+        decoContainer.className = 'theme-decorations';
+        decoContainer.setAttribute('aria-hidden', 'true');
+
+        decorations.forEach(emoji => {
+            const span = document.createElement('span');
+            span.className = 'deco';
+            span.textContent = emoji;
+            decoContainer.appendChild(span);
+        });
+
+        document.body.appendChild(decoContainer);
+    }
+
+    // Thêm banner sự kiện
+    const bannerText = theme.banner_text;
+    if (bannerText) {
+        const chatMessages = document.querySelector('#chatMessages .max-w-3xl');
+        if (chatMessages) {
+            // Xóa banner cũ
+            const oldBanner = document.getElementById('themeBanner');
+            if (oldBanner) oldBanner.remove();
+
+            const banner = document.createElement('div');
+            banner.id = 'themeBanner';
+            banner.className = 'theme-banner';
+            banner.textContent = bannerText;
+            chatMessages.insertBefore(banner, chatMessages.firstChild);
+        }
+    }
+
+    // Override welcome message nếu theme có
+    if (theme.welcome_message) {
+        const welcomeTitle = document.querySelector('#welcomeBlock h2 [data-i18n="welcome_title"]');
+        // Không override title, chỉ log
+    }
+}
+
+/**
  * Render câu hỏi gợi ý
  */
 function renderSuggestions(suggestions) {
@@ -111,6 +178,8 @@ async function sendMessage() {
 
     // Hiển thị typing indicator
     showTypingIndicator();
+    const typingStart = Date.now();
+    const MIN_TYPING_MS = 1500; // Hiệu ứng typing tối thiểu 1.5 giây
 
     try {
         const lang = (typeof currentLang !== 'undefined') ? currentLang : 'vi';
@@ -125,6 +194,12 @@ async function sendMessage() {
         });
 
         const data = await res.json();
+
+        // Đợi đủ thời gian tối thiểu để typing indicator hiển thị tự nhiên
+        const elapsed = Date.now() - typingStart;
+        if (elapsed < MIN_TYPING_MS) {
+            await new Promise(r => setTimeout(r, MIN_TYPING_MS - elapsed));
+        }
         hideTypingIndicator();
 
         if (data.success) {
@@ -136,6 +211,10 @@ async function sendMessage() {
             appendMessage('bot', data.error || (typeof t === 'function' ? t('error_occurred') : 'Đã có lỗi xảy ra. Vui lòng thử lại.'));
         }
     } catch (e) {
+        const elapsed = Date.now() - typingStart;
+        if (elapsed < MIN_TYPING_MS) {
+            await new Promise(r => setTimeout(r, MIN_TYPING_MS - elapsed));
+        }
         hideTypingIndicator();
         appendMessage('bot', typeof t === 'function' ? t('cannot_connect') : 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.');
     }
@@ -205,12 +284,16 @@ function appendMessage(sender, text, forms = []) {
  */
 function showTypingIndicator() {
     const container = document.getElementById('chatMessages');
+    const typingLabel = (typeof t === 'function') ? t('typing') : 'Đang trả lời';
     const html = `
         <div class="message bot" id="typingIndicator">
             <img src="https://ui-avatars.com/api/?name=CELRAS&background=0369a1&color=fff&rounded=true&size=36" alt="bot" class="avatar">
             <div class="bubble">
-                <div class="typing-indicator">
-                    <span></span><span></span><span></span>
+                <div class="typing-wrapper">
+                    <div class="typing-indicator">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <span class="typing-text">${typingLabel}...</span>
                 </div>
             </div>
         </div>`;

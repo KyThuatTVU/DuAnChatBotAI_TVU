@@ -465,7 +465,10 @@ async function loadThemes() {
         const data = await res.json();
         const themes = data.themes || [];
         renderThemes(themes);
-    } catch (e) {}
+    } catch (e) {
+        const container = document.getElementById('themesList');
+        if (container) container.innerHTML = '<p class="text-red-400 text-sm">Không thể tải chủ đề</p>';
+    }
 }
 
 function renderThemes(themes) {
@@ -477,16 +480,128 @@ function renderThemes(themes) {
         return;
     }
 
-    container.innerHTML = themes.map(t => `
-        <div class="flex items-center gap-3 p-3 rounded-lg border ${t.is_active ? 'border-sky-300 bg-sky-50' : 'border-gray-200'} transition">
-            <div class="w-8 h-8 rounded-full border-2 border-white shadow" style="background: ${t.primary_color}"></div>
-            <div class="flex-1">
-                <p class="font-medium text-sm">${escapeHtml(t.theme_name)}</p>
-                <p class="text-xs text-gray-500">${t.start_date ? t.start_date + ' - ' + t.end_date : 'Không giới hạn'}</p>
+    container.innerHTML = themes.map(t => {
+        const isActive = parseInt(t.is_active) === 1;
+        const isDefault = t.theme_key === 'mac-dinh';
+        return `
+        <div class="flex items-center gap-3 p-3 rounded-xl border ${isActive ? 'border-sky-300 bg-sky-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'} transition-all" style="min-height:56px;">
+            <div class="w-9 h-9 rounded-full flex-shrink-0" style="background: ${escapeHtml(t.primary_color)}; box-shadow: 0 3px 10px ${escapeHtml(t.primary_color)}40; border: 2px solid #fff;"></div>
+            <div class="flex-1 min-w-0">
+                <p class="font-semibold text-sm truncate">${escapeHtml(t.theme_name)}</p>
+                <p class="text-xs text-gray-500">${t.start_date ? t.start_date + ' → ' + (t.end_date || '∞') : 'Không giới hạn'}</p>
             </div>
-            ${t.is_active ? '<span class="badge badge-success">Đang dùng</span>' : '<span class="badge badge-warning">Tắt</span>'}
-        </div>
-    `).join('');
+            <div class="flex items-center gap-2 flex-shrink-0">
+                ${isActive
+                    ? '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-700 border border-sky-200">Đang dùng</span>'
+                    : `<button onclick="activateTheme(${t.id})" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 hover:bg-sky-100 hover:text-sky-700 border border-gray-200 hover:border-sky-200 transition-all cursor-pointer" title="Bật chủ đề này">Tắt</button>`
+                }
+                ${!isDefault ? `<button onclick="deleteTheme(${t.id}, '${escapeHtml(t.theme_name)}')" class="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all" title="Xóa">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function activateTheme(themeId) {
+    if (!confirm('Bạn muốn bật chủ đề này? Chủ đề đang dùng sẽ bị tắt.')) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/themes/${themeId}/activate`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        const data = await res.json();
+        if (data.success) {
+            loadThemes();
+        } else {
+            alert(data.message || 'Lỗi khi bật chủ đề');
+        }
+    } catch (e) {
+        alert('Lỗi kết nối server');
+    }
+}
+
+async function deleteTheme(themeId, themeName) {
+    if (!confirm(`Bạn chắc chắn muốn xóa chủ đề "${themeName}"?`)) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/themes/${themeId}`, {
+            method: 'DELETE',
+        });
+        const data = await res.json();
+        if (data.success) {
+            loadThemes();
+        } else {
+            alert(data.message || 'Lỗi khi xóa chủ đề');
+        }
+    } catch (e) {
+        alert('Lỗi kết nối server');
+    }
+}
+
+function openThemeModal() {
+    const modal = document.getElementById('themeModal');
+    if (!modal) return;
+    // Reset form
+    document.getElementById('themeName').value = '';
+    document.getElementById('themePrimaryColor').value = '#0369a1';
+    document.getElementById('themeSecondaryColor').value = '#ffffff';
+    document.getElementById('themeHeaderBg').value = '#0369a1';
+    document.getElementById('themeHeaderText').value = '#ffffff';
+    document.getElementById('themeUserBubble').value = '#e3f2fd';
+    document.getElementById('themeBotBubble').value = '#f5f5f5';
+    document.getElementById('themeButtonColor').value = '#0369a1';
+    document.getElementById('themeWelcome').value = '';
+    document.getElementById('themeStartDate').value = '';
+    document.getElementById('themeEndDate').value = '';
+    document.getElementById('themeActive').checked = false;
+    modal.classList.add('active');
+}
+
+function closeThemeModal() {
+    const modal = document.getElementById('themeModal');
+    if (modal) modal.classList.remove('active');
+}
+
+async function saveTheme(e) {
+    e.preventDefault();
+    const name = document.getElementById('themeName').value.trim();
+    if (!name) {
+        alert('Vui lòng nhập tên chủ đề');
+        return;
+    }
+
+    const body = {
+        theme_name: name,
+        primary_color: document.getElementById('themePrimaryColor').value,
+        secondary_color: document.getElementById('themeSecondaryColor').value,
+        header_bg_color: document.getElementById('themeHeaderBg').value,
+        header_text_color: document.getElementById('themeHeaderText').value,
+        user_bubble_color: document.getElementById('themeUserBubble').value,
+        bot_bubble_color: document.getElementById('themeBotBubble').value,
+        button_color: document.getElementById('themeButtonColor').value,
+        welcome_message: document.getElementById('themeWelcome').value.trim(),
+        start_date: document.getElementById('themeStartDate').value || null,
+        end_date: document.getElementById('themeEndDate').value || null,
+        is_active: document.getElementById('themeActive').checked ? 1 : 0
+    };
+
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/themes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeThemeModal();
+            loadThemes();
+            alert('Lưu chủ đề thành công!');
+        } else {
+            alert(data.message || 'Lỗi khi lưu chủ đề');
+        }
+    } catch (err) {
+        alert('Lỗi kết nối server');
+    }
 }
 
 // ==================== DATASETS (Upload) ====================

@@ -392,27 +392,58 @@ class AdminController extends BaseController
 
     /**
      * /api/admin/themes
+     * /api/admin/themes/{id}/activate (PUT)
+     * /api/admin/themes/{id} (DELETE)
      */
-    public function themes()
+    public function themes($id = null, $action = null)
     {
         $adminId = $this->requireAuth();
+        $db = Database::getInstance()->getConnection();
 
+        // PUT /api/admin/themes/{id}/activate - Bật chủ đề
+        if ($this->getMethod() === 'PUT' && $id && $action === 'activate') {
+            // Tắt tất cả theme
+            $db->exec("UPDATE event_themes SET is_active = 0");
+            // Bật theme được chọn
+            $stmt = $db->prepare("UPDATE event_themes SET is_active = 1 WHERE id = ?");
+            $stmt->execute([$id]);
+            $this->json(['success' => true, 'message' => 'Đã bật chủ đề']);
+            return;
+        }
+
+        // DELETE /api/admin/themes/{id} - Xóa chủ đề
+        if ($this->getMethod() === 'DELETE' && $id) {
+            // Không cho xóa theme mặc định
+            $stmt = $db->prepare("SELECT theme_key FROM event_themes WHERE id = ?");
+            $stmt->execute([$id]);
+            $theme = $stmt->fetch();
+            if ($theme && $theme['theme_key'] === 'mac-dinh') {
+                $this->json(['success' => false, 'message' => 'Không thể xóa chủ đề mặc định'], 400);
+                return;
+            }
+            $stmt = $db->prepare("DELETE FROM event_themes WHERE id = ?");
+            $stmt->execute([$id]);
+            $this->json(['success' => true, 'message' => 'Đã xóa chủ đề']);
+            return;
+        }
+
+        // POST - Thêm theme mới
         if ($this->getMethod() === 'POST') {
             $input = $this->getJsonInput();
-            $db = Database::getInstance()->getConnection();
             
             // Nếu kích hoạt theme mới, tắt các theme cũ
             if (!empty($input['is_active'])) {
                 $db->exec("UPDATE event_themes SET is_active = 0");
             }
 
-            $id = $db->prepare(
-                "INSERT INTO event_themes (theme_name, primary_color, secondary_color, header_bg_color, header_text_color, 
+            $stmt = $db->prepare(
+                "INSERT INTO event_themes (theme_name, theme_key, primary_color, secondary_color, header_bg_color, header_text_color, 
                 user_bubble_color, bot_bubble_color, button_color, welcome_message, start_date, end_date, is_active, created_by) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             );
-            $id->execute([
-                $input['theme_name'], $input['primary_color'] ?? '#1976D2',
+            $themeKey = $input['theme_key'] ?? $this->generateThemeKey($input['theme_name']);
+            $stmt->execute([
+                $input['theme_name'], $themeKey, $input['primary_color'] ?? '#1976D2',
                 $input['secondary_color'] ?? '#FFFFFF', $input['header_bg_color'] ?? '#1976D2',
                 $input['header_text_color'] ?? '#FFFFFF', $input['user_bubble_color'] ?? '#E3F2FD',
                 $input['bot_bubble_color'] ?? '#F5F5F5', $input['button_color'] ?? '#1976D2',
@@ -420,10 +451,23 @@ class AdminController extends BaseController
                 $input['end_date'] ?? null, $input['is_active'] ?? 0, $adminId,
             ]);
             $this->json(['success' => true, 'id' => $db->lastInsertId()], 201);
+            return;
         }
 
+        // GET - Lấy danh sách themes
         $themes = $this->settingModel->getAllThemes();
         $this->json(['themes' => $themes]);
+    }
+
+    /**
+     * Tạo theme_key từ tên theme
+     */
+    private function generateThemeKey($name)
+    {
+        $key = mb_strtolower($name);
+        $key = preg_replace('/[^a-z0-9\s-]/u', '', $key);
+        $key = preg_replace('/\s+/', '-', trim($key));
+        return $key ?: 'custom-' . time();
     }
 
     // ==================== UPLOAD DATASET ====================
