@@ -5,6 +5,7 @@
 
 const API_BASE = '/DuAnChatbotThuVien/public/index.php?url=api';
 let sessionToken = localStorage.getItem('chat_session') || '';
+let activeCategoryId = null; // Danh mục đang mở
 
 /**
  * Khởi tạo chatbot
@@ -33,6 +34,9 @@ async function initChatbot() {
         console.warn('Could not load chatbot settings:', e);
     }
 
+    // Tải danh mục câu hỏi
+    loadCategories();
+
     // Focus vào input
     document.getElementById('chatInput')?.focus();
 }
@@ -59,8 +63,8 @@ function applySettings(settings) {
     if (!settings.enabled) {
         document.getElementById('chatArea').innerHTML = `
             <div class="text-center py-20">
-                <p class="text-gray-500 text-lg">Chatbot hiện đang tạm ngưng hoạt động.</p>
-                <p class="text-gray-400 text-sm mt-2">Vui lòng quay lại sau.</p>
+                <p class="text-gray-500 text-lg">${typeof t === 'function' ? t('chatbot_disabled') : 'Chatbot hiện đang tạm ngưng hoạt động.'}</p>
+                <p class="text-gray-400 text-sm mt-2">${typeof t === 'function' ? t('come_back_later') : 'Vui lòng quay lại sau.'}</p>
             </div>`;
         return;
     }
@@ -109,12 +113,14 @@ async function sendMessage() {
     showTypingIndicator();
 
     try {
+        const lang = (typeof currentLang !== 'undefined') ? currentLang : 'vi';
         const res = await fetch(`${API_BASE}/chat/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 message: message,
                 session_token: sessionToken,
+                lang: lang,
             }),
         });
 
@@ -127,11 +133,11 @@ async function sendMessage() {
             console.log('Chat response forms:', data.forms);
             appendMessage('bot', data.reply, data.forms || []);
         } else {
-            appendMessage('bot', data.error || 'Đã có lỗi xảy ra. Vui lòng thử lại.');
+            appendMessage('bot', data.error || (typeof t === 'function' ? t('error_occurred') : 'Đã có lỗi xảy ra. Vui lòng thử lại.'));
         }
     } catch (e) {
         hideTypingIndicator();
-        appendMessage('bot', 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.');
+        appendMessage('bot', typeof t === 'function' ? t('cannot_connect') : 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.');
     }
 }
 
@@ -189,7 +195,9 @@ function appendMessage(sender, text, forms = []) {
     container.insertAdjacentHTML('beforeend', msgHtml);
 
     // Scroll to bottom
-    container.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+    });
 }
 
 /**
@@ -207,7 +215,9 @@ function showTypingIndicator() {
             </div>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
-    container.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+    });
 }
 
 function hideTypingIndicator() {
@@ -226,6 +236,9 @@ async function startNewChat() {
     if (welcome) welcome.style.display = 'flex';
     const suggestions = document.getElementById('suggestionsContainer');
     if (suggestions) suggestions.style.display = 'flex';
+
+    // Reset danh mục sidebar
+    closeCategoryQuestions();
 
     // Clear session
     sessionToken = '';
@@ -288,6 +301,197 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// ===== DANH MỤC CÂU HỎI (SIDEBAR) =====
+
+/** SVG icon paths for categories (outline style) */
+const categorySVGs = [
+    '<path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>',
+    '<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>',
+    '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z"/>',
+    '<path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"/><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"/>',
+    '<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"/>',
+    '<path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"/>',
+];
+
+/** Color palette for category icons (light ocean blue) */
+const categoryColors = [
+    { bg: 'rgba(14,165,233,0.1)', color: '#0284c7' },
+    { bg: 'rgba(16,185,129,0.1)', color: '#059669' },
+    { bg: 'rgba(245,158,11,0.1)', color: '#d97706' },
+    { bg: 'rgba(236,72,153,0.1)', color: '#db2777' },
+    { bg: 'rgba(139,92,246,0.1)', color: '#7c3aed' },
+    { bg: 'rgba(6,182,212,0.1)', color: '#0891b2' },
+];
+
+/**
+ * Tải danh mục từ server
+ */
+async function loadCategories() {
+    try {
+        const res = await fetch(`${API_BASE}/chat/categories`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.categories && data.categories.length > 0) {
+                renderCategories(data.categories);
+                // Chỉ tự mở sidebar trên desktop (> 768px)
+                const sidebar = document.getElementById('categorySidebar');
+                if (sidebar && window.innerWidth > 768) {
+                    sidebar.classList.remove('sidebar-hidden');
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Could not load categories:', e);
+    }
+}
+
+/**
+ * Toggle sidebar
+ */
+function toggleSidebar() {
+    const sidebar = document.getElementById('categorySidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (!sidebar) return;
+
+    const isHidden = sidebar.classList.contains('sidebar-hidden');
+
+    if (isHidden) {
+        // Mở sidebar
+        sidebar.classList.remove('sidebar-hidden');
+        if (overlay) overlay.classList.add('active');
+    } else {
+        // Đóng sidebar
+        sidebar.classList.add('sidebar-hidden');
+        if (overlay) overlay.classList.remove('active');
+    }
+}
+
+/**
+ * Render danh mục dạng danh sách dọc trong sidebar
+ */
+function renderCategories(categories) {
+    const container = document.getElementById('categoryList');
+    if (!container) return;
+
+    container.innerHTML = categories.map((cat, idx) => {
+        const svgPath = categorySVGs[idx % categorySVGs.length];
+        const palette = categoryColors[idx % categoryColors.length];
+        const count = cat.question_count || 0;
+        return `
+            <div>
+                <div class="category-item" onclick="openCategory(${cat.id}, this)" data-cat-id="${cat.id}">
+                    <div class="cat-icon-wrap" style="background:${palette.bg};color:${palette.color}">
+                        <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">${svgPath}</svg>
+                    </div>
+                    <div class="cat-info">
+                        <div class="cat-name" data-name-vi="${escapeHtml(cat.name)}">${typeof translateCatName === 'function' ? translateCatName(cat.name) : escapeHtml(cat.name)}</div>
+                        <div class="cat-count" data-count="${count}">${count} ${typeof t === 'function' ? t('questions') : 'câu hỏi'}</div>
+                    </div>
+                    <svg class="cat-arrow" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </div>
+                <div class="category-questions" id="catQuestions_${cat.id}"></div>
+            </div>`;
+    }).join('');
+}
+
+/**
+ * Mở danh mục → tải câu hỏi inline bên dưới
+ */
+async function openCategory(categoryId, itemEl) {
+    const questionsDiv = document.getElementById(`catQuestions_${categoryId}`);
+
+    // Nếu bấm lại danh mục đang mở → đóng
+    if (activeCategoryId === categoryId) {
+        closeCategoryQuestions();
+        return;
+    }
+
+    // Đóng danh mục cũ
+    closeCategoryQuestions();
+    activeCategoryId = categoryId;
+
+    // Highlight item
+    if (itemEl) itemEl.classList.add('active');
+
+    // Hiện panel câu hỏi
+    if (questionsDiv) {
+        questionsDiv.classList.add('open');
+        questionsDiv.innerHTML = `
+            <div class="flex items-center justify-center py-4 text-gray-400 text-xs gap-2">
+                <svg class="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                ${typeof t === 'function' ? t('loading') : 'Đang tải...'}
+            </div>`;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/chat/categoryQuestions/${categoryId}`);
+        const data = await res.json();
+
+        if (data.success && questionsDiv) {
+            if (data.questions.length === 0) {
+                questionsDiv.innerHTML = `
+                    <div class="text-center py-3 text-gray-400 text-xs">
+                        ${typeof t === 'function' ? t('no_questions') : 'Chưa có câu hỏi nào.'}
+                    </div>`;
+            } else {
+                questionsDiv.innerHTML = data.questions.map(q =>
+                    `<div class="cat-question-item" onclick="askCategoryQuestion(this)" data-question="${escapeHtml(q.question_text)}" data-question-vi="${escapeHtml(q.question_text)}"${q.question_text_en ? ` data-question-en="${escapeHtml(q.question_text_en)}"` : ''}>
+                        <span class="q-dot"></span>
+                        <span class="q-text">${escapeHtml(q.question_text)}</span>
+                    </div>`
+                ).join('');
+            }
+        } else if (questionsDiv) {
+            questionsDiv.innerHTML = `
+                <div class="text-center py-3 text-red-400 text-xs">
+                    ${data.error || (typeof t === 'function' ? t('cannot_load') : 'Không thể tải.')}
+                </div>`;
+        }
+    } catch (e) {
+        if (questionsDiv) {
+            questionsDiv.innerHTML = `
+                <div class="text-center py-3 text-red-400 text-xs">
+                    ${typeof t === 'function' ? t('connection_error') : 'Lỗi kết nối.'}
+                </div>`;
+        }
+    }
+}
+
+/**
+ * Đóng panel câu hỏi danh mục
+ */
+function closeCategoryQuestions() {
+    activeCategoryId = null;
+    document.querySelectorAll('.category-item').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.category-questions').forEach(c => {
+        c.classList.remove('open');
+        c.innerHTML = '';
+    });
+}
+
+/**
+ * Gửi câu hỏi từ danh mục vào chatbot
+ */
+function askCategoryQuestion(el) {
+    const question = el.getAttribute('data-question');
+    if (!question) return;
+
+    // Trên mobile: đóng sidebar sau khi chọn câu hỏi
+    if (window.innerWidth <= 768) {
+        toggleSidebar();
+    }
+
+    const input = document.getElementById('chatInput');
+    input.value = question;
+    updateCharCount();
+    sendMessage();
 }
 
 /**

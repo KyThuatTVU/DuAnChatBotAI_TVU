@@ -65,7 +65,7 @@ class SettingModel extends BaseModel
             'button_color' => $all['button_color']['value'] ?? '#1976D2',
             'button_position' => json_decode($all['button_position']['value'] ?? '{}', true),
             'bot_avatar' => $all['bot_avatar']['value'] ?? '',
-            'no_answer_message' => $all['no_answer_message']['value'] ?? 'Xin lỗi, tôi chưa có câu trả lời.',
+            'no_answer_message' => $all['no_answer_message']['value'] ?? 'Cảm ơn bạn đã đặt câu hỏi! Hiện tại mình chưa tìm thấy thông tin phù hợp cho câu hỏi này. Bạn có thể thử hỏi lại theo cách khác, hoặc liên hệ trực tiếp với thủ thư qua số (02943) 855 246 hoặc email celras@tvu.edu.vn để được hỗ trợ tận tình nhé! 😊',
             'max_suggestions' => (int)($all['max_suggestions']['value'] ?? 5),
         ];
     }

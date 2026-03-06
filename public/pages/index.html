@@ -1,11 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CELRAS TVU Chatbot - Trung tâm Học liệu và Chuyển đổi số</title>
 
-    <!-- Tailwind CDN: viết class trực tiếp vào HTML, có hiệu lực ngay, không cần build -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -18,33 +17,43 @@
     <link rel="icon" href="/DuAnChatbotThuVien/public/assets/images/logo.png" type="image/png">
 
     <style>
-        /* ===== Style cho các phần tử do JS inject động ===== */
-        body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+        body {
+            font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+            background: linear-gradient(135deg, #e0f4fd 0%, #cce8f9 30%, #b8e0f7 60%, #d5effc 100%);
+            background-attachment: fixed;
+        }
 
-        /* Tin nhắn */
+        /* ===== TIN NHẮN ===== */
         .message { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 16px; }
         .message.user { flex-direction: row-reverse; }
-        .message .avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; }
+        .message .avatar {
+            width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+            box-shadow: 0 3px 10px rgba(14,116,176,0.2), 0 1px 3px rgba(0,0,0,0.08);
+            border: 2px solid #fff;
+        }
         .message.bot .bubble {
-            background: #ffffff; color: #1f2937;
-            border-radius: 0 16px 16px 16px;
-            padding: 10px 14px; max-width: 72%;
-            font-size: 14px; line-height: 1.6;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-            border: 1px solid #e5e7eb;
+            background: linear-gradient(145deg, #ffffff, #f0f9ff);
+            color: #1e3a5a;
+            border-radius: 4px 18px 18px 18px;
+            padding: 12px 16px; max-width: 72%;
+            font-size: 14px; line-height: 1.65;
+            box-shadow: 0 4px 15px rgba(14,116,176,0.1), 0 2px 4px rgba(0,0,0,0.04), inset 0 1px 0 #fff;
+            border: 1px solid rgba(14,165,233,0.12);
         }
         .message.user .bubble {
-            background: #0ea5e9; color: #fff;
-            border-radius: 16px 0 16px 16px;
-            padding: 10px 14px; max-width: 72%;
-            font-size: 14px; line-height: 1.6;
+            background: linear-gradient(145deg, #0ea5e9, #0284c7);
+            color: #fff;
+            border-radius: 18px 4px 18px 18px;
+            padding: 12px 16px; max-width: 72%;
+            font-size: 14px; line-height: 1.65;
+            box-shadow: 0 4px 18px rgba(14,165,233,0.35), 0 2px 6px rgba(2,132,199,0.2), inset 0 1px 0 rgba(255,255,255,0.2);
         }
 
-        /* Typing indicator */
-        .typing-indicator { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+        /* Typing */
+        .typing-indicator { display: flex; gap: 5px; align-items: center; padding: 4px 0; }
         .typing-indicator span {
             display: inline-block; width: 7px; height: 7px;
-            border-radius: 50%; background: #93c5fd;
+            border-radius: 50%; background: #38bdf8;
             animation: tw-bounce 1.2s infinite;
         }
         .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
@@ -54,82 +63,488 @@
             40%           { transform: translateY(-6px); }
         }
 
-        /* Suggestion chip do JS render */
+        /* Suggestion chip */
         .suggestion-chip {
             display: inline-flex; align-items: center;
             padding: 8px 16px;
-            border: 1px solid #bae6fd; border-radius: 9999px;
-            background: rgba(255,255,255,0.75);
+            border: 1px solid rgba(14,165,233,0.2); border-radius: 9999px;
+            background: linear-gradient(145deg, #ffffff, #f0f9ff);
             color: #0369a1; font-size: 13px; font-weight: 500;
+            cursor: pointer; transition: all 0.25s;
+            box-shadow: 0 2px 8px rgba(14,116,176,0.1), 0 1px 2px rgba(0,0,0,0.04), inset 0 1px 0 #fff;
+        }
+        .suggestion-chip:hover {
+            background: linear-gradient(145deg, #e0f2fe, #bae6fd);
+            border-color: rgba(14,165,233,0.35); color: #075985;
+            box-shadow: 0 6px 20px rgba(14,165,233,0.2), 0 2px 6px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.6);
+            transform: translateY(-2px);
+        }
+        .suggestion-chip:active { transform: translateY(0); }
+
+        /* ===== SIDEBAR ===== */
+        #categorySidebar {
+            width: 272px; flex-shrink: 0;
+            background: linear-gradient(180deg, #f0f9ff, #e8f5fe);
+            border-right: 1px solid rgba(14,165,233,0.12);
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            transition: margin-left 0.3s ease;
+            box-shadow: 4px 0 20px rgba(14,116,176,0.08), 1px 0 0 rgba(186,230,253,0.5);
+        }
+        #categorySidebar.sidebar-hidden { margin-left: -272px; }
+
+        .sidebar-header {
+            padding: 18px 20px 14px;
+            border-bottom: 1px solid rgba(14,165,233,0.1);
+            flex-shrink: 0;
+            background: linear-gradient(180deg, rgba(224,242,254,0.6), transparent);
+        }
+        .sidebar-body { flex: 1; overflow-y: auto; padding: 4px 0; }
+        .sidebar-body::-webkit-scrollbar { width: 3px; }
+        .sidebar-body::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-body::-webkit-scrollbar-thumb { background: rgba(14,165,233,0.2); border-radius: 9999px; }
+
+        /* Category item */
+        .category-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 20px;
+            cursor: pointer; transition: all 0.18s;
+            border-left: 3px solid transparent;
+        }
+        .category-item:hover {
+            background: rgba(14,165,233,0.06);
+            border-left-color: #7dd3fc;
+        }
+        .category-item.active {
+            background: linear-gradient(90deg, rgba(14,165,233,0.1), transparent);
+            border-left-color: #0ea5e9;
+        }
+
+        .cat-icon-wrap {
+            width: 36px; height: 36px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            background: linear-gradient(145deg, #fff, #e0f2fe);
+            color: #0284c7;
+            transition: all 0.18s;
+            box-shadow: 0 3px 8px rgba(14,116,176,0.1), 0 1px 2px rgba(0,0,0,0.04), inset 0 1px 0 #fff;
+        }
+        .category-item:hover .cat-icon-wrap {
+            background: linear-gradient(145deg, #e0f2fe, #bae6fd);
+            box-shadow: 0 4px 12px rgba(14,165,233,0.18), inset 0 1px 0 rgba(255,255,255,0.6);
+        }
+        .category-item.active .cat-icon-wrap {
+            background: linear-gradient(145deg, #0ea5e9, #0284c7);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(14,165,233,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+        }
+
+        .cat-info { flex: 1; min-width: 0; }
+        .cat-name {
+            font-size: 13px; font-weight: 600; color: #1e3a5a;
+            line-height: 1.3; white-space: nowrap;
+            overflow: hidden; text-overflow: ellipsis;
+        }
+        .category-item:hover .cat-name { color: #075985; }
+        .category-item.active .cat-name { color: #0369a1; }
+        .cat-count { font-size: 11px; color: #7cadca; margin-top: 1px; }
+
+        .cat-arrow {
+            flex-shrink: 0; color: #a5d4ef; transition: all 0.2s;
+            width: 16px; height: 16px;
+        }
+        .category-item:hover .cat-arrow { color: #38bdf8; }
+        .category-item.active .cat-arrow { color: #0ea5e9; transform: rotate(90deg); }
+
+        /* Sub-questions */
+        .category-questions { display: none; background: rgba(224,242,254,0.4); }
+        .category-questions.open { display: block; }
+
+        .cat-question-item {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 9px 20px 9px 54px;
             cursor: pointer; transition: all 0.15s;
-            backdrop-filter: blur(4px);
+            font-size: 13px; color: #4a8eb8; line-height: 1.45;
         }
-        .suggestion-chip:hover { background: #e0f2fe; border-color: #7dd3fc; }
+        .cat-question-item:hover { background: rgba(14,165,233,0.08); color: #075985; }
+        .q-dot {
+            flex-shrink: 0; width: 5px; height: 5px;
+            border-radius: 50%; background: #7dd3fc;
+            margin-top: 7px; transition: all 0.15s;
+        }
+        .cat-question-item:hover .q-dot { background: #0ea5e9; }
+        .q-text { flex: 1; }
 
-        /* Scrollbar mỏng */
-        #chatMessages::-webkit-scrollbar { width: 4px; }
+        /* Toggle button */
+        #sidebarToggle { display: none; }
+
+        @media (max-width: 768px) {
+            #categorySidebar {
+                position: fixed; top: 64px; left: 0; bottom: 0;
+                z-index: 40; width: 280px;
+                box-shadow: 4px 0 30px rgba(14,116,176,0.15);
+                margin-left: 0; transform: translateX(0);
+                transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+            }
+            #categorySidebar.sidebar-hidden { margin-left: 0; transform: translateX(-100%); }
+            #sidebarToggle { display: inline-flex; }
+
+            #sidebarOverlay {
+                display: none; position: fixed; inset: 0; top: 64px;
+                background: rgba(7,89,133,0.2); z-index: 39;
+                pointer-events: none;
+                backdrop-filter: blur(3px);
+            }
+            #sidebarOverlay.active { display: block; pointer-events: auto; }
+
+            main.flex-1 { justify-content: flex-start !important; }
+            main { padding-left: 0 !important; padding-right: 0 !important; }
+
+            header { height: 64px !important; }
+            .layout-wrapper { margin-top: 64px !important; }
+
+            #welcomeBlock { padding-top: 1.2rem !important; padding-bottom: 0.5rem !important; }
+            #welcomeBlock img { width: 56px !important; height: 56px !important; }
+            #welcomeBlock h2 { font-size: 1.05rem !important; }
+            #welcomeBlock p { font-size: 12.5px !important; }
+            #welcomeBlock p br { display: none; }
+
+            #chatMessages { padding: 6px 10px !important; }
+            .message .bubble { max-width: 88% !important; font-size: 13px !important; }
+            .message .avatar { width: 28px !important; height: 28px !important; }
+
+            #suggestionsContainer { gap: 5px !important; }
+            .suggestion-chip { font-size: 11.5px !important; padding: 5px 10px !important; }
+
+            .input-wrapper { padding: 4px 10px 8px !important; }
+
+            footer { padding: 6px 10px !important; }
+            footer p { font-size: 9.5px !important; }
+        }
+
+        @media (max-width: 400px) {
+            header { height: 56px !important; }
+            #categorySidebar { top: 56px !important; width: 260px !important; }
+            #sidebarOverlay { top: 56px !important; }
+            .layout-wrapper { margin-top: 56px !important; }
+            #welcomeBlock img { width: 48px !important; height: 48px !important; }
+            .suggestion-chip { font-size: 11px !important; padding: 4px 8px !important; }
+        }
+
+        /* Scrollbar */
+        #chatMessages::-webkit-scrollbar { width: 3px; }
         #chatMessages::-webkit-scrollbar-track { background: transparent; }
-        #chatMessages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        #chatMessages::-webkit-scrollbar-thumb { background: rgba(14,165,233,0.18); border-radius: 9999px; }
 
-        /*Hiệu ứng vẫy tay*/
+        /* Wave */
         @keyframes wave {
-            0% { transform: rotate(0deg); }
-            10% { transform: rotate(15deg); }
-            20% { transform: rotate(-10deg); }
-            30% { transform: rotate(15deg); }
-            40% { transform: rotate(-5deg); }
+            0%,60%,100% { transform: rotate(0); }
+            10% { transform: rotate(14deg); } 20% { transform: rotate(-8deg); }
+            30% { transform: rotate(14deg); } 40% { transform: rotate(-4deg); }
             50% { transform: rotate(10deg); }
-            60% { transform: rotate(0deg); }
-            100% { transform: rotate(0deg); }
+        }
+        .wave { display: inline-block; transform-origin: 70% 70%; animation: wave 2s ease-in-out infinite; }
+
+        /* 3D floating animation for welcome avatar */
+        @keyframes float3d {
+            0%, 100% { transform: translateY(0) rotateX(0); }
+            50% { transform: translateY(-8px) rotateX(2deg); }
+        }
+        .float-3d { animation: float3d 4s ease-in-out infinite; }
+
+        /* ===== DARK MODE TOGGLE ===== */
+        .theme-toggle {
+            position: relative;
+            width: 56px; height: 30px;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.35s;
+            border: none; outline: none;
+            background: linear-gradient(145deg, #bae6fd, #7dd3fc);
+            box-shadow: 0 2px 8px rgba(14,165,233,0.2), inset 0 1px 0 rgba(255,255,255,0.5);
+        }
+        .theme-toggle .toggle-circle {
+            position: absolute; top: 3px; left: 3px;
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            background: #fff;
+            transition: all 0.35s cubic-bezier(.4,0,.2,1);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .theme-toggle .toggle-circle svg { width: 14px; height: 14px; transition: all 0.3s; }
+        .theme-toggle .sun-icon { color: #f59e0b; }
+        .theme-toggle .moon-icon { color: #7dd3fc; display: none; }
+
+        /* Dark mode toggle state */
+        body.dark .theme-toggle {
+            background: linear-gradient(145deg, #1e3a5a, #0f2847);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+        body.dark .theme-toggle .toggle-circle {
+            left: 29px;
+            background: #1e293b;
+        }
+        body.dark .theme-toggle .sun-icon { display: none; }
+        body.dark .theme-toggle .moon-icon { display: block; }
+
+        /* ===== LANGUAGE TOGGLE ===== */
+        .lang-toggle {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 46px; height: 30px; padding: 0 10px;
+            border-radius: 8px; border: 1px solid rgba(14,165,233,0.2);
+            background: linear-gradient(145deg, #fff, #f0f9ff);
+            cursor: pointer; transition: all 0.25s;
+            font-size: 13px; font-weight: 700; color: #0284c7;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 6px rgba(14,116,176,0.1), inset 0 1px 0 #fff;
+        }
+        .lang-toggle:hover {
+            background: linear-gradient(145deg, #e0f2fe, #bae6fd);
+            border-color: rgba(14,165,233,0.35);
+            box-shadow: 0 4px 12px rgba(14,165,233,0.2);
+            transform: translateY(-1px);
         }
 
-        .wave {
-            display: inline-block;
-            transform-origin: 70% 70%;
-            animation: wave 2s ease-in-out infinite;
+        /* ===== HOME ICON ===== */
+        .nav-home-icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 38px; height: 38px; border-radius: 10px;
+            color: #0284c7; transition: all 0.25s;
+        }
+        .nav-home-icon:hover {
+            background: rgba(14,165,233,0.1);
+            color: #075985;
+            transform: translateY(-1px);
+        }
+
+        /* ===== DARK MODE STYLES ===== */
+        body.dark {
+            background: linear-gradient(135deg, #0a1628 0%, #0f2847 50%, #0a1628 100%) !important;
+            background-attachment: fixed;
+        }
+
+        body.dark header {
+            background: linear-gradient(145deg, #0d2137, #0a1a2e) !important;
+            border-bottom-color: rgba(56,189,248,0.12) !important;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4) !important;
+        }
+        body.dark header .logo-text { color: #e0f2fe !important; }
+        body.dark header .divider-line { background: rgba(56,189,248,0.2) !important; }
+        body.dark #sidebarToggle { color: #64a3d4 !important; }
+        body.dark .btn-new-chat {
+            background: linear-gradient(145deg, #2563eb, #1d4ed8) !important;
+            box-shadow: 0 4px 14px rgba(37,99,235,0.5), inset 0 1px 0 rgba(255,255,255,0.12) !important;
+        }
+        body.dark .nav-home-icon { color: #5a8ab5 !important; }
+        body.dark .nav-home-icon:hover { background: rgba(37,99,235,0.15) !important; color: #93c5fd !important; }
+        body.dark .lang-toggle {
+            background: linear-gradient(145deg, #1e3a5a, #152a47) !important;
+            border-color: rgba(56,189,248,0.15) !important;
+            color: #93c5fd !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+        }
+        body.dark .lang-toggle:hover {
+            background: linear-gradient(145deg, #2563eb, #1d4ed8) !important;
+            color: #e0f2fe !important;
+        }
+
+        /* Sidebar dark */
+        body.dark #categorySidebar {
+            background: linear-gradient(180deg, #0d1f3c, #0a1829) !important;
+            border-right-color: rgba(56,130,246,0.1) !important;
+            box-shadow: 4px 0 20px rgba(0,0,0,0.3) !important;
+        }
+        body.dark .sidebar-header {
+            border-bottom-color: rgba(56,130,246,0.12) !important;
+            background: linear-gradient(180deg, rgba(15,40,71,0.5), transparent) !important;
+        }
+        body.dark .sidebar-header h3 { color: #c7d7ea !important; }
+        body.dark .sidebar-header p { color: #4a6a8a !important; }
+        body.dark .sidebar-body::-webkit-scrollbar-thumb { background: rgba(56,130,246,0.2) !important; }
+
+        body.dark .category-item:hover {
+            background: rgba(37,99,235,0.08) !important;
+            border-left-color: rgba(56,189,248,0.4) !important;
+        }
+        body.dark .category-item.active {
+            background: rgba(37,99,235,0.15) !important;
+            border-left-color: #38bdf8 !important;
+        }
+        body.dark .cat-icon-wrap {
+            background: rgba(30,58,95,0.6) !important; color: #64a3d4 !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+        }
+        body.dark .category-item:hover .cat-icon-wrap {
+            background: rgba(37,99,235,0.25) !important; color: #93c5fd !important;
+        }
+        body.dark .category-item.active .cat-icon-wrap {
+            background: linear-gradient(145deg, #2563eb, #1d4ed8) !important; color: #fff !important;
+            box-shadow: 0 3px 10px rgba(37,99,235,0.5), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+        }
+        body.dark .cat-name { color: #c7d7ea !important; }
+        body.dark .category-item:hover .cat-name { color: #e0f2fe !important; }
+        body.dark .category-item.active .cat-name { color: #93c5fd !important; }
+        body.dark .cat-count { color: #5a7a9a !important; }
+        body.dark .cat-arrow { color: #3a5a7a !important; }
+        body.dark .category-item:hover .cat-arrow { color: #64a3d4 !important; }
+        body.dark .category-item.active .cat-arrow { color: #38bdf8 !important; }
+
+        body.dark .category-questions { background: rgba(8,20,38,0.5) !important; }
+        body.dark .cat-question-item { color: #7a9ec0 !important; }
+        body.dark .cat-question-item:hover { background: rgba(37,99,235,0.12) !important; color: #93c5fd !important; }
+        body.dark .q-dot { background: #3a5a7a !important; }
+        body.dark .cat-question-item:hover .q-dot { background: #38bdf8 !important; }
+
+        /* Messages dark */
+        body.dark .message.bot .bubble {
+            background: linear-gradient(145deg, #1a3358, #162d4e) !important;
+            color: #d1dff0 !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+            border-color: rgba(56,130,246,0.15) !important;
+        }
+        body.dark .message.user .bubble {
+            background: linear-gradient(145deg, #2563eb, #1d4ed8) !important;
+            box-shadow: 0 4px 14px rgba(37,99,235,0.4), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+        }
+        body.dark .message .avatar {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+            border-color: rgba(56,189,248,0.2) !important;
+        }
+
+        /* Welcome dark */
+        body.dark #welcomeBlock h2 { color: #e0f2fe !important; }
+        body.dark #welcomeBlock p { color: #8aaec8 !important; }
+        body.dark #welcomeBlock strong { color: #93c5fd !important; }
+        body.dark #botAvatarImg {
+            box-shadow: 0 8px 30px rgba(37,99,235,0.4), 0 0 60px rgba(56,189,248,0.15) !important;
+            border-color: rgba(56,189,248,0.3) !important;
+        }
+
+        /* Suggestions dark */
+        body.dark .suggestion-chip {
+            background: linear-gradient(145deg, rgba(30,58,95,0.8), rgba(20,40,70,0.9)) !important;
+            border-color: rgba(56,189,248,0.25) !important;
+            color: #93c5fd !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+        }
+        body.dark .suggestion-chip:hover {
+            background: linear-gradient(145deg, rgba(37,99,235,0.5), rgba(30,58,95,0.9)) !important;
+            border-color: rgba(56,189,248,0.5) !important; color: #e0f2fe !important;
+            box-shadow: 0 4px 16px rgba(37,99,235,0.3), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+        }
+
+        /* Input dark */
+        body.dark .input-box {
+            background: linear-gradient(145deg, #152a47, #0f2038) !important;
+            border-color: rgba(56,189,248,0.15) !important;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04) !important;
+        }
+        body.dark #chatInput { color: #d1dff0 !important; }
+        body.dark #charCount { color: #3a5a7a !important; }
+        body.dark #sendBtn {
+            background: linear-gradient(145deg, #2563eb, #1d4ed8) !important;
+            box-shadow: 0 3px 10px rgba(37,99,235,0.4), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+        }
+
+        /* Footer dark */
+        body.dark footer {
+            background: linear-gradient(145deg, #06101e, #081525) !important;
+            border-top-color: rgba(56,130,246,0.1) !important;
+            box-shadow: none !important;
+        }
+        body.dark footer p { color: #3a5a7a !important; }
+        body.dark footer .dot-sep { color: #1e3a5a !important; }
+
+        /* Scrollbar dark */
+        body.dark #chatMessages::-webkit-scrollbar-thumb { background: rgba(56,130,246,0.2) !important; }
+
+        /* Overlay dark */
+        @media (max-width: 768px) {
+            body.dark #sidebarOverlay.active { background: rgba(0,0,0,0.5) !important; }
         }
     </style>
 </head>
 
-<body class="bg-gradient-to-br from-sky-100 via-blue-50 to-cyan-100 h-screen flex flex-col overflow-hidden">
+<body class="h-screen flex flex-col overflow-hidden">
 
-    <!-- ===== HEADER ===== -->
-    <header class="bg-white shadow-sm fixed top-0 left-0 right-0 z-50 h-16">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 h-full flex items-center justify-between">
-
-            <!-- Trái: Logo + Tên thương hiệu + Nút tạo chat mới -->
-            <div class="flex items-center gap-3">
+    <!-- HEADER -->
+    <header class="fixed top-0 left-0 right-0 z-50 h-[72px]" style="flex-shrink:0; background: linear-gradient(145deg, #ffffff, #f0f9ff); border-bottom: 1px solid rgba(14,165,233,0.15); box-shadow: 0 4px 20px rgba(14,116,176,0.08), 0 1px 3px rgba(0,0,0,0.04);">
+        <div class="max-w-7xl mx-auto px-4 sm:px-5 h-full flex items-center justify-between">
+            <div class="flex items-center gap-2">
                 <a href="/DuAnChatbotThuVien/public/pages/index.html" class="flex items-center gap-2">
-                    <img
-                        src="../assets/images/logo2.png"
-                        alt="CELRAS TVU"
-                        class="w-9 h-9 rounded-full object-cover">
-                    <span class="font-bold text-blue-700 text-base hidden sm:inline">CELRAS TVU Chatbot</span>
+                    <img src="../assets/images/logo2.png" alt="CELRAS TVU" class="w-12 h-12 rounded-full object-cover flex-shrink-0" style="box-shadow: 0 2px 8px rgba(14,165,233,0.2); border: 2px solid #fff;">
+                <span class="font-bold text-[15px] hidden sm:inline tracking-tight logo-text" style="color: #0c4a6e;">CELRAS TVU</span>
                 </a>
-                <span class="text-gray-300 hidden sm:inline text-lg">|</span>
-                <button
-                    onclick="startNewChat()"
-                    class="hidden sm:inline-flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors shadow-sm"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
-                        <title xmlns="">square-pen</title><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/></g>
+
+                <div class="w-px h-5 mx-1 hidden sm:block divider-line" style="background: rgba(14,165,233,0.15);"></div>
+
+                <button id="sidebarToggle" onclick="toggleSidebar()"
+                    class="items-center justify-center w-8 h-8 rounded-lg transition-all" style="color: #0284c7;" title="Danh mục"
+                    onmouseover="this.style.background='rgba(14,165,233,0.1)';this.style.color='#0369a1'"
+                    onmouseout="this.style.background='';this.style.color='#0284c7'">
+                    <svg class="w-[18px] h-[18px] mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
                     </svg>
-                    Đoạn chat mới
+                </button>
+
+                <button onclick="startNewChat()"
+                    class="btn-new-chat inline-flex items-center gap-1.5 text-white text-[13px] font-semibold px-4 py-[7px] rounded-full transition-all"
+                    style="background: linear-gradient(145deg, #0ea5e9, #0284c7); box-shadow: 0 4px 14px rgba(14,165,233,0.35), 0 1px 3px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.2);"
+                    onmouseover="this.style.boxShadow='0 6px 20px rgba(14,165,233,0.4), 0 2px 4px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25)';this.style.transform='translateY(-1px)'"
+                    onmouseout="this.style.boxShadow='0 4px 14px rgba(14,165,233,0.35), 0 1px 3px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.2)';this.style.transform=''">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    <span class="hidden sm:inline" data-i18n="new_chat">Chat mới</span>
                 </button>
             </div>
 
-            <!-- Phải: Link trang chủ + Đăng nhập / Avatar user -->
-            <div class="flex items-center gap-3">
-                <a href="#" class="text-gray-500 hover:text-gray-800 text-sm font-medium hidden sm:inline transition-colors">
-                    Trở về trang chủ
+            <div class="flex items-center gap-2">
+                <!-- Language Toggle -->
+                <button class="lang-toggle" onclick="toggleLanguage()" id="langToggle" data-i18n-title="switch_lang" title="Chuyển ngôn ngữ">
+                    <span id="langLabel">VN</span>
+                </button>
+
+                <!-- Dark/Light Toggle -->
+                <button class="theme-toggle" onclick="toggleTheme()" data-i18n-title="toggle_theme" title="Chuyển chế độ sáng/tối">
+                    <div class="toggle-circle">
+                        <svg class="sun-icon" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
+                        <svg class="moon-icon" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+                    </div>
+                </button>
+
+                <!-- Home Icon -->
+                <a href="/DuAnChatbotThuVien/public/pages/index.html" class="nav-home-icon" data-i18n-title="home" title="Trang chủ">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/>
+                    </svg>
                 </a>
             </div>
-
         </div>
     </header>
 
+    <!-- LAYOUT -->
+    <div class="flex flex-1 overflow-hidden layout-wrapper" style="margin-top: 72px;">
+        <div id="sidebarOverlay" onclick="toggleSidebar()" style="display:none;"></div>
 
-    <!-- ===== KHU VỰC CHAT CHÍNH ===== -->
+        <!-- SIDEBAR -->
+        <aside id="categorySidebar" class="sidebar-hidden">
+            <div class="sidebar-header">
+                <h3 class="text-[13px] font-semibold flex items-center gap-2" style="color: #0c4a6e;">
+                    <svg class="w-4 h-4" style="color: #0ea5e9;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                    </svg>
+                    <span data-i18n="categories_title">Danh mục câu hỏi</span>
+                </h3>
+                <p class="text-[11px] mt-1 ml-6" style="color: #7cadca;" data-i18n="categories_sub">Chọn chủ đề để xem nhanh</p>
+            </div>
+            <div class="sidebar-body">
+                <div id="categoryList"></div>
+            </div>
+        </aside>
+
+        <!-- ===== KHU VỰC CHAT CHÍNH ===== -->
     <main class="flex-1 flex flex-col justify-center overflow-hidden px-4">
 
         <!-- Vùng cuộn tin nhắn -->
@@ -142,15 +557,16 @@
                         id="botAvatarImg"
                         src="../assets/images/logo1.png"
                         alt="CELRAS Bot"
-                        class="w-24 h-24 rounded-full object-cover shadow-xl mb-5 border-4 border-white"
+                        class="w-24 h-24 rounded-full object-cover mb-5 float-3d"
+                        style="box-shadow: 0 10px 35px rgba(14,165,233,0.25), 0 4px 15px rgba(14,116,176,0.15), 0 0 0 4px #fff, 0 0 0 6px rgba(14,165,233,0.15); border: 3px solid #fff;"
                     >
-                    <h2 class="text-blue-600 font-bold text-xl sm:text-2xl mb-3">
-                        CELRAS TVU xin chào! 
+                    <h2 class="font-bold text-xl sm:text-2xl mb-3" style="color: #0c4a6e;">
+                        <span data-i18n="welcome_title">CELRAS TVU xin chào!</span> 
                         <span class="wave">👋</span>
                     </h2>
-                    <p class="text-gray-700 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto text-center px-6">
+                    <p class="text-sm sm:text-base leading-relaxed max-w-2xl mx-auto text-center px-6" style="color: #3a7ca5;" data-i18n-html="welcome_desc">
                         Bạn đang kết nối với 
-                        <strong class="text-gray-900 font-semibold">CELRAS TVU Chatbot</strong> – trợ lý ảo của Trung tâm Học liệu 
+                        <strong style="color: #0369a1;" class="font-semibold">CELRAS TVU Chatbot</strong> – trợ lý ảo của Trung tâm Học liệu 
                         <br> và Hỗ trợ Học thuật, Đại học Trà Vinh. Nếu có thắc mắc về thư viện, tài liệu 
                         <br> hoặc dịch vụ số,... đừng ngần ngại đặt câu hỏi để được hỗ trợ ngay nhé!
                     </p>
@@ -160,83 +576,249 @@
 
             </div>
         </div>
-
-        <!-- ===== INPUT + CÂU HỎI GỢI Ý (ghim phía dưới) ===== -->
-        <div class="flex-shrink-0 px-4 pb-6 pt-3 bg-gradient-to-t from-sky-100/95 to-transparent">
-
-            <!-- Câu hỏi gợi ý -->
-            <div class="max-w-4xl mx-auto mb-5">
-                <div id="suggestionsContainer" class="max-w-4xl mx-auto space-y-3">
-
-                    <div class="flex justify-center gap-4">
+            <!-- INPUT + GỢI Ý -->
+            <div class="flex-shrink-0 px-4 pb-4 pt-2 input-wrapper">
+                <div class="max-w-3xl mx-auto mb-3">
+                    <div id="suggestionsContainer" class="flex flex-wrap justify-center gap-2">
                         <button class="suggestion-chip" onclick="sendSuggestion(this)">Thư viện mở cửa lúc mấy giờ?</button>
                         <button class="suggestion-chip" onclick="sendSuggestion(this)">Làm thế nào để mượn sách?</button>
                         <button class="suggestion-chip" onclick="sendSuggestion(this)">Làm thẻ thư viện ở đâu?</button>
-                    </div>
-                    <div class="flex justify-center gap-4">
                         <button class="suggestion-chip" onclick="sendSuggestion(this)">Tra cứu sách như thế nào?</button>
-                        <button class="suggestion-chip" onclick="sendSuggestion(this)">Thời hạn mượn sách là bao lâu?</button>
                     </div>
-
                 </div>
-            </div>
-
-            <!-- Ô nhập tin nhắn -->
-            <div class="max-w-3xl mx-auto">
-                <div class="bg-white rounded-2xl shadow-md border border-gray-200 flex items-end gap-2 px-4 py-3">
-                    <textarea
-                        id="chatInput"
-                        placeholder="Nhắn tin cho CELRAS TVU Chatbot..."
-                        rows="1"
-                        maxlength="3000"
-                        onkeydown="handleKeyDown(event)"
-                        oninput="updateCharCount(); autoResize(this)"
-                        class="flex-1 text-sm text-gray-700 placeholder-gray-400 bg-transparent border-none outline-none resize-none leading-relaxed"
-                        style="max-height: 100px; overflow-y: auto;"
-                    ></textarea>
-
-                    <div class="flex flex-col items-end gap-1 flex-shrink-0">
-                        <span id="charCount" class="text-xs text-gray-400 tabular-nums">0 / 3000</span>
-
-                        <button
-                            id="sendBtn"
-                            onclick="sendMessage()"
-                            disabled
-                            class="w-9 h-9 flex items-center justify-center rounded-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-200 disabled:cursor-not-allowed transition-colors text-white shadow-sm"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/>
-                            </svg>
-                        </button>
+                <div class="max-w-3xl mx-auto">
+                    <div class="input-box rounded-2xl flex items-end gap-2 px-4 py-3"
+                         style="background: linear-gradient(145deg, #ffffff, #f0f9ff); border: 1px solid rgba(14,165,233,0.15); box-shadow: 0 6px 20px rgba(14,116,176,0.1), 0 2px 6px rgba(0,0,0,0.04), inset 0 1px 0 #fff;">
+                        <textarea id="chatInput" data-i18n-placeholder="input_placeholder" placeholder="Nhập câu hỏi của bạn..."
+                            rows="1" maxlength="3000"
+                            onkeydown="handleKeyDown(event)"
+                            oninput="updateCharCount(); autoResize(this)"
+                            class="flex-1 text-sm bg-transparent border-none outline-none resize-none leading-relaxed"
+                            style="max-height: 100px; overflow-y: auto; color: #1e3a5a;"></textarea>
+                        <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                            <span id="charCount" class="text-[11px] tabular-nums" style="color: #a5d4ef;">0 / 3000</span>
+                            <button id="sendBtn" onclick="sendMessage()" disabled
+                                class="w-9 h-9 flex items-center justify-center rounded-xl transition-all text-white disabled:cursor-not-allowed"
+                                style="background: linear-gradient(145deg, #0ea5e9, #0284c7); box-shadow: 0 4px 14px rgba(14,165,233,0.35), inset 0 1px 0 rgba(255,255,255,0.2);"
+                                >
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
+        </main>
+    </div>
 
-        </div>
-    </main>
+   <!-- FOOTER -->
+<footer class="py-4 px-4 flex-shrink-0" 
+style="background: linear-gradient(145deg, #e0f2fe, #d4edfc); 
+border-top: 1px solid rgba(14,165,233,0.12); 
+box-shadow: 0 -3px 15px rgba(14,116,176,0.08);">
 
+    <div class="max-w-5xl mx-auto text-center">
 
-    <!-- ===== FOOTER ===== -->
-    <footer class="bg-blue-900 text-white py-4 px-6">
-        <div class="max-w-5xl mx-auto text-center space-y-3">
-            
+        <p class="text-base font-semibold tracking-wide" 
+        style="color:#0369a1; letter-spacing:0.5px;">
 
-            <p class="font-semibold uppercase tracking-wide text-blue-200">
-                TRUNG TÂM HỌC LIỆU VÀ HỖ TRỢ HỌC THUẬT, ĐẠI HỌC TRÀ VINH.
-            </p>
+            <span data-i18n="footer_org">
+                Trung tâm Học liệu & Hỗ trợ Học thuật — ĐH Trà Vinh
+            </span>
 
+            <span class="mx-2 font-bold" style="color:#38bdf8;">|</span>
 
-            <p class="text-blue-100">
-                Tel. (02943) 855 246 - 102. Email: celras@tvu.edu.vn
-            </p>
-        </div>
-    </footer>
+            📞 (02943) 855 246
 
+            <span class="mx-2 font-bold" style="color:#38bdf8;">|</span>
 
-    <!-- ===== SCRIPTS ===== -->
-    <script src="/DuAnChatbotThuVien/public/assets/js/chatbot.js"></script>
+            ✉ celras@tvu.edu.vn
+
+        </p>
+
+    </div>
+</footer>
+    <!-- Translation system (must load before chatbot.js) -->
     <script>
+        // ===== TRANSLATION SYSTEM =====
+        const translations = {
+            vi: {
+                new_chat: 'Chat mới',
+                categories_title: 'Danh mục câu hỏi',
+                categories_sub: 'Chọn chủ đề để xem nhanh',
+                welcome_title: 'CELRAS TVU xin chào!',
+                welcome_desc: 'Bạn đang kết nối với <strong style="color:#0369a1" class="font-semibold">CELRAS TVU Chatbot</strong> – trợ lý ảo của Trung tâm Học liệu <br> và Hỗ trợ Học thuật, Đại học Trà Vinh. Nếu có thắc mắc về thư viện, tài liệu <br> hoặc dịch vụ số,... đừng ngần ngại đặt câu hỏi để được hỗ trợ ngay nhé!',
+                input_placeholder: 'Nhập câu hỏi của bạn...',
+                footer_org: 'Trung tâm Học liệu & Hỗ trợ Học thuật — ĐH Trà Vinh',
+                questions: 'câu hỏi',
+                loading: 'Đang tải...',
+                no_questions: 'Chưa có câu hỏi nào.',
+                cannot_load: 'Không thể tải.',
+                connection_error: 'Lỗi kết nối.',
+                error_occurred: 'Đã có lỗi xảy ra. Vui lòng thử lại.',
+                cannot_connect: 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.',
+                chatbot_disabled: 'Chatbot hiện đang tạm ngưng hoạt động.',
+                come_back_later: 'Vui lòng quay lại sau.',
+                sidebar_title: 'Danh mục',
+                home: 'Trang chủ',
+                toggle_theme: 'Chuyển chế độ sáng/tối',
+                switch_lang: 'Chuyển ngôn ngữ',
+            },
+            en: {
+                new_chat: 'New Chat',
+                categories_title: 'FAQ Categories',
+                categories_sub: 'Select a topic for quick view',
+                welcome_title: 'Welcome to CELRAS TVU!',
+                welcome_desc: 'You are connected to <strong style="color:#0369a1" class="font-semibold">CELRAS TVU Chatbot</strong> – the virtual assistant of the Learning Resource Center <br> and Academic Support, Tra Vinh University. If you have questions about the library, <br> documents, or digital services, feel free to ask!',
+                input_placeholder: 'Type your question...',
+                footer_org: 'Learning Resource Center & Academic Support — Tra Vinh University',
+                questions: 'questions',
+                loading: 'Loading...',
+                no_questions: 'No questions yet.',
+                cannot_load: 'Cannot load.',
+                connection_error: 'Connection error.',
+                error_occurred: 'An error occurred. Please try again.',
+                cannot_connect: 'Cannot connect to server. Please check your network.',
+                chatbot_disabled: 'Chatbot is currently unavailable.',
+                come_back_later: 'Please come back later.',
+                sidebar_title: 'Categories',
+                home: 'Home',
+                toggle_theme: 'Toggle dark/light mode',
+                switch_lang: 'Switch language',
+            }
+        };
+
+        // Category name translations (vi → en)
+        const categoryNameMap = {
+            'Quy định': 'Regulations',
+            'Tra cứu thông tin': 'Information Search',
+            'Mượn trả sách': 'Book Borrowing & Return',
+            'Thẻ thư viện': 'Library Card',
+            'Tra cứu tài liệu': 'Document Search',
+            'Giờ hoạt động': 'Operating Hours',
+            'Dịch vụ khác': 'Other Services',
+            'Tài liệu số': 'Digital Resources',
+            'Hỗ trợ học thuật': 'Academic Support',
+            'Không gian học tập': 'Study Spaces',
+            'Sự kiện': 'Events',
+            'Liên hệ': 'Contact',
+        };
+        window.categoryNameMap = categoryNameMap;
+
+        let currentLang = localStorage.getItem('chatbot_lang') || 'vi';
+
+        function t(key) {
+            return (translations[currentLang] && translations[currentLang][key]) || key;
+        }
+        window.t = t;
+
+        function translateCatName(viName) {
+            if (currentLang === 'en' && categoryNameMap[viName]) return categoryNameMap[viName];
+            return viName;
+        }
+        window.translateCatName = translateCatName;
+    </script>
+
+    <script src="/DuAnChatbotThuVien/public/assets/js/chatbot.js?v=15"></script>
+    <script>
+        // ===== DARK MODE =====
+        function toggleTheme() {
+            const isDark = document.body.classList.toggle('dark');
+            localStorage.setItem('chatbot_theme', isDark ? 'dark' : 'light');
+            updateThemeColors(isDark);
+        }
+
+        function updateThemeColors(isDark) {
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            if (sidebarToggle) sidebarToggle.style.color = isDark ? '#64a3d4' : '#0284c7';
+        }
+
+        // ===== LANGUAGE =====
+        function toggleLanguage() {
+            currentLang = currentLang === 'vi' ? 'en' : 'vi';
+            localStorage.setItem('chatbot_lang', currentLang);
+            window.t = function(key) {
+                return (translations[currentLang] && translations[currentLang][key]) || key;
+            };
+            applyLanguage();
+        }
+
+        function applyLanguage() {
+            // Update toggle label
+            const label = document.getElementById('langLabel');
+            if (label) label.textContent = currentLang.toUpperCase();
+
+            // Static text elements
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                el.textContent = t(key);
+            });
+
+            // HTML content elements
+            document.querySelectorAll('[data-i18n-html]').forEach(el => {
+                const key = el.getAttribute('data-i18n-html');
+                el.innerHTML = t(key);
+            });
+
+            // Placeholders
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                el.placeholder = t(key);
+            });
+
+            // Titles (tooltips)
+            document.querySelectorAll('[data-i18n-title]').forEach(el => {
+                const key = el.getAttribute('data-i18n-title');
+                el.title = t(key);
+            });
+
+            // Re-render category counts
+            document.querySelectorAll('.cat-count').forEach(el => {
+                const count = el.getAttribute('data-count');
+                if (count !== null) el.textContent = count + ' ' + t('questions');
+            });
+
+            // Translate category names
+            document.querySelectorAll('.cat-name').forEach(el => {
+                const viName = el.getAttribute('data-name-vi');
+                if (viName) {
+                    el.textContent = translateCatName(viName);
+                }
+            });
+
+            // Translate sub-question items
+            document.querySelectorAll('.cat-question-item').forEach(el => {
+                const viQ = el.getAttribute('data-question-vi');
+                if (viQ) {
+                    const qTextEl = el.querySelector('.q-text');
+                    if (qTextEl) {
+                        qTextEl.textContent = currentLang === 'en' 
+                            ? (el.getAttribute('data-question-en') || viQ) 
+                            : viQ;
+                    }
+                }
+            });
+        }
+
+        // Apply saved preferences on load (before DOMContentLoaded to avoid flash)
+        (function() {
+            const savedTheme = localStorage.getItem('chatbot_theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark');
+            }
+            const savedLang = localStorage.getItem('chatbot_lang');
+            if (savedLang) {
+                currentLang = savedLang;
+                const label = document.getElementById('langLabel');
+                if (label) label.textContent = currentLang.toUpperCase();
+            }
+        })();
+
         document.addEventListener('DOMContentLoaded', () => {
+            const isDark = document.body.classList.contains('dark');
+            if (isDark) updateThemeColors(true);
+            applyLanguage();
             initChatbot();
         });
     </script>

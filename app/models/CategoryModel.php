@@ -27,4 +27,20 @@ class CategoryModel extends BaseModel
     {
         return $this->getAll('is_active = 1', [], 'sort_order ASC');
     }
+
+    /**
+     * Lấy danh mục đang hoạt động kèm đếm số câu hỏi
+     */
+    public function getActiveWithCount()
+    {
+        $sql = "SELECT c.*, COUNT(q.id) as question_count 
+                FROM {$this->table} c 
+                LEFT JOIN questions q ON c.id = q.category_id AND q.is_active = 1
+                WHERE c.is_active = 1
+                GROUP BY c.id 
+                ORDER BY c.sort_order ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
 }

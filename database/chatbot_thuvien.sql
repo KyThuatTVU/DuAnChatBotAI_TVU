@@ -245,7 +245,7 @@ INSERT INTO chatbot_settings (setting_key, setting_value, setting_type, descript
 ('button_color', '#1976D2', 'color', 'Màu nút mở chatbot'),
 ('button_position', '{"bottom": "20px", "right": "20px"}', 'json', 'Vị trí nút chatbot'),
 ('bot_avatar', '/assets/bot-avatar.png', 'text', 'Đường dẫn avatar bot'),
-('no_answer_message', 'Xin lỗi, tôi chưa có câu trả lời cho câu hỏi này. Bạn có thể liên hệ thủ thư để được hỗ trợ.', 'text', 'Tin nhắn khi không tìm thấy câu trả lời'),
+('no_answer_message', 'Cảm ơn bạn đã đặt câu hỏi! Hiện tại mình chưa tìm thấy thông tin phù hợp cho câu hỏi này. Bạn có thể thử hỏi lại theo cách khác, hoặc liên hệ trực tiếp với thủ thư qua số (02943) 855 246 hoặc email celras@tvu.edu.vn để được hỗ trợ tận tình nhé! 😊', 'text', 'Tin nhắn khi không tìm thấy câu trả lời'),
 ('max_suggestions', '5', 'number', 'Số câu hỏi gợi ý tối đa');
 
 -- Danh mục mẫu

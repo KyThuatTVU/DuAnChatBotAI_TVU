@@ -7,6 +7,7 @@ class ChatController extends BaseController
     private $chatModel;
     private $settingModel;
     private $formModel;
+    private $categoryModel;
 
     public function __construct()
     {
@@ -14,6 +15,7 @@ class ChatController extends BaseController
         $this->chatModel     = $this->model('ChatModel');
         $this->settingModel  = $this->model('SettingModel');
         $this->formModel     = $this->model('FormModel');
+        $this->categoryModel = $this->model('CategoryModel');
     }
 
     /**
@@ -45,13 +47,14 @@ class ChatController extends BaseController
         $input = $this->getJsonInput();
         $message = trim($input['message'] ?? '');
         $sessionToken = $input['session_token'] ?? '';
+        $lang = $input['lang'] ?? 'vi';
 
         if (empty($message)) {
-            $this->json(['error' => 'Tin nhắn không được để trống'], 400);
+            $this->json(['error' => $lang === 'en' ? 'Message cannot be empty' : 'Tin nhắn không được để trống'], 400);
         }
 
         if (mb_strlen($message) > 3000) {
-            $this->json(['error' => 'Tin nhắn không được vượt quá 3000 ký tự'], 400);
+            $this->json(['error' => $lang === 'en' ? 'Message must not exceed 3000 characters' : 'Tin nhắn không được vượt quá 3000 ký tự'], 400);
         }
 
         // Tìm hoặc tạo session
@@ -78,13 +81,24 @@ class ChatController extends BaseController
         $matchedForms = $this->formModel->findMatchingForms($message);
 
         if ($answer) {
-            $botReply = $answer['answer_text'];
+            // Use English answer if lang=en and answer_text_en is available
+            if ($lang === 'en' && !empty($answer['answer_text_en'])) {
+                $botReply = $answer['answer_text_en'];
+            } else {
+                $botReply = $answer['answer_text'];
+            }
             $this->chatModel->saveMessage($session['id'], 'bot', $botReply, $answer['id'], 1.0);
         } elseif (!empty($matchedForms)) {
-            $botReply = 'Dưới đây là biểu mẫu / giấy tờ liên quan đến yêu cầu của bạn. Vui lòng nhấn vào link để tải về hoặc điền thông tin:';
+            $botReply = $lang === 'en'
+                ? 'Here are the forms/documents related to your request. Please click the link to download or fill in the information:'
+                : 'Dưới đây là biểu mẫu / giấy tờ liên quan đến yêu cầu của bạn. Vui lòng nhấn vào link để tải về hoặc điền thông tin:';
             $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
         } else {
-            $botReply = $settings['no_answer_message'];
+            if ($lang === 'en') {
+                $botReply = "Sorry, I couldn't find an answer to your question. 😊\n\nYou can try:\n📌 Rephrasing your question\n📌 Browsing the categories on the left\n📌 Contacting us directly:\n📧 Email: trungtamhoclieu@tvu.edu.vn\n📞 Phone: 0294 3855 246 (ext. 142)\n\nWe're happy to help!";
+            } else {
+                $botReply = $settings['no_answer_message'];
+            }
             $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
             $this->chatModel->saveUnanswered($session['id'], $message);
         }
@@ -111,6 +125,41 @@ class ChatController extends BaseController
         $this->json([
             'success' => true,
             'session_token' => $session['session_token'],
+        ]);
+    }
+
+    /**
+     * GET /api/chat/categories - Lấy danh sách danh mục đang hoạt động kèm số câu hỏi
+     */
+    public function categories()
+    {
+        $categories = $this->categoryModel->getActiveWithCount();
+        $this->json([
+            'success'    => true,
+            'categories' => $categories,
+        ]);
+    }
+
+    /**
+     * GET /api/chat/categoryQuestions/{id} - Lấy câu hỏi theo danh mục
+     */
+    public function categoryQuestions($categoryId = 0)
+    {
+        $categoryId = (int) $categoryId;
+        if ($categoryId <= 0) {
+            $this->json(['error' => 'ID danh mục không hợp lệ'], 400);
+        }
+
+        $category = $this->categoryModel->getById($categoryId);
+        if (!$category || !$category['is_active']) {
+            $this->json(['error' => 'Danh mục không tồn tại'], 404);
+        }
+
+        $questions = $this->questionModel->getByCategory($categoryId);
+        $this->json([
+            'success'   => true,
+            'category'  => $category,
+            'questions' => $questions,
         ]);
     }
 

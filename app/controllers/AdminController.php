@@ -35,6 +35,175 @@ class AdminController extends BaseController
     // ==================== QUESTIONS ====================
 
     /**
+     * Chuẩn hóa text để so sánh trùng lặp:
+     * - Bỏ dấu tiếng Việt
+     * - Bỏ ký tự đặc biệt, chỉ giữ chữ + số
+     * - Chuyển lowercase
+     * - Gộp khoảng trắng
+     */
+    private function normalizeForCompare(string $text): string
+    {
+        // Bảng chuyển đổi dấu tiếng Việt
+        $vietnamese = [
+            'à','á','ạ','ả','ã','â','ầ','ấ','ậ','ẩ','ẫ','ă','ằ','ắ','ặ','ẳ','ẵ',
+            'è','é','ẹ','ẻ','ẽ','ê','ề','ế','ệ','ể','ễ',
+            'ì','í','ị','ỉ','ĩ',
+            'ò','ó','ọ','ỏ','õ','ô','ồ','ố','ộ','ổ','ỗ','ơ','ờ','ớ','ợ','ở','ỡ',
+            'ù','ú','ụ','ủ','ũ','ư','ừ','ứ','ự','ử','ữ',
+            'ỳ','ý','ỵ','ỷ','ỹ',
+            'đ',
+            'À','Á','Ạ','Ả','Ã','Â','Ầ','Ấ','Ậ','Ẩ','Ẫ','Ă','Ằ','Ắ','Ặ','Ẳ','Ẵ',
+            'È','É','Ẹ','Ẻ','Ẽ','Ê','Ề','Ế','Ệ','Ể','Ễ',
+            'Ì','Í','Ị','Ỉ','Ĩ',
+            'Ò','Ó','Ọ','Ỏ','Õ','Ô','Ồ','Ố','Ộ','Ổ','Ỗ','Ơ','Ờ','Ớ','Ợ','Ở','Ỡ',
+            'Ù','Ú','Ụ','Ủ','Ũ','Ư','Ừ','Ứ','Ự','Ử','Ữ',
+            'Ỳ','Ý','Ỵ','Ỷ','Ỹ',
+            'Đ',
+        ];
+        $ascii = [
+            'a','a','a','a','a','a','a','a','a','a','a','a','a','a','a','a','a',
+            'e','e','e','e','e','e','e','e','e','e','e',
+            'i','i','i','i','i',
+            'o','o','o','o','o','o','o','o','o','o','o','o','o','o','o','o','o',
+            'u','u','u','u','u','u','u','u','u','u','u',
+            'y','y','y','y','y',
+            'd',
+            'a','a','a','a','a','a','a','a','a','a','a','a','a','a','a','a','a',
+            'e','e','e','e','e','e','e','e','e','e','e',
+            'i','i','i','i','i',
+            'o','o','o','o','o','o','o','o','o','o','o','o','o','o','o','o','o',
+            'u','u','u','u','u','u','u','u','u','u','u',
+            'y','y','y','y','y',
+            'd',
+        ];
+
+        $text = str_replace($vietnamese, $ascii, $text);
+        $text = mb_strtolower($text);
+        // Chỉ giữ chữ cái, số và khoảng trắng
+        $text = preg_replace('/[^a-z0-9\s]/u', '', $text);
+        // Gộp khoảng trắng
+        $text = preg_replace('/\s+/', ' ', trim($text));
+        return $text;
+    }
+
+    /**
+     * Kiểm tra trùng lặp câu hỏi + câu trả lời với DB hiện có
+     * Trả về mảng câu hỏi trùng nếu có
+     */
+    private function findDuplicates(array $qaPairs): array
+    {
+        $db = Database::getInstance()->getConnection();
+        $stmt = $db->prepare("SELECT id, question_text, answer_text FROM questions WHERE is_active = 1");
+        $stmt->execute();
+        $existingQuestions = $stmt->fetchAll();
+
+        // Chuẩn hóa tất cả câu hỏi+trả lời hiện có
+        $existingNormalized = [];
+        foreach ($existingQuestions as $eq) {
+            $existingNormalized[] = [
+                'id' => $eq['id'],
+                'question_text' => $eq['question_text'],
+                'answer_text' => $eq['answer_text'],
+                'norm_q' => $this->normalizeForCompare($eq['question_text']),
+                'norm_a' => $this->normalizeForCompare($eq['answer_text']),
+            ];
+        }
+
+        $duplicates = [];
+        $newItems = [];
+
+        foreach ($qaPairs as $index => $qa) {
+            $normQ = $this->normalizeForCompare($qa['question']);
+            $normA = $this->normalizeForCompare($qa['answer']);
+            $isDuplicate = false;
+
+            foreach ($existingNormalized as $eq) {
+                // So sánh cả câu hỏi VÀ câu trả lời
+                $qSimilar = ($normQ === $eq['norm_q']);
+                $aSimilar = ($normA === $eq['norm_a']);
+
+                // Hoặc dùng similar_text nếu gần giống (>= 85%)
+                if (!$qSimilar && !empty($normQ) && !empty($eq['norm_q'])) {
+                    similar_text($normQ, $eq['norm_q'], $qPercent);
+                    $qSimilar = ($qPercent >= 85);
+                }
+                if (!$aSimilar && !empty($normA) && !empty($eq['norm_a'])) {
+                    similar_text($normA, $eq['norm_a'], $aPercent);
+                    $aSimilar = ($aPercent >= 85);
+                }
+
+                // Trùng nếu câu hỏi HOẶC câu trả lời giống nhau
+                if ($qSimilar || $aSimilar) {
+                    $isDuplicate = true;
+                    $duplicates[] = [
+                        'index' => $index + 1,
+                        'new_question' => $qa['question'],
+                        'new_answer' => mb_substr($qa['answer'], 0, 100) . (mb_strlen($qa['answer']) > 100 ? '...' : ''),
+                        'existing_id' => $eq['id'],
+                        'existing_question' => $eq['question_text'],
+                        'match_type' => $qSimilar ? 'question' : 'answer',
+                    ];
+                    break;
+                }
+            }
+
+            if (!$isDuplicate) {
+                $newItems[] = $qa;
+            }
+        }
+
+        return [
+            'duplicates' => $duplicates,
+            'new_items' => $newItems,
+        ];
+    }
+
+    /**
+     * Kiểm tra 1 câu hỏi trùng (dùng khi thêm thủ công)
+     */
+    private function checkSingleDuplicate(string $questionText, string $answerText, ?int $excludeId = null): ?array
+    {
+        $db = Database::getInstance()->getConnection();
+        $sql = "SELECT id, question_text, answer_text FROM questions WHERE is_active = 1";
+        if ($excludeId) {
+            $sql .= " AND id != " . intval($excludeId);
+        }
+        $stmt = $db->prepare($sql);
+        $stmt->execute();
+        $existingQuestions = $stmt->fetchAll();
+
+        $normQ = $this->normalizeForCompare($questionText);
+        $normA = $this->normalizeForCompare($answerText);
+
+        foreach ($existingQuestions as $eq) {
+            $eqNormQ = $this->normalizeForCompare($eq['question_text']);
+            $eqNormA = $this->normalizeForCompare($eq['answer_text']);
+
+            $qSimilar = ($normQ === $eqNormQ);
+            $aSimilar = ($normA === $eqNormA);
+
+            if (!$qSimilar && !empty($normQ) && !empty($eqNormQ)) {
+                similar_text($normQ, $eqNormQ, $qPercent);
+                $qSimilar = ($qPercent >= 85);
+            }
+            if (!$aSimilar && !empty($normA) && !empty($eqNormA)) {
+                similar_text($normA, $eqNormA, $aPercent);
+                $aSimilar = ($aPercent >= 85);
+            }
+
+            if ($qSimilar || $aSimilar) {
+                return [
+                    'existing_id' => $eq['id'],
+                    'existing_question' => $eq['question_text'],
+                    'match_type' => $qSimilar ? 'question' : 'answer',
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * GET /api/admin/questions - Lấy danh sách câu hỏi
      */
     public function questions()
@@ -56,11 +225,32 @@ class AdminController extends BaseController
     {
         $adminId = $this->requireAuth();
         $input = $this->getJsonInput();
+        $forceAdd = $input['force_add'] ?? false;
+
+        // Kiểm tra trùng lặp (trừ khi user xác nhận thêm)
+        if (!$forceAdd) {
+            $duplicate = $this->checkSingleDuplicate(
+                $input['question_text'],
+                $input['answer_text']
+            );
+            if ($duplicate) {
+                $matchLabel = $duplicate['match_type'] === 'question' ? 'câu hỏi' : 'câu trả lời';
+                $this->json([
+                    'success' => false,
+                    'duplicate' => true,
+                    'error' => "Phát hiện trùng lặp {$matchLabel} với câu hỏi đã có (ID #{$duplicate['existing_id']}): \"{$duplicate['existing_question']}\"",
+                    'existing_id' => $duplicate['existing_id'],
+                    'existing_question' => $duplicate['existing_question'],
+                    'match_type' => $duplicate['match_type'],
+                ], 409);
+            }
+        }
 
         $id = $this->questionModel->create([
             'category_id' => $input['category_id'] ?? null,
             'question_text' => sanitize($input['question_text']),
             'answer_text' => $input['answer_text'],
+            'answer_text_en' => $input['answer_text_en'] ?? null,
             'source_type' => 'manual',
             'created_by' => $adminId,
         ]);
@@ -99,6 +289,7 @@ class AdminController extends BaseController
                 'category_id' => $input['category_id'] ?? null,
                 'question_text' => sanitize($input['question_text']),
                 'answer_text' => $input['answer_text'],
+                'answer_text_en' => $input['answer_text_en'] ?? null,
                 'is_active' => $input['is_active'] ?? 1,
             ]);
 
@@ -331,18 +522,30 @@ class AdminController extends BaseController
                 ], 400);
             }
 
-            // Lưu Q&A vào database
-            $importCount = $this->importQAPairs($db, $qaPairs, $datasetId, $adminId, $fileType);
+            // Lưu Q&A vào database (tự kiểm tra trùng lặp)
+            $importResult = $this->importQAPairs($db, $qaPairs, $datasetId, $adminId, $fileType);
+            $importCount = $importResult['imported'];
+            $duplicateCount = $importResult['skipped'];
+            $duplicateList = $importResult['duplicates'];
 
             // Cập nhật dataset status
             $this->updateDatasetStatus($db, $datasetId, 'completed', null, $importCount);
+
+            // Tạo message kết quả
+            $message = "Đã tự động tạo {$importCount} câu hỏi từ file.";
+            if ($duplicateCount > 0) {
+                $message .= " Bỏ qua {$duplicateCount} câu hỏi trùng lặp.";
+            }
+            $message .= " Bạn có thể chỉnh sửa tại trang Quản lý câu hỏi.";
 
             $this->json([
                 'success' => true,
                 'id' => $datasetId,
                 'total_questions' => $importCount,
                 'questions' => $qaPairs,
-                'message' => "Đã tự động tạo {$importCount} câu hỏi từ file. Bạn có thể chỉnh sửa tại trang Quản lý câu hỏi.",
+                'duplicates' => $duplicateList,
+                'duplicate_count' => $duplicateCount,
+                'message' => $message,
             ], 201);
 
         } catch (\Exception $e) {
@@ -855,17 +1058,22 @@ class AdminController extends BaseController
     }
 
     /**
-     * Import danh sách Q&A vào bảng questions
+     * Import danh sách Q&A vào bảng questions (chỉ các item mới, bỏ qua trùng)
      */
-    private function importQAPairs(\PDO $db, array $qaPairs, int $datasetId, int $adminId, string $sourceType): int
+    private function importQAPairs(\PDO $db, array $qaPairs, int $datasetId, int $adminId, string $sourceType): array
     {
+        // Kiểm tra trùng lặp trước khi import
+        $checkResult = $this->findDuplicates($qaPairs);
+        $newItems = $checkResult['new_items'];
+        $duplicates = $checkResult['duplicates'];
+
         $stmt = $db->prepare(
             "INSERT INTO questions (question_text, answer_text, source_type, dataset_id, created_by, is_active) 
              VALUES (?, ?, ?, ?, ?, 1)"
         );
 
         $count = 0;
-        foreach ($qaPairs as $qa) {
+        foreach ($newItems as $qa) {
             try {
                 $stmt->execute([
                     $qa['question'],
@@ -880,7 +1088,11 @@ class AdminController extends BaseController
             }
         }
 
-        return $count;
+        return [
+            'imported' => $count,
+            'duplicates' => $duplicates,
+            'skipped' => count($duplicates),
+        ];
     }
 
     /**

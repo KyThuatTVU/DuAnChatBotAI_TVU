@@ -170,6 +170,7 @@ function openAddModal() {
     document.getElementById('questionId').value = '';
     document.getElementById('questionText').value = '';
     document.getElementById('answerText').value = '';
+    document.getElementById('answerTextEn').value = '';
     document.getElementById('keywordsInput').value = '';
     document.getElementById('questionModal').classList.add('active');
 }
@@ -189,6 +190,7 @@ async function editQuestion(id) {
             document.getElementById('questionCategory').value = q.category_id || '';
             document.getElementById('questionText').value = q.question_text;
             document.getElementById('answerText').value = q.answer_text;
+            document.getElementById('answerTextEn').value = q.answer_text_en || '';
             document.getElementById('questionModal').classList.add('active');
         }
     } catch (e) {
@@ -203,6 +205,7 @@ async function saveQuestion(event) {
         category_id: document.getElementById('questionCategory').value || null,
         question_text: document.getElementById('questionText').value,
         answer_text: document.getElementById('answerText').value,
+        answer_text_en: document.getElementById('answerTextEn').value,
         keywords: document.getElementById('keywordsInput').value.split(',').map(k => k.trim()).filter(k => k),
     };
 
@@ -218,6 +221,26 @@ async function saveQuestion(event) {
         if (data.success) {
             closeModal();
             loadQuestions();
+        } else if (data.duplicate) {
+            // Phát hiện trùng lặp - hỏi user có muốn thêm hay không
+            const matchLabel = data.match_type === 'question' ? 'câu hỏi' : 'câu trả lời';
+            const confirmMsg = `⚠️ Phát hiện trùng lặp ${matchLabel}!\n\nCâu hỏi đã có (ID #${data.existing_id}):\n"${data.existing_question}"\n\nBạn có muốn thêm dù trùng không?`;
+            if (confirm(confirmMsg)) {
+                // User xác nhận → gửi lại với force_add
+                payload.force_add = true;
+                const res2 = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data2 = await res2.json();
+                if (data2.success) {
+                    closeModal();
+                    loadQuestions();
+                } else {
+                    alert(data2.error || 'Lỗi khi lưu');
+                }
+            }
         } else {
             alert(data.error || 'Lỗi khi lưu');
         }
@@ -541,6 +564,34 @@ async function uploadFile(file) {
         if (data.success) {
             document.getElementById('uploadFileName').textContent = `Hoàn thành!`;
 
+            // Build duplicate warning HTML
+            let duplicateHtml = '';
+            if (data.duplicate_count > 0 && data.duplicates && data.duplicates.length > 0) {
+                const dupRows = data.duplicates.map(d => {
+                    const matchLabel = d.match_type === 'question' ? 'Trùng câu hỏi' : 'Trùng câu trả lời';
+                    return `<div class="flex items-start gap-2 py-2 border-b border-amber-200 last:border-0">
+                        <span class="bg-amber-200 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">#${d.index}</span>
+                        <div class="text-xs">
+                            <p class="font-medium text-amber-900">${escapeHtml(d.new_question)}</p>
+                            <p class="text-amber-600 mt-0.5">${matchLabel} với ID #${d.existing_id}: "${escapeHtml(d.existing_question)}"</p>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                duplicateHtml = `
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-3">
+                        <div class="flex items-start gap-3 mb-2">
+                            <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                            </svg>
+                            <div class="w-full">
+                                <p class="font-semibold text-amber-800 text-sm">⚠️ Bỏ qua ${data.duplicate_count} câu hỏi trùng lặp</p>
+                                <div class="mt-2 max-h-48 overflow-y-auto">${dupRows}</div>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
             // Show success result
             if (resultDiv) {
                 resultDiv.classList.remove('hidden');
@@ -556,6 +607,7 @@ async function uploadFile(file) {
                             </div>
                         </div>
                     </div>
+                    ${duplicateHtml}
                 `;
             }
 
