@@ -238,12 +238,14 @@ async function deleteQuestion(id) {
 
 // ==================== CATEGORIES ====================
 
+let _categoriesData = [];
+
 async function loadCategories() {
     try {
         const res = await fetch(`${ADMIN_API}/admin/categories`);
         const data = await res.json();
-        const categories = data.categories || [];
-        renderCategories(categories);
+        _categoriesData = data.categories || [];
+        renderCategories(_categoriesData);
     } catch (e) {
         console.error('Failed to load categories:', e);
     }
@@ -261,7 +263,7 @@ function renderCategories(categories) {
             <div class="flex items-start justify-between mb-3">
                 <h3 class="font-semibold text-gray-800">${escapeHtml(c.name)}</h3>
                 <div class="flex gap-1">
-                    <button onclick="editCategory(${c.id}, ${escapeAttr(c.name)}, ${escapeAttr(c.description || '')}, ${c.sort_order})" class="text-sky-600 hover:text-sky-800 p-1">
+                    <button onclick="editCategory(${c.id})" class="text-sky-600 hover:text-sky-800 p-1">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     </button>
                     <button onclick="deleteCategory(${c.id})" class="text-red-500 hover:text-red-700 p-1">
@@ -271,7 +273,7 @@ function renderCategories(categories) {
             </div>
             <p class="text-sm text-gray-500 mb-3">${escapeHtml(c.description || 'Không có mô tả')}</p>
             <div class="flex items-center gap-2">
-                <span class="badge badge-info">${c.question_count || 0} câu hỏi</span>
+                <a href="/DuAnChatbotThuVien/public/pages/admin/questions.html?category=${c.id}" class="badge badge-info hover:opacity-80 cursor-pointer no-underline" title="Xem danh sách câu hỏi">${c.question_count || 0} câu hỏi</a>
                 <span class="badge ${c.is_active ? 'badge-success' : 'badge-danger'}">${c.is_active ? 'Hoạt động' : 'Tắt'}</span>
             </div>
         </div>
@@ -313,12 +315,14 @@ function closeCategoryModal() {
     document.getElementById('categoryModal').classList.remove('active');
 }
 
-function editCategory(id, name, desc, order) {
+function editCategory(id) {
+    const c = _categoriesData.find(cat => cat.id == id);
+    if (!c) return;
     document.getElementById('catModalTitle').textContent = 'Sửa danh mục';
-    document.getElementById('catId').value = id;
-    document.getElementById('catName').value = name;
-    document.getElementById('catDescription').value = desc;
-    document.getElementById('catOrder').value = order;
+    document.getElementById('catId').value = c.id;
+    document.getElementById('catName').value = c.name;
+    document.getElementById('catDescription').value = c.description || '';
+    document.getElementById('catOrder').value = c.sort_order || 0;
     document.getElementById('categoryModal').classList.add('active');
 }
 
@@ -894,6 +898,15 @@ window.closeFormModal = closeFormModal;
 window.editForm       = editForm;
 window.saveForm       = saveForm;
 window.deleteForm     = deleteForm;
+
+// ==================== CATEGORIES (window) ====================
+window.loadCategories      = loadCategories;
+window.renderCategories    = renderCategories;
+window.openCategoryModal   = openCategoryModal;
+window.closeCategoryModal  = closeCategoryModal;
+window.editCategory        = editCategory;
+window.saveCategory        = saveCategory;
+window.deleteCategory      = deleteCategory;
 
 /**
  * Escape cho attribute onclick - trả về chuỗi JSON an toàn

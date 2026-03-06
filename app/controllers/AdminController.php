@@ -101,6 +101,20 @@ class AdminController extends BaseController
                 'answer_text' => $input['answer_text'],
                 'is_active' => $input['is_active'] ?? 1,
             ]);
+
+            // Cập nhật từ khóa: xóa cũ, thêm mới
+            $db = Database::getInstance()->getConnection();
+            $db->prepare("DELETE FROM keywords WHERE question_id = ?")->execute([$id]);
+            if (!empty($input['keywords'])) {
+                $stmt = $db->prepare("INSERT INTO keywords (question_id, keyword) VALUES (?, ?)");
+                foreach ($input['keywords'] as $keyword) {
+                    $kw = trim($keyword);
+                    if ($kw !== '') {
+                        $stmt->execute([$id, $kw]);
+                    }
+                }
+            }
+
             $this->json(['success' => true]);
         }
 

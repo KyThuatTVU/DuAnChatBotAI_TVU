@@ -26,8 +26,8 @@ class QuestionModel extends BaseModel
     {
         $messageLength = mb_strlen(trim($userMessage));
 
-        // 0. Tin nhắn quá ngắn (< 2 ký tự) → không tìm
-        if ($messageLength < 2) {
+        // 0. Tin nhắn rỗng → không tìm
+        if ($messageLength < 1) {
             return false;
         }
 
@@ -61,7 +61,24 @@ class QuestionModel extends BaseModel
             }
         }
 
-        // 3. Tìm bằng từ khóa (keyword phải >= 3 ký tự để tránh match sai)
+        // 3a. Tìm bằng từ khóa ngắn (< 3 ký tự) - chỉ khớp khi tin nhắn ngắn trùng chính xác
+        if ($messageLength <= 5) {
+            $sql = "SELECT q.*, k.keyword FROM {$this->table} q
+                    INNER JOIN keywords k ON q.id = k.question_id
+                    WHERE q.is_active = 1
+                    AND CHAR_LENGTH(k.keyword) < 3
+                    AND LOWER(TRIM(?)) = LOWER(TRIM(k.keyword))
+                    LIMIT 1";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$userMessage]);
+            $result = $stmt->fetch();
+
+            if ($result) {
+                return $result;
+            }
+        }
+
+        // 3b. Tìm bằng từ khóa dài (>= 3 ký tự) - khớp substring
         $sql = "SELECT q.*, k.keyword FROM {$this->table} q
                 INNER JOIN keywords k ON q.id = k.question_id
                 WHERE q.is_active = 1 
