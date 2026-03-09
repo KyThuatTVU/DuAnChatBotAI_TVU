@@ -193,12 +193,21 @@
     </div>
 
     <script src="/DuAnChatbotThuVien/public/assets/js/loading.js"></script>
-    <script src="/DuAnChatbotThuVien/public/assets/js/admin.js?v=20260306c"></script>
+    <script src="/DuAnChatbotThuVien/public/assets/js/admin.js?v=20260310"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             await loadAdminPage('questions');
-            loadCategoriesForSelect();
-            loadQuestions();
+            await loadCategoriesForSelect();
+            await loadQuestions();
+            PageStateManager.restoreAndWatch('questions', ['#searchInput', '#filterCategory', '#filterSource'], () => { try { filterQuestions(); } catch(e){} });
+            // Kiểm tra có câu hỏi chờ tạo từ trang "Chưa trả lời"
+            const _pq = sessionStorage.getItem('celras_pendingQuestion');
+            if (_pq) {
+                sessionStorage.removeItem('celras_pendingQuestion');
+                try { openAddModal(); const _t = document.getElementById('questionText'); if (_t) _t.value = _pq; } catch(e) {}
+            } else {
+                setTimeout(() => checkQuestionDraft(), 800);
+            }
         });
     </script>
 </body>

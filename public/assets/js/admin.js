@@ -5,6 +5,580 @@
 
 const ADMIN_API = '/DuAnChatbotThuVien/public/index.php?url=api';
 
+// ==================== FORM DRAFT MANAGER ====================
+// Tự động lưu trạng thái form vào sessionStorage khi user đang nhập liệu
+// Khôi phục khi quay lại trang để tránh mất dữ liệu khi chuyển trang
+
+const FormDraftManager = {
+    PREFIX: 'celras_draft_',
+    _listeners: {},
+    _dirty: false,
+    _activeForm: null,
+
+    /**
+     * Lưu draft cho một form
+     * @param {string} formKey - Tên định danh form (vd: 'question', 'category', 'form')
+     * @param {Object} data - Dữ liệu cần lưu
+     */
+    saveDraft(formKey, data) {
+        try {
+            const key = this.PREFIX + formKey;
+            data._timestamp = Date.now();
+            data._page = window.location.pathname;
+            localStorage.setItem(key, JSON.stringify(data));
+            this._dirty = true;
+            this._activeForm = formKey;
+        } catch (e) {
+            console.warn('FormDraftManager: Không thể lưu draft', e);
+        }
+    },
+
+    /**
+     * Lấy draft đã lưu
+     * @param {string} formKey
+     * @returns {Object|null}
+     */
+    getDraft(formKey) {
+        try {
+            const key = this.PREFIX + formKey;
+            const raw = localStorage.getItem(key);
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            // Bỏ qua draft cũ hơn 2 giờ
+            if (data._timestamp && (Date.now() - data._timestamp) > 2 * 60 * 60 * 1000) {
+                this.clearDraft(formKey);
+                return null;
+            }
+            return data;
+        } catch (e) {
+            return null;
+        }
+    },
+
+    /**
+     * Xóa draft
+     * @param {string} formKey
+     */
+    clearDraft(formKey) {
+        localStorage.removeItem(this.PREFIX + formKey);
+        if (this._activeForm === formKey) {
+            this._dirty = false;
+            this._activeForm = null;
+        }
+    },
+
+    /**
+     * Kiểm tra có draft chưa lưu không
+     * @param {string} formKey
+     * @returns {boolean}
+     */
+    hasDraft(formKey) {
+        return !!this.getDraft(formKey);
+    },
+
+    /**
+     * Theo dõi thay đổi trên các field của form và tự động lưu draft
+     * @param {string} formKey - Tên form
+     * @param {string[]} fieldIds - Danh sách ID các input/textarea/select
+     * @param {Object} [options] - { debounce: ms }
+     */
+    watchFields(formKey, fieldIds, options = {}) {
+        const debounceMs = options.debounce || 500;
+        let timer = null;
+
+        const saveCurrentState = () => {
+            const data = {};
+            let hasValue = false;
+            fieldIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (el.type === 'checkbox') {
+                    data[id] = el.checked;
+                } else {
+                    data[id] = el.value;
+                }
+                if (el.value && el.value.trim()) hasValue = true;
+            });
+            // Chỉ lưu nếu form có ít nhất 1 field có giá trị
+            if (hasValue) {
+                this.saveDraft(formKey, data);
+            }
+        };
+
+        const debouncedSave = () => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(saveCurrentState, debounceMs);
+        };
+
+        // Gắn listener vào từng field
+        fieldIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('input', debouncedSave);
+            el.addEventListener('change', debouncedSave);
+        });
+
+        // Lưu reference để có thể cleanup
+        this._listeners[formKey] = { fieldIds, timer };
+    },
+
+    /**
+     * Khôi phục draft vào form
+     * @param {string} formKey
+     * @param {string[]} fieldIds
+     * @returns {boolean} - true nếu có draft được khôi phục
+     */
+    restoreDraft(formKey, fieldIds) {
+        const data = this.getDraft(formKey);
+        if (!data) return false;
+
+        let restored = false;
+        fieldIds.forEach(id => {
+            if (data[id] === undefined) return;
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (el.type === 'checkbox') {
+                el.checked = !!data[id];
+            } else {
+                el.value = data[id];
+            }
+            restored = true;
+        });
+
+        return restored;
+    },
+
+    /**
+     * Hiển thị thông báo có draft cần khôi phục
+     * @param {string} formKey
+     * @param {Function} onRestore - Callback khi user chọn khôi phục
+     * @param {Function} onDiscard - Callback khi user chọn bỏ qua
+     */
+    showDraftNotification(formKey, onRestore, onDiscard) {
+        const draft = this.getDraft(formKey);
+        if (!draft) return;
+
+        const timeAgo = this._formatTimeAgo(draft._timestamp);
+
+        // Tạo toast notification
+        const toast = document.createElement('div');
+        toast.id = 'draftToast_' + formKey;
+        toast.style.cssText = `
+            position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+            background: linear-gradient(145deg, #ffffff, #f8fafc);
+            border: 1px solid #e2e8f0; border-left: 4px solid #0ea5e9;
+            border-radius: 16px; padding: 16px 20px; max-width: 380px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
+            animation: draftSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            font-family: 'Inter', sans-serif;
+        `;
+        toast.innerHTML = `
+            <div style="display:flex;align-items:flex-start;gap:12px">
+                <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#dbeafe,#bfdbfe);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                    <svg style="width:20px;height:20px;color:#2563eb" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                </div>
+                <div style="flex:1;min-width:0">
+                    <p style="font-weight:700;font-size:14px;color:#1e293b;margin:0 0 4px">📝 Có bản nháp chưa lưu</p>
+                    <p style="font-size:12px;color:#64748b;margin:0 0 12px">${timeAgo}</p>
+                    <div style="display:flex;gap:8px">
+                        <button id="draftRestore_${formKey}" style="padding:7px 16px;border-radius:10px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#fff;box-shadow:0 2px 8px rgba(14,165,233,0.3);transition:all .2s">Khôi phục</button>
+                        <button id="draftDiscard_${formKey}" style="padding:7px 16px;border-radius:10px;font-size:12px;font-weight:600;border:1.5px solid #e2e8f0;cursor:pointer;background:#fff;color:#64748b;transition:all .2s">Bỏ qua</button>
+                    </div>
+                </div>
+                <button id="draftCloseToast_${formKey}" style="position:absolute;top:8px;right:10px;background:none;border:none;cursor:pointer;color:#94a3b8;font-size:18px;line-height:1;padding:4px">&times;</button>
+            </div>
+        `;
+
+        // Thêm animation styles
+        if (!document.getElementById('draftToastStyles')) {
+            const style = document.createElement('style');
+            style.id = 'draftToastStyles';
+            style.textContent = `
+                @keyframes draftSlideIn {
+                    from { transform: translateX(100%) translateY(20px); opacity: 0; }
+                    to { transform: translateX(0) translateY(0); opacity: 1; }
+                }
+                @keyframes draftSlideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(120%); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        document.body.appendChild(toast);
+
+        const removeToast = () => {
+            toast.style.animation = 'draftSlideOut 0.3s ease-in forwards';
+            setTimeout(() => toast.remove(), 300);
+        };
+
+        document.getElementById(`draftRestore_${formKey}`).addEventListener('click', () => {
+            removeToast();
+            if (onRestore) onRestore();
+        });
+
+        document.getElementById(`draftDiscard_${formKey}`).addEventListener('click', () => {
+            this.clearDraft(formKey);
+            removeToast();
+            if (onDiscard) onDiscard();
+        });
+
+        document.getElementById(`draftCloseToast_${formKey}`).addEventListener('click', removeToast);
+
+        // Tự ẩn sau 15 giây
+        setTimeout(() => {
+            if (document.getElementById(`draftToast_${formKey}`)) removeToast();
+        }, 15000);
+    },
+
+    /**
+     * Format thời gian tương đối
+     */
+    _formatTimeAgo(timestamp) {
+        if (!timestamp) return '';
+        const diff = Math.floor((Date.now() - timestamp) / 1000);
+        if (diff < 60) return 'Vừa xong';
+        if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
+        return new Date(timestamp).toLocaleString('vi-VN');
+    },
+
+    /**
+     * Bật cảnh báo beforeunload khi có dữ liệu chưa lưu
+     */
+    enableBeforeUnloadWarning() {
+        window.addEventListener('beforeunload', (e) => {
+            if (this._dirty && this._activeForm) {
+                e.preventDefault();
+                e.returnValue = 'Bạn có dữ liệu chưa lưu. Bạn có chắc muốn rời trang?';
+                return e.returnValue;
+            }
+        });
+    },
+
+    /**
+     * Đánh dấu form đã lưu thành công (xóa dirty flag)
+     */
+    markSaved(formKey) {
+        this.clearDraft(formKey);
+        this._dirty = false;
+        this._activeForm = null;
+    }
+};
+
+// Bật cảnh báo khi rời trang có dữ liệu chưa lưu
+FormDraftManager.enableBeforeUnloadWarning();
+
+// ==================== PAGE STATE MANAGER ====================
+// Lưu trạng thái trang (search/filter) vào localStorage để khôi phục sau load lại
+
+const PageStateManager = {
+    PREFIX: 'celras_pagestate_',
+    TTL: 24 * 60 * 60 * 1000, // 24 giờ
+
+    /**
+     * Khôi phục state đã lưu vào DOM elements và bắt đầu theo dõi thay đổi
+     * @param {string} page - Tên trang (vd: 'questions', 'forms')
+     * @param {string[]} selectors - CSS selectors của các input/select cần theo dõi
+     * @param {Function} [onRestore] - Callback gọi sau khi khôi phục để re-apply filter
+     */
+    restoreAndWatch(page, selectors, onRestore) {
+        let restored = false;
+        try {
+            const raw = localStorage.getItem(this.PREFIX + page);
+            if (raw) {
+                const state = JSON.parse(raw);
+                if (!state._ts || (Date.now() - state._ts) < this.TTL) {
+                    selectors.forEach(sel => {
+                        if (state[sel] === undefined) return;
+                        const el = document.querySelector(sel);
+                        if (el) { el.value = state[sel]; restored = true; }
+                    });
+                }
+            }
+        } catch(e) {}
+
+        if (restored && onRestore) { try { onRestore(); } catch(e) {} }
+
+        // Theo dõi thay đổi → tự động lưu
+        const save = () => {
+            const state = { _ts: Date.now() };
+            selectors.forEach(sel => {
+                const el = document.querySelector(sel);
+                if (el) state[sel] = el.value;
+            });
+            try { localStorage.setItem(this.PREFIX + page, JSON.stringify(state)); } catch(e) {}
+        };
+
+        selectors.forEach(sel => {
+            const el = document.querySelector(sel);
+            if (!el || el._pswatched) return;
+            el._pswatched = true;
+            el.addEventListener('input', save);
+            el.addEventListener('change', save);
+        });
+    }
+};
+
+// ==================== SPA NAVIGATION (AJAX) ====================
+// Chuyển trang admin bằng AJAX, không reload – giữ nguyên trạng thái
+
+const AdminSPA = {
+    currentPage: null,
+    contentWrapper: null,   // .min-h-screen
+    isNavigating: false,
+    initialized: false,
+
+    // Tên hiển thị trên mobile topbar
+    PAGE_TITLES: {
+        dashboard: 'Dashboard',
+        questions: 'Quản lý câu hỏi',
+        categories: 'Danh mục',
+        datasets: 'Tải dữ liệu',
+        forms: 'Biểu mẫu / Giấy tờ',
+        settings: 'Cài đặt giao diện',
+        unanswered: 'Chưa trả lời',
+    },
+
+    // Hàm khởi tạo dữ liệu cho từng trang
+    PAGE_INIT: {
+        dashboard:  () => loadDashboardStats(),
+        questions:  async () => {
+            await loadCategoriesForSelect();
+            await loadQuestions();
+            PageStateManager.restoreAndWatch('questions', ['#searchInput', '#filterCategory', '#filterSource'], () => { try { filterQuestions(); } catch(e){} });
+            const _pq = sessionStorage.getItem('celras_pendingQuestion');
+            if (_pq) {
+                sessionStorage.removeItem('celras_pendingQuestion');
+                try { openAddModal(); const _t = document.getElementById('questionText'); if (_t) _t.value = _pq; } catch(e) {}
+            } else {
+                setTimeout(() => { try { checkQuestionDraft(); } catch(e){} }, 800);
+            }
+        },
+        categories: async () => { await loadCategories(); setTimeout(() => { try { checkCategoryDraft(); } catch(e){} }, 800); },
+        datasets:   async () => { await loadDatasets(); restoreUploadSession(); },
+        forms:      async () => {
+            await loadForms();
+            PageStateManager.restoreAndWatch('forms', ['#formSearch'], () => { try { filterForms(); } catch(e){} });
+            setTimeout(() => { try { checkFormDraft(); } catch(e){} }, 800);
+        },
+        settings:   async () => { await loadSettings(); await loadThemes(); setTimeout(() => { try { checkSettingsDraft(); watchSettingsFields(); } catch(e){} }, 1000); },
+        unanswered: () => loadUnanswered(),
+    },
+
+    /**
+     * Khởi tạo SPA — chỉ gọi 1 lần
+     */
+    init() {
+        if (this.initialized) return;
+
+        this.contentWrapper = document.querySelector('.min-h-screen');
+        if (!this.contentWrapper) return;
+
+        this.currentPage = this._pageName(window.location.pathname);
+
+        // Gắn event cho sidebar links
+        this._bindNavLinks();
+
+        // Xử lý nút Back / Forward trình duyệt
+        window.addEventListener('popstate', (e) => {
+            if (e.state && e.state.adminPage) {
+                this.loadPage(e.state.adminPage, false);
+            }
+        });
+
+        // Ghi state hiện tại
+        history.replaceState({ adminPage: this.currentPage }, '', window.location.href);
+
+        this.initialized = true;
+    },
+
+    _pageName(path) {
+        const m = path.match(/admin\/(\w+)\.html/);
+        return m ? m[1] : 'dashboard';
+    },
+
+    /**
+     * Gắn click listener cho tất cả sidebar nav-items
+     */
+    _bindNavLinks() {
+        document.querySelectorAll('#adminSidebar .nav-item[data-page]').forEach(link => {
+            // Đánh dấu đã bind để không bind lại
+            if (link._spaBound) return;
+            link._spaBound = true;
+
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const page = link.getAttribute('data-page');
+                if (!page) return;
+                if (page === this.currentPage && !this.isNavigating) return;
+                this.loadPage(page, true);
+                closeSidebarOnMobile();
+            });
+        });
+
+        // Bắt tất cả link trong content area trỏ đến trang admin
+        this._bindContentLinks();
+    },
+
+    /**
+     * Sử dụng event delegation để bắt mọi link trong .admin-content
+     * trỏ đến trang admin → chuyển SPA thay vì reload
+     */
+    _bindContentLinks() {
+        const wrapper = document.querySelector('.min-h-screen') || document.querySelector('.admin-layout');
+        if (!wrapper || wrapper._spaContentBound) return;
+        wrapper._spaContentBound = true;
+
+        wrapper.addEventListener('click', (e) => {
+            // Tìm thẻ <a> gần nhất
+            const link = e.target.closest('a[href]');
+            if (!link) return;
+            // Bỏ qua sidebar links (đã xử lý riêng)
+            if (link.closest('#adminSidebar')) return;
+            // Bỏ qua links có target="_blank"
+            if (link.getAttribute('target') === '_blank') return;
+            // Bỏ qua links href="#" hoặc javascript:
+            const href = link.getAttribute('href');
+            if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+
+            // Kiểm tra link có trỏ đến trang admin không
+            const match = href.match(/(?:^|\/)(\w+)\.html(?:\?.*)?$/);
+            if (!match) return;
+            const pageName = match[1];
+            if (!this.PAGE_INIT[pageName] && pageName !== 'dashboard') return;
+
+            // Chặn reload và dùng SPA
+            e.preventDefault();
+            this.loadPage(pageName, true);
+        });
+    },
+
+    /**
+     * Tải trang mới bằng AJAX — không reload
+     */
+    async loadPage(pageName, pushState = true) {
+        if (this.isNavigating) return;
+        this.isNavigating = true;
+
+        const contentEl = document.querySelector('.admin-content');
+        if (!contentEl) { this.isNavigating = false; return; }
+
+        // Fade-out hiện tại
+        contentEl.style.transition = 'opacity 0.12s ease, transform 0.12s ease';
+        contentEl.style.opacity = '0.3';
+        contentEl.style.transform = 'translateY(6px)';
+
+        try {
+            const fullUrl = '/DuAnChatbotThuVien/public/pages/admin/' + pageName + '.html';
+            const res = await fetch(fullUrl, { cache: 'no-cache' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const html = await res.text();
+
+            // Parse
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+
+            // 1) Nội dung chính
+            const newContent = doc.querySelector('.admin-content');
+            if (!newContent) throw new Error('.admin-content not found');
+
+            // 2) Modals (nằm ngoài .min-h-screen)
+            const newModals = doc.querySelectorAll('body > .modal-overlay');
+
+            // 3) Styles từ <head>
+            const newStyles = Array.from(doc.querySelectorAll('head > style'))
+                .map(s => s.textContent).join('\n');
+
+            // 4) Inline scripts (function definitions, event wiring)
+            const newScripts = doc.querySelectorAll('body > script:not([src])');
+
+            // --- Cleanup DOM cũ ---
+            // Xóa modals cũ
+            document.querySelectorAll('body > .modal-overlay').forEach(m => m.remove());
+            // Xóa styles cũ của SPA
+            document.querySelectorAll('style[data-spa]').forEach(s => s.remove());
+            // Xóa scripts cũ của SPA
+            document.querySelectorAll('script[data-spa]').forEach(s => s.remove());
+            // Xóa draft toast nếu đang hiện
+            document.querySelectorAll('[id^="draftToast_"]').forEach(t => t.remove());
+
+            // --- Inject mới ---
+            // Styles
+            if (newStyles.trim()) {
+                const styleEl = document.createElement('style');
+                styleEl.setAttribute('data-spa', pageName);
+                styleEl.textContent = newStyles;
+                document.head.appendChild(styleEl);
+            }
+
+            // Swap nội dung
+            contentEl.innerHTML = newContent.innerHTML;
+
+            // Inject modals
+            newModals.forEach(modal => {
+                const clone = document.importNode(modal, true);
+                clone.setAttribute('data-spa', pageName);
+                document.body.appendChild(clone);
+            });
+
+            // Inject inline scripts (chạy trong global scope)
+            newScripts.forEach(scriptNode => {
+                const s = document.createElement('script');
+                s.setAttribute('data-spa', pageName);
+                s.textContent = scriptNode.textContent;
+                document.body.appendChild(s);
+            });
+
+            // Fade-in
+            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+            contentEl.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+            contentEl.style.opacity = '1';
+            contentEl.style.transform = 'translateY(0)';
+
+            // URL
+            if (pushState) {
+                history.pushState({ adminPage: pageName }, '', fullUrl);
+            }
+
+            // Active nav
+            this._setActiveNav(pageName);
+
+            // Title
+            const titleEl = doc.querySelector('title');
+            if (titleEl) document.title = titleEl.textContent;
+
+            // Mobile topbar text
+            const span = document.querySelector('.mobile-topbar .font-bold, .mobile-topbar span');
+            if (span && this.PAGE_TITLES[pageName]) {
+                span.textContent = this.PAGE_TITLES[pageName];
+            }
+
+            this.currentPage = pageName;
+
+            // Gọi loadAdminPage (auth + admin info vào header mới)
+            await loadAdminPage(pageName);
+
+            // Gọi init cho trang (load dữ liệu)
+            const initFn = this.PAGE_INIT[pageName];
+            if (initFn) await initFn();
+
+        } catch (err) {
+            console.error('[AdminSPA] Error:', err);
+            // Fallback → chuyển trang bình thường
+            window.location.href = '/DuAnChatbotThuVien/public/pages/admin/' + pageName + '.html';
+        } finally {
+            this.isNavigating = false;
+        }
+    },
+
+    _setActiveNav(pageName) {
+        document.querySelectorAll('#adminSidebar .nav-item[data-page]').forEach(link => {
+            link.classList.toggle('active', link.getAttribute('data-page') === pageName);
+        });
+    }
+};
+
 // ==================== MOBILE SIDEBAR TOGGLE ====================
 
 /**
@@ -85,6 +659,11 @@ async function loadAdminPage(pageName) {
     if (sidebarAvatar) sidebarAvatar.src = avatarSrc;
     const sidebarName = document.getElementById('sidebarAdminName');
     if (sidebarName) sidebarName.textContent = admin.name;
+
+    // Khởi tạo SPA navigation (chỉ chạy 1 lần)
+    if (typeof AdminSPA !== 'undefined' && !AdminSPA.initialized) {
+        AdminSPA.init();
+    }
 }
 
 // ==================== DASHBOARD ====================
@@ -165,6 +744,8 @@ function filterQuestions() {
     renderQuestions(filtered);
 }
 
+const QUESTION_DRAFT_FIELDS = ['questionId', 'questionCategory', 'questionText', 'answerText', 'answerTextEn', 'keywordsInput'];
+
 function openAddModal() {
     document.getElementById('modalTitle').textContent = 'Thêm câu hỏi mới';
     document.getElementById('questionId').value = '';
@@ -173,10 +754,14 @@ function openAddModal() {
     document.getElementById('answerTextEn').value = '';
     document.getElementById('keywordsInput').value = '';
     document.getElementById('questionModal').classList.add('active');
+    // Bắt đầu theo dõi thay đổi để lưu draft
+    FormDraftManager.watchFields('question', QUESTION_DRAFT_FIELDS);
 }
 
 function closeModal() {
     document.getElementById('questionModal').classList.remove('active');
+    // Xóa draft khi đóng modal (user chủ động đóng)
+    FormDraftManager.clearDraft('question');
 }
 
 async function editQuestion(id) {
@@ -192,6 +777,8 @@ async function editQuestion(id) {
             document.getElementById('answerText').value = q.answer_text;
             document.getElementById('answerTextEn').value = q.answer_text_en || '';
             document.getElementById('questionModal').classList.add('active');
+            // Bắt đầu theo dõi thay đổi để lưu draft
+            FormDraftManager.watchFields('question', QUESTION_DRAFT_FIELDS);
         }
     } catch (e) {
         alert('Lỗi khi tải câu hỏi');
@@ -219,6 +806,7 @@ async function saveQuestion(event) {
         });
         const data = await res.json();
         if (data.success) {
+            FormDraftManager.markSaved('question');
             closeModal();
             loadQuestions();
         } else if (data.duplicate) {
@@ -235,6 +823,7 @@ async function saveQuestion(event) {
                 });
                 const data2 = await res2.json();
                 if (data2.success) {
+                    FormDraftManager.markSaved('question');
                     closeModal();
                     loadQuestions();
                 } else {
@@ -325,6 +914,8 @@ async function loadCategoriesForSelect() {
     } catch (e) {}
 }
 
+const CATEGORY_DRAFT_FIELDS = ['catId', 'catName', 'catDescription', 'catOrder'];
+
 function openCategoryModal() {
     document.getElementById('catModalTitle').textContent = 'Thêm danh mục mới';
     document.getElementById('catId').value = '';
@@ -332,10 +923,12 @@ function openCategoryModal() {
     document.getElementById('catDescription').value = '';
     document.getElementById('catOrder').value = '0';
     document.getElementById('categoryModal').classList.add('active');
+    FormDraftManager.watchFields('category', CATEGORY_DRAFT_FIELDS);
 }
 
 function closeCategoryModal() {
     document.getElementById('categoryModal').classList.remove('active');
+    FormDraftManager.clearDraft('category');
 }
 
 function editCategory(id) {
@@ -347,6 +940,7 @@ function editCategory(id) {
     document.getElementById('catDescription').value = c.description || '';
     document.getElementById('catOrder').value = c.sort_order || 0;
     document.getElementById('categoryModal').classList.add('active');
+    FormDraftManager.watchFields('category', CATEGORY_DRAFT_FIELDS);
 }
 
 async function saveCategory(event) {
@@ -368,6 +962,7 @@ async function saveCategory(event) {
         });
         const data = await res.json();
         if (data.success) {
+            FormDraftManager.markSaved('category');
             closeCategoryModal();
             loadCategories();
         }
@@ -450,6 +1045,7 @@ async function saveSettings() {
         });
         const data = await res.json();
         if (data.success) {
+            FormDraftManager.markSaved('settings');
             alert('Đã lưu cài đặt thành công!');
         }
     } catch (e) {
@@ -662,6 +1258,9 @@ async function uploadFile(file) {
         return;
     }
 
+    // Clear stale upload session when starting a new upload
+    sessionStorage.removeItem('celras_upload_session');
+
     // Hide previous result & preview
     const resultDiv = document.getElementById('uploadResult');
     const previewSection = document.getElementById('qaPreviewSection');
@@ -728,7 +1327,7 @@ async function uploadFile(file) {
                             </svg>
                             <div>
                                 <p class="font-semibold text-green-800">${escapeHtml(data.message)}</p>
-                                <p class="text-sm text-green-600 mt-1">Bạn có thể chỉnh sửa câu hỏi và câu trả lời tại <a href="questions.html?source=word" class="underline font-semibold">Quản lý câu hỏi</a></p>
+                                <p class="text-sm text-green-600 mt-1">Bạn có thể chỉnh sửa câu hỏi và câu trả lời tại <a href="#" onclick="event.preventDefault();AdminSPA.loadPage('questions')" class="underline font-semibold">Quản lý câu hỏi</a></p>
                             </div>
                         </div>
                     </div>
@@ -759,6 +1358,17 @@ async function uploadFile(file) {
                 document.getElementById('uploadBar').style.width = '0%';
                 loadDatasets();
             }, 1500);
+
+            // Save upload session so result is restored on F5
+            try {
+                sessionStorage.setItem('celras_upload_session', JSON.stringify({
+                    message: data.message,
+                    questions: data.questions || [],
+                    duplicate_count: data.duplicate_count || 0,
+                    duplicates: data.duplicates || [],
+                    ts: Date.now()
+                }));
+            } catch(e) { /* quota exceeded — ignore */ }
         } else {
             document.getElementById('uploadFileName').textContent = `Lỗi xử lý`;
             if (resultDiv) {
@@ -790,6 +1400,94 @@ async function uploadFile(file) {
 }
 
 // ==================== DATASETS HISTORY ====================
+
+/**
+ * Restore the last upload result from sessionStorage so F5 doesn't lose it.
+ * Session expires after 30 minutes of inactivity.
+ */
+function restoreUploadSession() {
+    try {
+        const raw = sessionStorage.getItem('celras_upload_session');
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        // Expire after 30 min
+        if (!saved.ts || Date.now() - saved.ts > 30 * 60 * 1000) {
+            sessionStorage.removeItem('celras_upload_session');
+            return;
+        }
+
+        const resultDiv = document.getElementById('uploadResult');
+        const previewSection = document.getElementById('qaPreviewSection');
+        if (!resultDiv) return;
+
+        // Rebuild duplicate warning HTML
+        let duplicateHtml = '';
+        if (saved.duplicate_count > 0 && saved.duplicates && saved.duplicates.length > 0) {
+            const dupRows = saved.duplicates.map(d => {
+                const matchLabel = d.match_type === 'question' ? 'Trùng câu hỏi' : 'Trùng câu trả lời';
+                return `<div class="flex items-start gap-2 py-2 border-b border-amber-200 last:border-0">
+                    <span class="bg-amber-200 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">#${d.index}</span>
+                    <div class="text-xs">
+                        <p class="font-medium text-amber-900">${escapeHtml(d.new_question)}</p>
+                        <p class="text-amber-600 mt-0.5">${matchLabel} với ID #${d.existing_id}: "${escapeHtml(d.existing_question)}"</p>
+                    </div>
+                </div>`;
+            }).join('');
+            duplicateHtml = `
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-3">
+                    <div class="flex items-start gap-3 mb-2">
+                        <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                        </svg>
+                        <div class="w-full">
+                            <p class="font-semibold text-amber-800 text-sm">⚠️ Bỏ qua ${saved.duplicate_count} câu hỏi trùng lặp</p>
+                            <div class="mt-2 max-h-48 overflow-y-auto">${dupRows}</div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        // Restore success panel with a "restored" note
+        resultDiv.classList.remove('hidden');
+        resultDiv.innerHTML = `
+            <div class="bg-green-50 border border-green-200 rounded-xl p-4">
+                <div class="flex items-start gap-3">
+                    <svg class="w-6 h-6 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-green-800">${escapeHtml(saved.message)}</p>
+                        <p class="text-sm text-green-600 mt-1">Bạn có thể chỉnh sửa câu hỏi và câu trả lời tại <a href="#" onclick="event.preventDefault();AdminSPA.loadPage('questions')" class="underline font-semibold">Quản lý câu hỏi</a></p>
+                        <p class="text-xs text-gray-400 mt-1">(Kết quả được khôi phục sau khi tải lại trang)</p>
+                    </div>
+                </div>
+            </div>
+            ${duplicateHtml}
+        `;
+
+        // Restore Q&A preview
+        if (saved.questions && saved.questions.length > 0 && previewSection) {
+            previewSection.classList.remove('hidden');
+            const listDiv = document.getElementById('qaPreviewList');
+            if (listDiv) {
+                listDiv.innerHTML = saved.questions.map((qa, i) => `
+                    <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div class="flex items-start gap-2 mb-2">
+                            <span class="bg-sky-100 text-sky-700 text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">Q${i+1}</span>
+                            <p class="text-sm font-medium text-gray-800">${escapeHtml(qa.question)}</p>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">A</span>
+                            <p class="text-sm text-gray-600 whitespace-pre-line">${escapeHtml(qa.answer.substring(0, 200))}${qa.answer.length > 200 ? '...' : ''}</p>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+    } catch(e) {
+        console.warn('restoreUploadSession error:', e);
+    }
+}
 
 async function loadDatasets() {
     try {
@@ -829,7 +1527,7 @@ function renderDatasets(datasets) {
             <td data-label="Số câu hỏi" class="font-semibold">${d.total_questions || 0} câu</td>
             <td data-label="Trạng thái">${statusBadges[d.status] || d.status}${d.error_message ? '<br><span class="text-xs text-red-500">' + escapeHtml(d.error_message) + '</span>' : ''}</td>
             <td data-label="Ngày tải" class="text-sm text-gray-500">${dateDisplay}</td>
-            <td data-label="Thao tác">${d.status === 'completed' && d.total_questions > 0 ? '<a href="questions.html?source=word" class="text-sky-600 hover:text-sky-800 text-sm font-medium">Xem & Sửa</a>' : ''}</td>
+            <td data-label="Thao tác">${d.status === 'completed' && d.total_questions > 0 ? '<a href="#" onclick="event.preventDefault();AdminSPA.loadPage(\'questions\')" class="text-sky-600 hover:text-sky-800 text-sm font-medium">Xem & Sửa</a>' : ''}</td>
         </tr>`;
     }).join('');
 }
@@ -881,11 +1579,16 @@ function renderUnanswered(items) {
 
 function createAnswerForUnanswered(btn) {
     const questionText = btn.getAttribute('data-question-text');
-    // Decode HTML entities back to raw text for URL encoding
     const div = document.createElement('div');
     div.innerHTML = questionText;
     const rawText = div.textContent;
-    window.location.href = `questions.html?autoAdd=${encodeURIComponent(rawText)}`;
+    // Lưu tạm vào sessionStorage để trang questions đọc lại sau khi SPA load xong
+    sessionStorage.setItem('celras_pendingQuestion', rawText);
+    if (typeof AdminSPA !== 'undefined' && AdminSPA.initialized) {
+        AdminSPA.loadPage('questions', true);
+    } else {
+        window.location.href = 'questions.html';
+    }
 }
 
 async function resolveUnanswered(btn) {
@@ -983,6 +1686,8 @@ function filterForms() {
     renderForms(filtered);
 }
 
+const FORM_DRAFT_FIELDS = ['formId', 'formName', 'formDesc', 'formUrl', 'formKeywords', 'formActive'];
+
 function openFormModal() {
     document.getElementById('formModalTitle').textContent = 'Thêm biểu mẫu mới';
     document.getElementById('formId').value = '';
@@ -992,10 +1697,12 @@ function openFormModal() {
     document.getElementById('formKeywords').value = '';
     document.getElementById('formActive').checked = true;
     document.getElementById('formModal').classList.add('active');
+    FormDraftManager.watchFields('form', FORM_DRAFT_FIELDS);
 }
 
 function closeFormModal() {
     document.getElementById('formModal').classList.remove('active');
+    FormDraftManager.clearDraft('form');
 }
 
 async function editForm(id) {
@@ -1009,6 +1716,7 @@ async function editForm(id) {
     document.getElementById('formKeywords').value = form.keywords || '';
     document.getElementById('formActive').checked = form.is_active == 1;
     document.getElementById('formModal').classList.add('active');
+    FormDraftManager.watchFields('form', FORM_DRAFT_FIELDS);
 }
 
 async function saveForm(event) {
@@ -1035,6 +1743,7 @@ async function saveForm(event) {
         });
         const data = await res.json();
         if (data.success) {
+            FormDraftManager.markSaved('form');
             closeFormModal();
             loadForms();
         } else {
@@ -1091,3 +1800,96 @@ window.deleteCategory      = deleteCategory;
 function escapeAttr(text) {
     return JSON.stringify(text || '');
 }
+
+// ==================== DRAFT RESTORE PER PAGE ====================
+
+/**
+ * Kiểm tra và khôi phục draft cho trang questions
+ */
+function checkQuestionDraft() {
+    if (!FormDraftManager.hasDraft('question')) return;
+    FormDraftManager.showDraftNotification('question',
+        () => {
+            // Khôi phục: mở modal và điền dữ liệu
+            const draft = FormDraftManager.getDraft('question');
+            document.getElementById('modalTitle').textContent = draft.questionId ? 'Sửa câu hỏi' : 'Thêm câu hỏi mới';
+            document.getElementById('questionModal').classList.add('active');
+            FormDraftManager.restoreDraft('question', QUESTION_DRAFT_FIELDS);
+            FormDraftManager.watchFields('question', QUESTION_DRAFT_FIELDS);
+        },
+        () => { /* Bỏ qua - đã xóa trong showDraftNotification */ }
+    );
+}
+
+/**
+ * Kiểm tra và khôi phục draft cho trang categories
+ */
+function checkCategoryDraft() {
+    if (!FormDraftManager.hasDraft('category')) return;
+    FormDraftManager.showDraftNotification('category',
+        () => {
+            const draft = FormDraftManager.getDraft('category');
+            document.getElementById('catModalTitle').textContent = draft.catId ? 'Sửa danh mục' : 'Thêm danh mục mới';
+            document.getElementById('categoryModal').classList.add('active');
+            FormDraftManager.restoreDraft('category', CATEGORY_DRAFT_FIELDS);
+            FormDraftManager.watchFields('category', CATEGORY_DRAFT_FIELDS);
+        },
+        () => {}
+    );
+}
+
+/**
+ * Kiểm tra và khôi phục draft cho trang forms
+ */
+function checkFormDraft() {
+    if (!FormDraftManager.hasDraft('form')) return;
+    FormDraftManager.showDraftNotification('form',
+        () => {
+            const draft = FormDraftManager.getDraft('form');
+            document.getElementById('formModalTitle').textContent = draft.formId ? 'Sửa biểu mẫu' : 'Thêm biểu mẫu mới';
+            document.getElementById('formModal').classList.add('active');
+            FormDraftManager.restoreDraft('form', FORM_DRAFT_FIELDS);
+            FormDraftManager.watchFields('form', FORM_DRAFT_FIELDS);
+        },
+        () => {}
+    );
+}
+
+/**
+ * Kiểm tra và khôi phục draft cho trang settings
+ */
+const SETTINGS_DRAFT_FIELDS = ['settingEnabled', 'settingTitle', 'settingWelcome', 'settingNoAnswer',
+    'colorPrimary', 'colorHeaderBg', 'colorHeaderText', 'colorUserBubble', 'colorBotBubble', 'colorButton'];
+
+function watchSettingsFields() {
+    // Bắt đầu theo dõi các field settings sau khi load xong
+    setTimeout(() => {
+        FormDraftManager.watchFields('settings', SETTINGS_DRAFT_FIELDS, { debounce: 1000 });
+    }, 1500);
+}
+
+function checkSettingsDraft() {
+    if (!FormDraftManager.hasDraft('settings')) return;
+    FormDraftManager.showDraftNotification('settings',
+        () => {
+            FormDraftManager.restoreDraft('settings', SETTINGS_DRAFT_FIELDS);
+            // Sync color text inputs
+            ['Primary', 'HeaderBg', 'HeaderText', 'UserBubble', 'BotBubble', 'Button'].forEach(name => {
+                if (typeof syncColor === 'function') {
+                    try { syncColor(name); } catch(e) {}
+                }
+            });
+            FormDraftManager.watchFields('settings', SETTINGS_DRAFT_FIELDS, { debounce: 1000 });
+        },
+        () => {}
+    );
+}
+
+// Export draft functions
+window.FormDraftManager     = FormDraftManager;
+window.AdminSPA             = AdminSPA;
+window.checkQuestionDraft   = checkQuestionDraft;
+window.checkCategoryDraft   = checkCategoryDraft;
+window.checkFormDraft       = checkFormDraft;
+window.checkSettingsDraft   = checkSettingsDraft;
+window.watchSettingsFields  = watchSettingsFields;

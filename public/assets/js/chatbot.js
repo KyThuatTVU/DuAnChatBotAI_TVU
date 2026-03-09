@@ -7,6 +7,78 @@ const API_BASE = '/DuAnChatbotThuVien/public/index.php?url=api';
 let sessionToken = localStorage.getItem('chat_session') || '';
 let activeCategoryId = null; // Danh mục đang mở
 
+// ==================== CHAT HISTORY (SESSION) ====================
+// Lưu lịch sử trò chuyện vào sessionStorage để khôi phục khi load lại trang.
+// sessionStorage tự xóa khi đóng tab — phù hợp với "phiên làm việc" hiện tại.
+
+const ChatHistory = {
+    KEY: 'celras_chat_history',
+    TOKEN_KEY: 'celras_chat_session_bak',
+
+    /** Thêm một tin nhắn vào lịch sử và lưu vào sessionStorage */
+    push(sender, text, forms = []) {
+        const history = this._load();
+        history.push({ sender, text, forms, ts: Date.now() });
+        try {
+            sessionStorage.setItem(this.KEY, JSON.stringify(history));
+            // Luôn đồng bộ session token theo lịch sử
+            if (sessionToken) sessionStorage.setItem(this.TOKEN_KEY, sessionToken);
+        } catch(e) {
+            // sessionStorage đầy (hiếm) — xóa tin cũ nhất rồi thử lại
+            if (history.length > 1) {
+                history.shift();
+                try { sessionStorage.setItem(this.KEY, JSON.stringify(history)); } catch(_) {}
+            }
+        }
+    },
+
+    /** Khôi phục lịch sử vào DOM, trả về số tin nhắn đã khôi phục */
+    restore() {
+        const history = this._load();
+        if (!history.length) return 0;
+
+        // Khôi phục session token từ backup nếu localStorage đã mất
+        if (!sessionToken) {
+            const bak = sessionStorage.getItem(this.TOKEN_KEY);
+            if (bak) {
+                sessionToken = bak;
+                localStorage.setItem('chat_session', bak);
+            }
+        }
+
+        // Ẩn welcome block & suggestions
+        const welcome = document.getElementById('welcomeBlock');
+        if (welcome) welcome.style.display = 'none';
+        const suggestions = document.getElementById('suggestionsContainer');
+        if (suggestions) suggestions.style.display = 'none';
+
+        // Render lại từng tin nhắn (không gọi push để tránh ghi đè)
+        history.forEach(msg => _renderMessage(msg.sender, msg.text, msg.forms || []));
+
+        // Scroll xuống cuối
+        const container = document.getElementById('chatMessages');
+        if (container) requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; });
+
+        return history.length;
+    },
+
+    /** Xóa toàn bộ lịch sử (gọi khi bắt đầu cuộc trò chuyện mới) */
+    clear() {
+        sessionStorage.removeItem(this.KEY);
+        sessionStorage.removeItem(this.TOKEN_KEY);
+    },
+
+    _load() {
+        try {
+            const raw = sessionStorage.getItem(this.KEY);
+            return raw ? JSON.parse(raw) : [];
+        } catch(e) { return []; }
+    },
+
+    /** Số tin nhắn đang được lưu */
+    get count() { return this._load().length; }
+};
+
 /**
  * Khởi tạo chatbot
  */
@@ -44,6 +116,9 @@ async function initChatbot() {
 
     // Focus vào input
     document.getElementById('chatInput')?.focus();
+
+    // Khôi phục lịch sử trò chuyện từ phiên làm việc hiện tại
+    ChatHistory.restore();
 }
 
 /**
@@ -231,12 +306,24 @@ function sendSuggestion(btn) {
 }
 
 /**
- * Thêm tin nhắn vào giao diện chat
+ * Thêm tin nhắn vào giao diện chat và lưu vào lịch sử phiên làm việc
  * @param {string} sender 'user' | 'bot'
  * @param {string} text   Nội dung tin nhắn
  * @param {Array}  forms  Danh sách biểu mẫu kèm (chỉ dùng cho bot)
  */
 function appendMessage(sender, text, forms = []) {
+    // Lưu vào lịch sử trước khi render (để khôi phục khi load lại)
+    ChatHistory.push(sender, text, forms);
+    _renderMessage(sender, text, forms);
+}
+
+/**
+ * Chỉ render tin nhắn lên DOM (không lưu lịch sử — dùng khi khôi phục)
+ * @param {string} sender
+ * @param {string} text
+ * @param {Array}  forms
+ */
+function _renderMessage(sender, text, forms = []) {
     const container = document.getElementById('chatMessages');
     const avatarUrl = sender === 'bot'
         ? "/DuAnChatbotThuVien/public/assets/images/logo1.png"
@@ -322,6 +409,9 @@ async function startNewChat() {
 
     // Reset danh mục sidebar
     closeCategoryQuestions();
+
+    // Xóa lịch sử phiên làm việc
+    ChatHistory.clear();
 
     // Clear session
     sessionToken = '';
