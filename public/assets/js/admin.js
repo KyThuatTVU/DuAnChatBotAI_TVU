@@ -713,11 +713,16 @@ function renderQuestions(questions) {
                 <div class="font-medium text-sm">${escapeHtml(q.question_text.substring(0, 80))}${q.question_text.length > 80 ? '...' : ''}</div>
                 <div class="text-xs text-gray-400 mt-1">${escapeHtml(q.answer_text.substring(0, 60))}...</div>
             </td>
+            <td data-label="Câu trả lời" class="hidden md:table-cell">
+                <div class="text-xs text-gray-600">${escapeHtml(q.answer_text.substring(0, 100))}${q.answer_text.length > 100 ? '...' : ''}</div>
+            </td>
             <td data-label="Danh mục"><span class="badge badge-info">${q.category_name || 'Chưa phân loại'}</span></td>
             <td data-label="Nguồn"><span class="badge ${q.source_type === 'manual' ? 'badge-success' : 'badge-warning'}">${q.source_type === 'manual' ? 'Nhập tay' : q.source_type.toUpperCase()}</span></td>
-            <td data-label="Trạng thái">${q.is_active ? '<span class="badge badge-success">Hoạt động</span>' : '<span class="badge badge-danger">Tắt</span>'}</td>
             <td data-label="Thao tác">
                 <div class="flex items-center gap-2">
+                    <button onclick="viewKeywords(${q.id})" class="text-green-600 hover:text-green-800" title="Xem từ khóa">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                    </button>
                     <button onclick="editQuestion(${q.id})" class="text-sky-600 hover:text-sky-800" title="Sửa">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     </button>
@@ -807,6 +812,12 @@ async function saveQuestion(event) {
         const data = await res.json();
         if (data.success) {
             FormDraftManager.markSaved('question');
+            
+            // Hiển thị từ khóa tự động đã tạo
+            if (data.auto_keywords) {
+                showAutoKeywordsNotification(data.auto_keywords);
+            }
+            
             closeModal();
             loadQuestions();
         } else if (data.duplicate) {
@@ -824,6 +835,12 @@ async function saveQuestion(event) {
                 const data2 = await res2.json();
                 if (data2.success) {
                     FormDraftManager.markSaved('question');
+                    
+                    // Hiển thị từ khóa tự động đã tạo
+                    if (data2.auto_keywords) {
+                        showAutoKeywordsNotification(data2.auto_keywords);
+                    }
+                    
                     closeModal();
                     loadQuestions();
                 } else {
@@ -836,6 +853,100 @@ async function saveQuestion(event) {
     } catch (e) {
         alert('Lỗi kết nối server');
     }
+}
+
+// Hiển thị thông báo từ khóa tự động đã tạo
+function showAutoKeywordsNotification(autoKeywords) {
+    const totalVi = autoKeywords.vi ? autoKeywords.vi.length : 0;
+    const totalEn = autoKeywords.en ? autoKeywords.en.length : 0;
+    
+    if (totalVi === 0 && totalEn === 0) return;
+    
+    // Tạo toast notification
+    const toast = document.createElement('div');
+    toast.id = 'autoKeywordsToast';
+    toast.style.cssText = `
+        position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+        background: linear-gradient(145deg, #ffffff, #f0fdf4);
+        border: 1px solid #bbf7d0; border-left: 4px solid #22c55e;
+        border-radius: 16px; padding: 18px 22px; max-width: 420px;
+        box-shadow: 0 20px 40px rgba(34,197,94,0.15), 0 4px 12px rgba(0,0,0,0.08);
+        animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        font-family: 'Inter', sans-serif;
+    `;
+    
+    let keywordsHtml = '';
+    
+    // Từ khóa tiếng Việt
+    if (totalVi > 0) {
+        const displayVi = autoKeywords.vi.slice(0, 5);
+        const moreVi = totalVi > 5 ? ` +${totalVi - 5}` : '';
+        keywordsHtml += `
+            <div style="margin-bottom:8px">
+                <div style="font-size:11px;font-weight:600;color:#059669;margin-bottom:4px">🇻🇳 TIẾNG VIỆT (${totalVi})</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px">
+                    ${displayVi.map(kw => `<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:500">${kw}</span>`).join('')}
+                    ${moreVi ? `<span style="color:#059669;font-size:11px;padding:3px 6px">${moreVi}</span>` : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Từ khóa tiếng Anh
+    if (totalEn > 0) {
+        const displayEn = autoKeywords.en.slice(0, 5);
+        const moreEn = totalEn > 5 ? ` +${totalEn - 5}` : '';
+        keywordsHtml += `
+            <div>
+                <div style="font-size:11px;font-weight:600;color:#0891b2;margin-bottom:4px">🇬🇧 TIẾNG ANH (${totalEn})</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px">
+                    ${displayEn.map(kw => `<span style="background:#cffafe;color:#155e75;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:500">${kw}</span>`).join('')}
+                    ${moreEn ? `<span style="color:#0891b2;font-size:11px;padding:3px 6px">${moreEn}</span>` : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    toast.innerHTML = `
+        <div style="display:flex;align-items:flex-start;gap:12px">
+            <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#dcfce7,#bbf7d0);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg style="width:20px;height:20px;color:#16a34a" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div style="flex:1;min-width:0">
+                <p style="font-weight:700;font-size:14px;color:#166534;margin:0 0 4px">✨ Đã tạo ${totalVi + totalEn} từ khóa tự động</p>
+                <p style="font-size:12px;color:#059669;margin:0 0 10px">Hệ thống đã tự động phân tích và tạo từ khóa cho câu hỏi</p>
+                ${keywordsHtml}
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" style="position:absolute;top:8px;right:10px;background:none;border:none;cursor:pointer;color:#94a3b8;font-size:20px;line-height:1;padding:4px;transition:color .2s" onmouseover="this.style.color='#64748b'" onmouseout="this.style.color='#94a3b8'">&times;</button>
+        </div>
+    `;
+    
+    // Thêm animation styles nếu chưa có
+    if (!document.getElementById('autoKeywordsStyles')) {
+        const style = document.createElement('style');
+        style.id = 'autoKeywordsStyles';
+        style.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(100%) translateY(20px); opacity: 0; }
+                to { transform: translateX(0) translateY(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Xóa toast cũ nếu có
+    const oldToast = document.getElementById('autoKeywordsToast');
+    if (oldToast) oldToast.remove();
+    
+    document.body.appendChild(toast);
+    
+    // Tự động ẩn sau 8 giây
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.style.animation = 'slideOutRight 0.3s ease-out';
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 8000);
 }
 
 async function deleteQuestion(id) {
@@ -1893,3 +2004,179 @@ window.checkCategoryDraft   = checkCategoryDraft;
 window.checkFormDraft       = checkFormDraft;
 window.checkSettingsDraft   = checkSettingsDraft;
 window.watchSettingsFields  = watchSettingsFields;
+
+
+// ==================== VIEW KEYWORDS ====================
+async function viewKeywords(questionId) {
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/keywords/${questionId}`);
+        const data = await res.json();
+        
+        if (!data.keywords) {
+            alert('Không thể tải từ khóa');
+            return;
+        }
+        
+        const keywords = data.keywords;
+        const totalManual = keywords.manual ? keywords.manual.length : 0;
+        const totalAutoVi = keywords.auto_vi ? keywords.auto_vi.length : 0;
+        const totalAutoEn = keywords.auto_en ? keywords.auto_en.length : 0;
+        const total = totalManual + totalAutoVi + totalAutoEn;
+        
+        // Tạo modal hiển thị từ khóa
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.style.zIndex = '10000';
+        
+        let contentHtml = '';
+        
+        // Từ khóa thủ công
+        if (totalManual > 0) {
+            contentHtml += `
+                <div class="mb-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                        <h4 class="font-bold text-gray-800">Từ khóa thủ công (${totalManual})</h4>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        ${keywords.manual.map(kw => `
+                            <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1.5 rounded-full text-sm font-medium">
+                                ✏️ ${escapeHtml(kw.keyword)}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Từ khóa tự động tiếng Việt
+        if (totalAutoVi > 0) {
+            contentHtml += `
+                <div class="mb-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <svg class="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        <h4 class="font-bold text-gray-800">Từ khóa tự động - Tiếng Việt (${totalAutoVi})</h4>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        ${keywords.auto_vi.map(kw => `
+                            <span class="inline-flex items-center gap-1 bg-green-100 text-green-800 px-3 py-1.5 rounded-full text-sm font-medium">
+                                🇻🇳 ${escapeHtml(kw.keyword)}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Từ khóa tự động tiếng Anh
+        if (totalAutoEn > 0) {
+            contentHtml += `
+                <div class="mb-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <svg class="w-5 h-5 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        <h4 class="font-bold text-gray-800">Từ khóa tự động - Tiếng Anh (${totalAutoEn})</h4>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        ${keywords.auto_en.map(kw => `
+                            <span class="inline-flex items-center gap-1 bg-cyan-100 text-cyan-800 px-3 py-1.5 rounded-full text-sm font-medium">
+                                🇬🇧 ${escapeHtml(kw.keyword)}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (total === 0) {
+            contentHtml = `
+                <div class="text-center py-8">
+                    <svg class="w-16 h-16 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                    </svg>
+                    <p class="text-gray-500 font-medium">Chưa có từ khóa nào</p>
+                    <p class="text-gray-400 text-sm mt-1">Hệ thống sẽ tự động tạo từ khóa khi bạn lưu câu hỏi</p>
+                </div>
+            `;
+        }
+        
+        modal.innerHTML = `
+            <div class="modal bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden max-h-[90vh] overflow-y-auto">
+                <div class="h-1 bg-gradient-to-r from-green-400 to-emerald-600"></div>
+                <div class="p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                <svg class="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                                </svg>
+                                Từ Khóa Câu Hỏi #${questionId}
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">Tổng cộng: ${total} từ khóa</p>
+                        </div>
+                        <button onclick="this.closest('.modal-overlay').remove()" class="w-10 h-10 rounded-xl hover:bg-gray-100 transition-colors flex items-center justify-center text-gray-400 hover:text-gray-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        ${contentHtml}
+                    </div>
+                    
+                    <div class="flex justify-between items-center gap-3 mt-6 pt-4 border-t border-gray-100">
+                        <button onclick="regenerateKeywords(${questionId})" class="inline-flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-300">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Tạo lại từ khóa tự động
+                        </button>
+                        <button onclick="this.closest('.modal-overlay').remove()" class="px-5 py-2.5 rounded-xl text-sm font-semibold border-2 border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all duration-300">
+                            Đóng
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+    } catch (e) {
+        alert('Lỗi khi tải từ khóa: ' + e.message);
+    }
+}
+
+// Tạo lại từ khóa tự động
+async function regenerateKeywords(questionId) {
+    if (!confirm('Bạn có chắc muốn tạo lại từ khóa tự động?\n\nCác từ khóa tự động cũ sẽ bị xóa và tạo mới.')) {
+        return;
+    }
+    
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/regenerateKeywords/${questionId}`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            // Đóng modal hiện tại
+            document.querySelector('.modal-overlay')?.remove();
+            
+            // Hiển thị thông báo thành công
+            showAutoKeywordsNotification(data.auto_keywords);
+            
+            // Mở lại modal với từ khóa mới
+            setTimeout(() => viewKeywords(questionId), 500);
+        } else {
+            alert(data.error || 'Lỗi khi tạo lại từ khóa');
+        }
+    } catch (e) {
+        alert('Lỗi kết nối server: ' + e.message);
+    }
+}

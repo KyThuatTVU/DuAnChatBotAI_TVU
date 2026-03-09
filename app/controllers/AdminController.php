@@ -255,16 +255,28 @@ class AdminController extends BaseController
             'created_by' => $adminId,
         ]);
 
-        // Thêm từ khóa nếu có
+        $db = Database::getInstance()->getConnection();
+
+        // Thêm từ khóa thủ công nếu có
         if (!empty($input['keywords'])) {
-            $db = Database::getInstance()->getConnection();
-            $stmt = $db->prepare("INSERT INTO keywords (question_id, keyword) VALUES (?, ?)");
+            $stmt = $db->prepare("INSERT INTO keywords (question_id, keyword, is_auto, language) VALUES (?, ?, 0, 'vi')");
             foreach ($input['keywords'] as $keyword) {
-                $stmt->execute([$id, trim($keyword)]);
+                $kw = trim($keyword);
+                if ($kw !== '') {
+                    $stmt->execute([$id, $kw]);
+                }
             }
         }
 
-        $this->json(['success' => true, 'id' => $id], 201);
+        // Tự động tạo từ khóa từ câu hỏi
+        $autoKeywords = $this->generateAutoKeywords($input['question_text']);
+        $this->saveAutoKeywords($db, $id, $autoKeywords);
+
+        $this->json([
+            'success' => true, 
+            'id' => $id,
+            'auto_keywords' => $autoKeywords,
+        ], 201);
     }
 
     /**
@@ -293,11 +305,14 @@ class AdminController extends BaseController
                 'is_active' => $input['is_active'] ?? 1,
             ]);
 
-            // Cập nhật từ khóa: xóa cũ, thêm mới
             $db = Database::getInstance()->getConnection();
+            
+            // Xóa tất cả từ khóa cũ (cả thủ công và tự động)
             $db->prepare("DELETE FROM keywords WHERE question_id = ?")->execute([$id]);
+            
+            // Thêm từ khóa thủ công mới
             if (!empty($input['keywords'])) {
-                $stmt = $db->prepare("INSERT INTO keywords (question_id, keyword) VALUES (?, ?)");
+                $stmt = $db->prepare("INSERT INTO keywords (question_id, keyword, is_auto, language) VALUES (?, ?, 0, 'vi')");
                 foreach ($input['keywords'] as $keyword) {
                     $kw = trim($keyword);
                     if ($kw !== '') {
@@ -306,7 +321,14 @@ class AdminController extends BaseController
                 }
             }
 
-            $this->json(['success' => true]);
+            // Tự động tạo lại từ khóa từ câu hỏi mới
+            $autoKeywords = $this->generateAutoKeywords($input['question_text']);
+            $this->saveAutoKeywords($db, $id, $autoKeywords);
+
+            $this->json([
+                'success' => true,
+                'auto_keywords' => $autoKeywords,
+            ]);
         }
 
         // GET - lấy chi tiết
@@ -1126,6 +1148,12 @@ class AdminController extends BaseController
                     $datasetId,
                     $adminId,
                 ]);
+                $questionId = $db->lastInsertId();
+                
+                // Tự động tạo từ khóa cho câu hỏi vừa import
+                $autoKeywords = $this->generateAutoKeywords($qa['question']);
+                $this->saveAutoKeywords($db, $questionId, $autoKeywords);
+                
                 $count++;
             } catch (\Exception $e) {
                 continue;
@@ -1137,6 +1165,43 @@ class AdminController extends BaseController
             'duplicates' => $duplicates,
             'skipped' => count($duplicates),
         ];
+    }
+
+    /**
+     * Tạo từ khóa tự động từ câu hỏi
+     */
+    private function generateAutoKeywords(string $questionText): array
+    {
+        require_once __DIR__ . '/../helpers/KeywordGenerator.php';
+        return KeywordGenerator::generate($questionText);
+    }
+
+    /**
+     * Lưu từ khóa tự động vào database
+     */
+    private function saveAutoKeywords(\PDO $db, int $questionId, array $autoKeywords): void
+    {
+        $stmt = $db->prepare("INSERT INTO keywords (question_id, keyword, is_auto, language) VALUES (?, ?, 1, ?)");
+        
+        // Lưu từ khóa tiếng Việt
+        foreach ($autoKeywords['vi'] as $keyword) {
+            try {
+                $stmt->execute([$questionId, $keyword, 'vi']);
+            } catch (\Exception $e) {
+                // Bỏ qua nếu trùng
+                continue;
+            }
+        }
+        
+        // Lưu từ khóa tiếng Anh
+        foreach ($autoKeywords['en'] as $keyword) {
+            try {
+                $stmt->execute([$questionId, $keyword, 'en']);
+            } catch (\Exception $e) {
+                // Bỏ qua nếu trùng
+                continue;
+            }
+        }
     }
 
     /**
@@ -1277,5 +1342,125 @@ class AdminController extends BaseController
 
         $form = $this->formModel->getById($id);
         $this->json(['form' => $form]);
+    }
+
+    // ==================== KEYWORDS ====================
+
+    /**
+     * GET /api/admin/keywords/{questionId} - Lấy tất cả từ khóa của câu hỏi
+     */
+    public function keywords($questionId = null)
+    {
+        $this->requireAuth();
+        
+        if (!$questionId) {
+            $this->json(['error' => 'Question ID không hợp lệ'], 400);
+        }
+
+        $db = Database::getInstance()->getConnection();
+        $stmt = $db->prepare(
+            "SELECT id, keyword, is_auto, language, created_at 
+             FROM keywords 
+             WHERE question_id = ? 
+             ORDER BY is_auto ASC, language ASC, keyword ASC"
+        );
+        $stmt->execute([$questionId]);
+        $keywords = $stmt->fetchAll();
+
+        // Nhóm theo loại
+        $result = [
+            'manual' => [],
+            'auto_vi' => [],
+            'auto_en' => [],
+        ];
+
+        foreach ($keywords as $kw) {
+            if ($kw['is_auto'] == 0) {
+                $result['manual'][] = $kw;
+            } elseif ($kw['language'] === 'vi') {
+                $result['auto_vi'][] = $kw;
+            } elseif ($kw['language'] === 'en') {
+                $result['auto_en'][] = $kw;
+            }
+        }
+
+        $this->json(['keywords' => $result]);
+    }
+
+    /**
+     * POST /api/admin/regenerateKeywords/{questionId} - Tạo lại từ khóa tự động
+     */
+    public function regenerateKeywords($questionId = null)
+    {
+        $this->requireAuth();
+        
+        if (!$questionId) {
+            $this->json(['error' => 'Question ID không hợp lệ'], 400);
+        }
+
+        $db = Database::getInstance()->getConnection();
+        
+        // Lấy câu hỏi
+        $stmt = $db->prepare("SELECT question_text FROM questions WHERE id = ?");
+        $stmt->execute([$questionId]);
+        $question = $stmt->fetch();
+        
+        if (!$question) {
+            $this->json(['error' => 'Câu hỏi không tồn tại'], 404);
+        }
+
+        // Xóa từ khóa tự động cũ
+        $stmt = $db->prepare("DELETE FROM keywords WHERE question_id = ? AND is_auto = 1");
+        $stmt->execute([$questionId]);
+
+        // Tạo từ khóa mới
+        $autoKeywords = $this->generateAutoKeywords($question['question_text']);
+        $this->saveAutoKeywords($db, $questionId, $autoKeywords);
+
+        $this->json([
+            'success' => true,
+            'auto_keywords' => $autoKeywords,
+            'message' => 'Đã tạo lại từ khóa tự động',
+        ]);
+    }
+
+    /**
+     * GET /api/admin/dictionary - Lấy từ điển dịch Vi-En
+     */
+    public function dictionary()
+    {
+        $this->requireAuth();
+
+        if ($this->getMethod() === 'POST') {
+            return $this->addToDictionary();
+        }
+
+        require_once __DIR__ . '/../helpers/KeywordGenerator.php';
+        $dict = KeywordGenerator::getDictionary();
+        
+        $this->json(['dictionary' => $dict]);
+    }
+
+    /**
+     * POST /api/admin/dictionary - Thêm từ vào từ điển
+     */
+    private function addToDictionary()
+    {
+        $input = $this->getJsonInput();
+        
+        if (empty($input['vi']) || empty($input['en'])) {
+            $this->json(['error' => 'Cần cung cấp cả từ tiếng Việt và tiếng Anh'], 400);
+        }
+
+        require_once __DIR__ . '/../helpers/KeywordGenerator.php';
+        KeywordGenerator::addToDictionary(
+            mb_strtolower(trim($input['vi'])),
+            mb_strtolower(trim($input['en']))
+        );
+
+        $this->json([
+            'success' => true,
+            'message' => 'Đã thêm từ vào từ điển',
+        ]);
     }
 }

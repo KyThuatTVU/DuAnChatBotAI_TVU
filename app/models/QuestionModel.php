@@ -95,13 +95,13 @@ class QuestionModel extends BaseModel
             }
         }
 
-        // 3b. Tìm bằng từ khóa dài (>= 3 ký tự) - khớp substring
-        $sql = "SELECT q.*, k.keyword FROM {$this->table} q
+        // 3b. Tìm bằng từ khóa dài (>= 3 ký tự) - khớp substring (cả tiếng Việt và tiếng Anh)
+        $sql = "SELECT q.*, k.keyword, k.language FROM {$this->table} q
                 INNER JOIN keywords k ON q.id = k.question_id
                 WHERE q.is_active = 1 
                 AND CHAR_LENGTH(k.keyword) >= 3
                 AND LOWER(?) LIKE CONCAT('%', LOWER(k.keyword), '%')
-                ORDER BY CHAR_LENGTH(k.keyword) DESC
+                ORDER BY k.is_auto ASC, CHAR_LENGTH(k.keyword) DESC
                 LIMIT 1";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$userMessage]);
