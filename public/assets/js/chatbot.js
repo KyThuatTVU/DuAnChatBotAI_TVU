@@ -687,3 +687,210 @@ async function logout() {
     } catch (e) {}
     window.location.href = '/DuAnChatbotThuVien/public/pages/index.html';
 }
+
+// ===== VOICE INPUT (SPEECH RECOGNITION) =====
+
+let recognition = null;
+let isListening = false;
+
+/**
+ * Khởi tạo Speech Recognition API
+ */
+function initSpeechRecognition() {
+    // Check browser support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        console.warn('Speech Recognition API not supported');
+        return null;
+    }
+
+    recognition = new SpeechRecognition();
+    
+    // Cấu hình
+    recognition.continuous = false; // Dừng sau khi nhận được kết quả
+    recognition.interimResults = true; // Hiển thị kết quả tạm thời
+    
+    // Tự động chọn ngôn ngữ dựa trên currentLang
+    const lang = (typeof currentLang !== 'undefined' && currentLang === 'en') ? 'en-US' : 'vi-VN';
+    recognition.lang = lang;
+
+    // Xử lý kết quả
+    recognition.onresult = (event) => {
+        let transcript = '';
+        let isFinal = false;
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                isFinal = true;
+            }
+        }
+
+        // Cập nhật input với kết quả
+        const input = document.getElementById('chatInput');
+        if (input) {
+            input.value = transcript;
+            updateCharCount();
+            autoResize(input);
+        }
+
+        // Nếu là kết quả cuối cùng, tự động gửi tin nhắn
+        if (isFinal && transcript.trim()) {
+            stopVoiceInput();
+            // Delay nhỏ để người dùng thấy text trước khi gửi
+            setTimeout(() => {
+                sendMessage();
+            }, 300);
+        }
+    };
+
+    // Xử lý lỗi
+    recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        stopVoiceInput();
+        
+        let errorMsg = typeof t === 'function' ? t('voice_error') : 'Lỗi nhận diện giọng nói';
+        
+        if (event.error === 'no-speech') {
+            errorMsg = typeof t === 'function' ? t('voice_no_speech') : 'Không nhận được giọng nói. Vui lòng thử lại.';
+        } else if (event.error === 'not-allowed') {
+            errorMsg = typeof t === 'function' 
+                ? 'Microphone access denied. Please allow microphone permission.' 
+                : 'Quyền truy cập microphone bị từ chối. Vui lòng cho phép quyền truy cập.';
+        }
+        
+        // Hiển thị thông báo lỗi
+        showVoiceError(errorMsg);
+    };
+
+    // Khi kết thúc
+    recognition.onend = () => {
+        stopVoiceInput();
+    };
+
+    return recognition;
+}
+
+/**
+ * Bật/tắt nhận diện giọng nói
+ */
+function toggleVoiceInput() {
+    if (isListening) {
+        stopVoiceInput();
+    } else {
+        startVoiceInput();
+    }
+}
+
+/**
+ * Bắt đầu nhận diện giọng nói
+ */
+function startVoiceInput() {
+    // Khởi tạo recognition nếu chưa có
+    if (!recognition) {
+        recognition = initSpeechRecognition();
+    }
+
+    if (!recognition) {
+        const msg = typeof t === 'function' ? t('voice_not_supported') : 'Trình duyệt không hỗ trợ nhận diện giọng nói';
+        showVoiceError(msg);
+        return;
+    }
+
+    // Cập nhật ngôn ngữ theo currentLang
+    const lang = (typeof currentLang !== 'undefined' && currentLang === 'en') ? 'en-US' : 'vi-VN';
+    recognition.lang = lang;
+
+    try {
+        recognition.start();
+        isListening = true;
+        
+        // Cập nhật UI
+        const voiceBtn = document.getElementById('voiceBtn');
+        if (voiceBtn) {
+            voiceBtn.classList.add('listening');
+            voiceBtn.title = typeof t === 'function' ? t('voice_listening') : 'Đang nghe...';
+        }
+
+        // Clear input để sẵn sàng nhận giọng nói mới
+        const input = document.getElementById('chatInput');
+        if (input) {
+            input.value = '';
+            updateCharCount();
+        }
+    } catch (e) {
+        console.error('Failed to start speech recognition:', e);
+        stopVoiceInput();
+    }
+}
+
+/**
+ * Dừng nhận diện giọng nói
+ */
+function stopVoiceInput() {
+    if (recognition && isListening) {
+        try {
+            recognition.stop();
+        } catch (e) {
+            console.warn('Error stopping recognition:', e);
+        }
+    }
+    
+    isListening = false;
+    
+    // Cập nhật UI
+    const voiceBtn = document.getElementById('voiceBtn');
+    if (voiceBtn) {
+        voiceBtn.classList.remove('listening');
+        voiceBtn.title = typeof t === 'function' ? t('voice_search') : 'Tìm kiếm bằng giọng nói';
+        voiceBtn.style.background = 'linear-gradient(145deg, #f0f9ff, #e0f2fe)';
+    }
+}
+
+/**
+ * Hiển thị thông báo lỗi giọng nói
+ */
+function showVoiceError(message) {
+    // Tạo toast notification
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+        background: linear-gradient(145deg, #fee2e2, #fecaca);
+        border: 1px solid #fca5a5; border-left: 4px solid #ef4444;
+        border-radius: 12px; padding: 12px 20px; max-width: 400px;
+        box-shadow: 0 10px 25px rgba(239, 68, 68, 0.2);
+        animation: voiceErrorSlideIn 0.3s ease-out;
+        font-family: 'Inter', sans-serif;
+        z-index: 9999;
+        color: #991b1b;
+        font-size: 14px;
+        font-weight: 500;
+    `;
+    toast.textContent = message;
+
+    // Animation
+    if (!document.getElementById('voiceErrorStyles')) {
+        const style = document.createElement('style');
+        style.id = 'voiceErrorStyles';
+        style.textContent = `
+            @keyframes voiceErrorSlideIn {
+                from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+                to { opacity: 1; transform: translateX(-50%) translateY(0); }
+            }
+            @keyframes voiceErrorSlideOut {
+                from { opacity: 1; transform: translateX(-50%) translateY(0); }
+                to { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    document.body.appendChild(toast);
+
+    // Tự động ẩn sau 3 giây
+    setTimeout(() => {
+        toast.style.animation = 'voiceErrorSlideOut 0.3s ease-in forwards';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
