@@ -3,11 +3,13 @@
 -- Ngày tạo: 2026-03-03
 -- =====================================================
 
-CREATE DATABASE IF NOT EXISTS chatbot_thuvien
-CHARACTER SET utf8mb4
-COLLATE utf8mb4_unicode_ci;
+-- CREATE DATABASE IF NOT EXISTS chatbot_thuvien
+-- CHARACTER SET utf8mb4
+-- COLLATE utf8mb4_unicode_ci;
 
-USE chatbot_thuvien;
+-- Thay 'your_database_name' bằng tên database bạn vừa tạo
+-- Ví dụ: lrctvu_chatbot, tvulrc_chatbot, etc.
+USE your_database_name;
 
 -- =====================================================
 -- 1. BẢNG QUẢN TRỊ VIÊN (Đăng nhập Google)
