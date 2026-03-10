@@ -1,9 +1,6 @@
 RewriteEngine On
 
-# Allow direct access to static files
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteRule ^ - [L]
-
-# Redirect clean API URLs to index.php
+# Redirect to index.php for API routes
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^api/(.*)$ index.php?url=api/$1 [QSA,L]

@@ -3,10 +3,7 @@
  * Xử lý giao diện chat phía người dùng
  */
 
-console.log('[Chatbot] Script loading started...');
-
-// Use clean URL with .htaccess rewrite
-const API_BASE = '../api';
+const API_BASE = '/DuAnChatbotThuVien/public/index.php?url=api';
 let sessionToken = localStorage.getItem('chat_session') || '';
 let activeCategoryId = null; // Danh mục đang mở
 
@@ -303,7 +300,6 @@ async function sendMessage() {
  */
 function sendSuggestion(btn) {
     const input = document.getElementById('chatInput');
-    if (!input) return;
     input.value = btn.textContent;
     updateCharCount();
     sendMessage();
@@ -330,8 +326,8 @@ function appendMessage(sender, text, forms = []) {
 function _renderMessage(sender, text, forms = []) {
     const container = document.getElementById('chatMessages');
     const avatarUrl = sender === 'bot'
-        ? "../assets/images/logo1.png"
-        : "../assets/images/US.jpg";
+        ? "/DuAnChatbotThuVien/public/assets/images/logo1.png"
+        : "/DuAnChatbotThuVien/public/assets/images/US.jpg";
 
     // Render nội dung text (safe), giữ xuống dòng
     const safeText = escapeHtml(text).replace(/\n/g, '<br>');
@@ -378,7 +374,7 @@ function showTypingIndicator() {
     const typingLabel = (typeof t === 'function') ? t('typing') : 'Đang trả lời';
     const html = `
         <div class="message bot" id="typingIndicator">
-            <img src="../assets/images/logo1.png" alt="bot" class="avatar">
+            <img src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="bot" class="avatar">
             <div class="bubble">
                 <div class="typing-wrapper">
                     <div class="typing-indicator">
@@ -689,7 +685,7 @@ async function logout() {
     try {
         await fetch(`${API_BASE}/auth/logout`);
     } catch (e) {}
-    window.location.href = 'index.html';
+    window.location.href = '/DuAnChatbotThuVien/public/pages/index.html';
 }
 
 // ===== VOICE INPUT (SPEECH RECOGNITION) =====
@@ -898,24 +894,3 @@ function showVoiceError(message) {
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
-
-// ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
-// These functions are called from HTML onclick handlers
-window.initChatbot = initChatbot;
-window.sendMessage = sendMessage;
-window.sendSuggestion = sendSuggestion;
-window.startNewChat = startNewChat;
-window.handleKeyDown = handleKeyDown;
-window.updateCharCount = updateCharCount;
-window.autoResize = autoResize;
-window.toggleSidebar = toggleSidebar;
-window.openCategory = openCategory;
-window.askCategoryQuestion = askCategoryQuestion;
-window.toggleVoiceInput = toggleVoiceInput;
-
-console.log('[Chatbot] Script loaded successfully. Functions exposed:', {
-    initChatbot: typeof window.initChatbot,
-    sendMessage: typeof window.sendMessage,
-    sendSuggestion: typeof window.sendSuggestion,
-    startNewChat: typeof window.startNewChat
-});
