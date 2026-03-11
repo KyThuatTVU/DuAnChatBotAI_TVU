@@ -284,7 +284,14 @@ async function sendMessage() {
             sessionToken = data.session_token;
             localStorage.setItem('chat_session', sessionToken);
             console.log('Chat response forms:', data.forms);
+            
+            // Hiển thị câu trả lời
             appendMessage('bot', data.reply, data.forms || []);
+            
+            // Nếu có câu hỏi liên quan, hiển thị dạng gợi ý để người dùng chọn
+            if (data.related_questions && data.related_questions.length > 0) {
+                appendRelatedQuestions(data.related_questions);
+            }
         } else {
             appendMessage('bot', data.error || (typeof t === 'function' ? t('error_occurred') : 'Đã có lỗi xảy ra. Vui lòng thử lại.'));
         }
@@ -955,4 +962,49 @@ function showVoiceError(message) {
         toast.style.animation = 'voiceErrorSlideOut 0.3s ease-in forwards';
         setTimeout(() => toast.remove(), 300);
     }, 3000);
+}
+
+/**
+ * Hiển thị danh sách câu hỏi liên quan dạng nút bấm
+ */
+function appendRelatedQuestions(questions) {
+    const container = document.getElementById('chatMessages');
+    const avatarUrl = "/DuAnChatbotThuVien/public/assets/images/logo1.png";
+
+    const questionsHtml = questions.map(q => {
+        const questionText = stripLeadingNumber(q.question_text);
+        return `<button class="related-question-btn" onclick="askRelatedQuestion(this)" data-question="${escapeHtml(questionText)}">
+            ${escapeHtml(questionText)}
+        </button>`;
+    }).join('');
+
+    const msgHtml = `
+        <div class="message bot">
+            <img src="${avatarUrl}" alt="bot" class="avatar">
+            <div class="bubble">
+                <div class="related-questions-container">
+                    ${questionsHtml}
+                </div>
+            </div>
+        </div>`;
+    
+    container.insertAdjacentHTML('beforeend', msgHtml);
+
+    // Scroll to bottom
+    requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+    });
+}
+
+/**
+ * Gửi câu hỏi liên quan được chọn
+ */
+function askRelatedQuestion(btn) {
+    const question = btn.getAttribute('data-question');
+    if (!question) return;
+
+    const input = document.getElementById('chatInput');
+    input.value = question;
+    updateCharCount();
+    sendMessage();
 }

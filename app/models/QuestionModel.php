@@ -21,6 +21,7 @@ class QuestionModel extends BaseModel
 
     /**
      * Tìm câu trả lời phù hợp nhất (FULLTEXT search + kiểm tra ngữ cảnh)
+     * Trả về false nếu câu hỏi quá mơ hồ hoặc không tìm thấy match chính xác
      */
     public function findAnswer($userMessage)
     {
@@ -43,48 +44,57 @@ class QuestionModel extends BaseModel
             return $result;
         }
 
-        // 2. Tìm bằng FULLTEXT (chỉ khi tin nhắn đủ dài cho FULLTEXT - tối thiểu 3 ký tự)
-        if ($messageLength >= 3) {
+        // 2. Kiểm tra xem có bao nhiêu câu hỏi chứa các từ khóa từ câu hỏi người dùng
+        // Nếu có nhiều câu → hiển thị danh sách thay vì trả lời 1 câu
+        $keywords = $this->extractKeywordsFromMessage($userMessage);
+        if (!empty($keywords)) {
+            $countSql = "SELECT COUNT(DISTINCT q.id) as total FROM {$this->table} q
+                        WHERE q.is_active = 1 AND (";
+            $conditions = [];
+            $params = [];
+            
+            foreach ($keywords as $keyword) {
+                $conditions[] = "LOWER(q.question_text) LIKE CONCAT('%', LOWER(?), '%')";
+                $params[] = $keyword;
+            }
+            
+            $countSql .= implode(" OR ", $conditions) . ")";
+            $countStmt = $this->db->prepare($countSql);
+            $countStmt->execute($params);
+            $count = $countStmt->fetch()['total'];
+            
+            // Nếu có nhiều hơn 1 câu hỏi chứa các từ khóa này → câu hỏi quá mơ hồ
+            if ($count > 1) {
+                return false;
+            }
+        }
+
+        // 3. Tìm bằng FULLTEXT (chỉ khi tin nhắn đủ dài - tối thiểu 15 ký tự)
+        // Để tránh match quá rộng với câu hỏi ngắn
+        // Tăng ngưỡng relevance lên 2.0 để chỉ match những câu rất liên quan
+        if ($messageLength >= 15) {
             $sql = "SELECT q.*, MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE) as relevance
                     FROM {$this->table} q 
                     WHERE q.is_active = 1 
                     AND MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE)
-                    HAVING relevance > 0.5
+                    HAVING relevance > 2.0
                     ORDER BY relevance DESC 
-                    LIMIT 5";
+                    LIMIT 1";
             $stmt = $this->db->prepare($sql);
             $stmt->execute([$userMessage, $userMessage]);
-            $results = $stmt->fetchAll();
+            $result = $stmt->fetch();
 
-            if (!empty($results)) {
-                // Kiểm tra từ khóa nội dung: ưu tiên câu hỏi có chứa từ chủ đề
-                $contentWords = $this->extractContentWords($userMessage);
-                
-                if (!empty($contentWords)) {
-                    // Tìm kết quả có từ khóa nội dung trùng khớp
-                    foreach ($results as $r) {
-                        $questionLower = mb_strtolower($r['question_text']);
-                        foreach ($contentWords as $word) {
-                            if (mb_strpos($questionLower, $word) !== false) {
-                                return $r;
-                            }
-                        }
-                    }
-                    // Không có kết quả nào khớp từ chủ đề → bỏ qua FULLTEXT
-                } else {
-                    // Không có từ nội dung đặc biệt → dùng kết quả relevance cao nhất
-                    return $results[0];
-                }
+            if ($result) {
+                return $result;
             }
         }
 
-        // 3a. Tìm bằng từ khóa ngắn (< 3 ký tự) - chỉ khớp khi tin nhắn ngắn trùng chính xác
-        if ($messageLength <= 5) {
-            $sql = "SELECT q.*, k.keyword FROM {$this->table} q
-                    INNER JOIN keywords k ON q.id = k.question_id
-                    WHERE q.is_active = 1
-                    AND CHAR_LENGTH(k.keyword) < 3
-                    AND LOWER(TRIM(?)) = LOWER(TRIM(k.keyword))
+        // 4. Tìm bằng LIKE - chỉ khi tin nhắn đủ dài (>= 20 ký tự) để tránh match quá rộng
+        if ($messageLength >= 20) {
+            $sql = "SELECT * FROM {$this->table} 
+                    WHERE is_active = 1 AND (
+                        LOWER(question_text) LIKE CONCAT('%', LOWER(?), '%')
+                    )
                     LIMIT 1";
             $stmt = $this->db->prepare($sql);
             $stmt->execute([$userMessage]);
@@ -95,41 +105,89 @@ class QuestionModel extends BaseModel
             }
         }
 
-        // 3b. Tìm bằng từ khóa dài (>= 3 ký tự) - khớp substring (cả tiếng Việt và tiếng Anh)
-        $sql = "SELECT q.*, k.keyword, k.language FROM {$this->table} q
-                INNER JOIN keywords k ON q.id = k.question_id
-                WHERE q.is_active = 1 
-                AND CHAR_LENGTH(k.keyword) >= 3
-                AND LOWER(?) LIKE CONCAT('%', LOWER(k.keyword), '%')
-                ORDER BY k.is_auto ASC, CHAR_LENGTH(k.keyword) DESC
-                LIMIT 1";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$userMessage]);
-        $result = $stmt->fetch();
+        // Không tìm thấy câu trả lời phù hợp
+        return false;
+    }
 
-        if ($result) {
-            return $result;
+    /**
+     * Trích xuất các từ khóa chính từ câu hỏi (loại bỏ stop words)
+     */
+    private function extractKeywordsFromMessage(string $message): array
+    {
+        $stopWords = [
+            // Từ hỏi
+            'gì', 'nào', 'đâu', 'sao', 'không', 'có', 'bao', 'nhiêu', 'mấy',
+            'thế', 'làm', 'bằng',
+            // Từ nối / chức năng
+            'là', 'và', 'của', 'cho', 'với', 'trong', 'ngoài', 'trên', 'dưới',
+            'từ', 'đến', 'được', 'bị', 'để', 'rằng', 'mà', 'thì', 'cũng',
+            'đã', 'sẽ', 'đang', 'vẫn', 'còn', 'nếu', 'khi', 'hay', 'hoặc',
+            'này', 'kia', 'đó', 'ấy', 'nọ',
+            // Đại từ
+            'tôi', 'mình', 'bạn', 'em', 'anh', 'chị',
+            // Từ phổ biến khác
+            'các', 'những', 'một', 'hai', 'ba', 'mỗi', 'tất', 'cả',
+            'rất', 'quá', 'lắm', 'nhất', 'hơn',
+            'xin', 'vui', 'lòng', 'ơi', 'nhé', 'nha', 'ạ', 'hả',
+            'muốn', 'cần', 'phải', 'nên', 'thể',
+            'hỏi', 'biết', 'hãy',
+        ];
+
+        $message = mb_strtolower(trim($message));
+        // Loại bỏ dấu câu
+        $message = preg_replace('/[?!.,;:]+/u', '', $message);
+
+        // Tách từ
+        $words = preg_split('/\s+/u', $message);
+
+        $keywords = [];
+        foreach ($words as $word) {
+            $word = trim($word);
+            if (mb_strlen($word) < 2) continue;
+            if (in_array($word, $stopWords)) continue;
+            $keywords[] = $word;
         }
 
-        // 4. Tìm bằng LIKE - chỉ khi tin nhắn đủ dài (>= 6 ký tự) để tránh match quá rộng
-        if ($messageLength >= 6) {
+        return $keywords;
+    }
+
+    /**
+     * Tìm các câu hỏi liên quan (dùng khi câu hỏi quá vắng tắt)
+     * Trả về danh sách câu hỏi để người dùng chọn
+     * Không duyệt từ khóa để tránh match nhầm
+     */
+    public function findRelatedQuestions($userMessage, $limit = 20)
+    {
+        $messageLength = mb_strlen(trim($userMessage));
+        $results = [];
+
+        // 1. Tìm bằng FULLTEXT (nếu đủ dài) - ngưỡng thấp hơn để linh hoạt hơn
+        if ($messageLength >= 3) {
+            $sql = "SELECT q.*, MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE) as relevance
+                    FROM {$this->table} q 
+                    WHERE q.is_active = 1 
+                    AND MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE)
+                    HAVING relevance > 0.1
+                    ORDER BY relevance DESC 
+                    LIMIT ?";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$userMessage, $userMessage, $limit]);
+            $results = $stmt->fetchAll();
+        }
+
+        // 2. Nếu không có kết quả FULLTEXT, tìm bằng LIKE rộng hơn
+        if (empty($results) && $messageLength >= 3) {
             $sql = "SELECT * FROM {$this->table} 
                     WHERE is_active = 1 AND (
                         LOWER(question_text) LIKE CONCAT('%', LOWER(?), '%')
-                        OR LOWER(?) LIKE CONCAT('%', LOWER(question_text), '%')
                     )
-                    LIMIT 1";
+                    LIMIT ?";
             $stmt = $this->db->prepare($sql);
-            $stmt->execute([$userMessage, $userMessage]);
-            $result = $stmt->fetch();
-
-            if ($result) {
-                return $result;
-            }
+            $stmt->execute([$userMessage, $limit]);
+            $results = $stmt->fetchAll();
         }
 
-        // Không tìm thấy câu trả lời phù hợp
-        return false;
+        return $results;
     }
 
     /**

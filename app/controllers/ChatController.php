@@ -73,12 +73,18 @@ class ChatController extends BaseController
         // Lưu tin nhắn người dùng
         $this->chatModel->saveMessage($session['id'], 'user', $message);
 
+        // Kiểm tra xem câu hỏi có liên quan đến thư viện không
+        $isRelevant = $this->isLibraryRelated($message);
+
         // Tìm câu trả lời
         $answer = $this->questionModel->findAnswer($message);
         $settings = $this->settingModel->getPublicSettings();
 
         // Tìm biểu mẫu liên quan
         $matchedForms = $this->formModel->findMatchingForms($message);
+
+        // Biến để lưu danh sách câu hỏi gợi ý (nếu câu hỏi vắng tắt)
+        $relatedQuestions = [];
 
         if ($answer) {
             // Use English answer if lang=en and answer_text_en is available
@@ -98,21 +104,44 @@ class ChatController extends BaseController
                 : 'Dưới đây là biểu mẫu / giấy tờ liên quan đến yêu cầu của bạn. Vui lòng nhấn vào link để tải về hoặc điền thông tin:';
             $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
         } else {
-            if ($lang === 'en') {
-                $botReply = "Sorry, I couldn't find an answer to your question. 😊\n\nYou can try:\n📌 Rephrasing your question\n📌 Browsing the categories on the left\n📌 Contacting us directly:\n📧 Email: trungtamhoclieu@tvu.edu.vn\n📞 Phone: 0294 3855 246 (ext. 142)\n\nWe're happy to help!";
+            // Kiểm tra độ liên quan trước khi tìm related questions
+            if (!$isRelevant) {
+                // Câu hỏi không liên quan đến thư viện
+                $botReply = $lang === 'en'
+                    ? "Hi there! 😊 I'm the CELRAS TVU Library chatbot, so I can only help with questions about the library.\n\nI can assist you with:\n📚 Library services and hours\n📖 Borrowing and returning books\n🏢 Library facilities and locations\n📋 Forms and procedures\n\nFeel free to ask me anything about the library!"
+                    : "Xin chào bạn! 😊 Mình là chatbot của Trung tâm Học liệu CELRAS TVU, nên mình chỉ có thể hỗ trợ các câu hỏi liên quan đến thư viện thôi nhé.\n\nMình có thể giúp bạn về:\n📚 Dịch vụ và giờ mở cửa thư viện\n📖 Mượn và trả sách\n🏢 Cơ sở vật chất và vị trí các phòng\n📋 Biểu mẫu và thủ tục\n\nHãy hỏi mình bất cứ điều gì về thư viện nhé!";
+                $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
+                $this->chatModel->saveUnanswered($session['id'], $message);
             } else {
-                $botReply = $settings['no_answer_message'];
+                // Không tìm thấy câu trả lời chính xác → tìm câu hỏi liên quan
+                $relatedQuestions = $this->questionModel->findRelatedQuestions($message, 20);
+
+                if (!empty($relatedQuestions)) {
+                    // Có câu hỏi liên quan → đưa ra để người dùng chọn
+                    $botReply = $lang === 'en'
+                        ? "I couldn't find an exact answer. Here are some related questions you might be interested in:"
+                        : "Mình không tìm thấy câu trả lời chính xác. Dưới đây là một số câu hỏi liên quan bạn có thể quan tâm:";
+                    $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
+                } else {
+                    // Không có câu hỏi liên quan → thông báo không tìm thấy
+                    if ($lang === 'en') {
+                        $botReply = "Sorry, I couldn't find an answer to your question. 😊\n\nYou can try:\n📌 Rephrasing your question\n📌 Browsing the categories on the left\n📌 Contacting us directly:\n📧 Email: trungtamhoclieu@tvu.edu.vn\n📞 Phone: 0294 3855 246 (ext. 142)\n\nWe're happy to help!";
+                    } else {
+                        $botReply = $settings['no_answer_message'];
+                    }
+                    $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
+                    $this->chatModel->saveUnanswered($session['id'], $message);
+                }
             }
-            $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
-            $this->chatModel->saveUnanswered($session['id'], $message);
         }
 
         $this->json([
-            'success'       => true,
-            'reply'         => $botReply,
-            'forms'         => $matchedForms,
-            'session_token' => $session['session_token'],
-            'matched'       => ($answer || !empty($matchedForms)) ? true : false,
+            'success'          => true,
+            'reply'            => $botReply,
+            'forms'            => $matchedForms,
+            'related_questions' => $relatedQuestions,
+            'session_token'    => $session['session_token'],
+            'matched'          => ($answer || !empty($matchedForms)) ? true : false,
         ]);
     }
 
@@ -211,5 +240,60 @@ class ChatController extends BaseController
         }
 
         return $answer;
+    }
+
+    /**
+     * Kiểm tra xem câu hỏi có liên quan đến thư viện không
+     * Dựa trên các từ khóa chủ đề của thư viện
+     */
+    private function isLibraryRelated(string $message): bool
+    {
+        $messageLower = mb_strtolower($message);
+
+        // Danh sách từ khóa liên quan đến thư viện
+        $libraryKeywords = [
+            // Từ khóa chính
+            'thư viện', 'library', 'học liệu', 'celras', 'tvu',
+            
+            // Dịch vụ
+            'sách', 'book', 'mượn', 'trả', 'borrow', 'return', 'gia hạn', 'renew',
+            'đọc', 'read', 'tài liệu', 'document', 'giáo trình', 'luận văn', 'thesis',
+            
+            // Địa điểm
+            'phòng', 'room', 'tầng', 'floor', 'khu', 'area', 'vị trí', 'location',
+            'đâu', 'where', 'nằm', 'ở đâu',
+            
+            // Thời gian
+            'giờ', 'hour', 'mở cửa', 'đóng cửa', 'open', 'close', 'thời gian',
+            
+            // Thủ tục
+            'đăng ký', 'register', 'thẻ', 'card', 'biểu mẫu', 'form', 'hồ sơ',
+            'thủ tục', 'procedure', 'quy định', 'regulation', 'quy trình',
+            
+            // Cơ sở vật chất
+            'máy tính', 'computer', 'wifi', 'internet', 'in ấn', 'print',
+            'photocopy', 'scan', 'thiết bị', 'equipment',
+            
+            // Dịch vụ khác
+            'hỗ trợ', 'support', 'tư vấn', 'consult', 'hướng dẫn', 'guide',
+            'tìm kiếm', 'search', 'tra cứu', 'lookup',
+            
+            // Người dùng
+            'sinh viên', 'student', 'giảng viên', 'teacher', 'lecturer',
+            
+            // Các phòng cụ thể
+            'nội sinh', 'ngoại sinh', 'tự học', 'nghiên cứu', 'đọc báo',
+            'multimedia', 'kho', 'lưu trữ',
+        ];
+
+        // Kiểm tra xem có từ khóa nào xuất hiện trong câu hỏi không
+        foreach ($libraryKeywords as $keyword) {
+            if (mb_strpos($messageLower, $keyword) !== false) {
+                return true;
+            }
+        }
+
+        // Nếu không có từ khóa nào → không liên quan
+        return false;
     }
 }
