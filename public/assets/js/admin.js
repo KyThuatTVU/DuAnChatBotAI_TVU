@@ -644,6 +644,12 @@ async function loadAdminPage(pageName) {
     // Check auth (redirect về login nếu chưa đăng nhập)
     const admin = await checkAuth();
     if (!admin) return;
+    window.currentAdmin = admin;
+
+    const isAccountManager = admin.role === 'admin' || admin.role === 'super_admin';
+    document.querySelectorAll('.nav-admin-only').forEach(el => {
+        el.style.display = isAccountManager ? '' : 'none';
+    });
 
     // Điền thông tin admin vào header
     const fallbackAvatar = '/DuAnChatbotThuVien/public/assets/images/US.jpg';
@@ -664,6 +670,8 @@ async function loadAdminPage(pageName) {
     if (typeof AdminSPA !== 'undefined' && !AdminSPA.initialized) {
         AdminSPA.init();
     }
+
+    return admin;
 }
 
 // ==================== DASHBOARD ====================
@@ -673,11 +681,15 @@ async function loadDashboardStats() {
         const res = await fetch(`${ADMIN_API}/admin/dashboard`);
         const data = await res.json();
         if (data.stats) {
-            document.getElementById('statQuestions').textContent = data.stats.total_questions || 0;
-            document.getElementById('statCategories').textContent = data.stats.total_categories || 0;
-            document.getElementById('statSessions').textContent = data.stats.total_sessions || 0;
-            document.getElementById('statUnanswered').textContent = data.stats.unanswered_count || 0;
-            document.getElementById('statMessages').textContent = data.stats.total_messages || 0;
+            const setText = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = value;
+            };
+            setText('statQuestions', data.stats.total_questions || 0);
+            setText('statCategories', data.stats.total_categories || 0);
+            setText('statSessions', data.stats.total_sessions || 0);
+            setText('statUnanswered', data.stats.unanswered_count || 0);
+            setText('statMessages', data.stats.total_messages || 0);
         }
     } catch (e) {
         console.error('Failed to load dashboard stats:', e);
@@ -1734,6 +1746,186 @@ async function deleteUnanswered(btn) {
     }
 }
 
+// ==================== ADMIN ACCOUNTS ====================
+
+async function loadAdminAccounts() {
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/admins`);
+        const data = await res.json();
+        if (data.error) {
+            showAdminMsg(data.error, true);
+            return;
+        }
+        renderAdminAccounts(data.admins || []);
+    } catch (e) {
+        showAdminMsg('Lỗi kết nối server', true);
+    }
+}
+
+function renderAdminAccounts(admins) {
+    const tbody = document.getElementById('adminsBody');
+    if (!tbody) return;
+    if (!admins.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-gray-400">Chưa có tài khoản nào.</td></tr>';
+        return;
+    }
+
+    const currentId = window.currentAdmin?.id;
+    tbody.innerHTML = admins.map((a, i) => {
+        const isSelf = currentId && Number(currentId) === Number(a.id);
+        const roleLabel = a.role === 'super_admin' ? 'Super Admin' : (a.role === 'admin' ? 'Quản trị viên' : 'Nhân viên');
+        const statusLabel = a.is_active ? 'Hoạt động' : 'Tạm khóa';
+        const statusClass = a.is_active ? 'badge badge-success' : 'badge badge-danger';
+        const lastLogin = a.last_login ? new Date(a.last_login).toLocaleString('vi-VN') : '—';
+        return `
+            <tr>
+                <td data-label="#" class="text-gray-500">${i + 1}</td>
+                <td data-label="Email" class="text-gray-800 break-all">${escapeHtml(a.email)}</td>
+                <td data-label="Họ tên" class="text-gray-800">${escapeHtml(a.full_name)}</td>
+                <td data-label="Vai trò"><span class="badge badge-info">${roleLabel}</span></td>
+                <td data-label="Trạng thái"><span class="${statusClass}">${statusLabel}</span></td>
+                <td data-label="Đăng nhập" class="text-gray-500 text-xs">${lastLogin}</td>
+                <td data-label="Thao tác">
+                    <div class="flex items-center gap-2">
+                        <button onclick="toggleAdminActive(${a.id}, ${a.is_active ? 1 : 0})" class="text-amber-600 hover:text-amber-800 ${isSelf ? 'opacity-40 cursor-not-allowed' : ''}" ${isSelf ? 'disabled' : ''} title="${a.is_active ? 'Vô hiệu hóa' : 'Kích hoạt'}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12A9 9 0 113 12a9 9 0 0118 0z"/></svg>
+                        </button>
+                        <button onclick="generateAdminResetLink(${a.id})" class="text-indigo-600 hover:text-indigo-800" title="Tạo link đặt lại mật khẩu">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1-1m-1-4a4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1 1"/></svg>
+                        </button>
+                        <button onclick="resetAdminPassword(${a.id})" class="text-sky-600 hover:text-sky-800" title="Đặt mật khẩu trực tiếp">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 00-8 0v4M5 11h14v8H5z"/></svg>
+                        </button>
+                        <button onclick="deleteAdminAccount(${a.id})" class="text-red-500 hover:text-red-700 ${isSelf ? 'opacity-40 cursor-not-allowed' : ''}" ${isSelf ? 'disabled' : ''} title="Xóa tài khoản">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function createAdminAccount(event) {
+    event.preventDefault();
+    const email = document.getElementById('adminEmail')?.value.trim();
+    const name = document.getElementById('adminName')?.value.trim();
+    const password = document.getElementById('adminPassword')?.value;
+
+    if (!email || !name || !password) {
+        showAdminMsg('Vui lòng nhập đầy đủ thông tin', true);
+        return;
+    }
+
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/admins`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, full_name: name, password }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            showAdminMsg('Tạo tài khoản thành công', false);
+            document.getElementById('adminEmail').value = '';
+            document.getElementById('adminName').value = '';
+            document.getElementById('adminPassword').value = '';
+            loadAdminAccounts();
+        } else {
+            showAdminMsg(data.error || 'Không thể tạo tài khoản', true);
+        }
+    } catch (e) {
+        showAdminMsg('Lỗi kết nối server', true);
+    }
+}
+
+async function toggleAdminActive(id, isActive) {
+    if (!confirm(isActive ? 'Vô hiệu hóa tài khoản này?' : 'Kích hoạt tài khoản này?')) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/admin/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_active: isActive ? 0 : 1 }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            loadAdminAccounts();
+        } else {
+            showAdminMsg(data.error || 'Không thể cập nhật trạng thái', true);
+        }
+    } catch (e) {
+        showAdminMsg('Lỗi kết nối server', true);
+    }
+}
+
+async function generateAdminResetLink(id) {
+    if (!confirm('Tạo link đặt lại mật khẩu cho tài khoản này?')) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/adminResetLink/${id}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success && data.reset_link) {
+            try {
+                await navigator.clipboard.writeText(data.reset_link);
+                showAdminMsg('Đã tạo link reset và sao chép vào clipboard.', false);
+            } catch (e) {
+                showAdminMsg('Đã tạo link reset. Hãy sao chép từ hộp thoại.', false);
+            }
+            window.prompt('Link đặt lại mật khẩu (hiệu lực 30 phút):', data.reset_link);
+        } else {
+            showAdminMsg(data.error || 'Không thể tạo link reset', true);
+        }
+    } catch (e) {
+        showAdminMsg('Lỗi kết nối server', true);
+    }
+}
+
+async function resetAdminPassword(id) {
+    const newPwd = prompt('Nhập mật khẩu mới (tối thiểu 6 ký tự):');
+    if (!newPwd) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/admin/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: newPwd }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            showAdminMsg('Đã cập nhật mật khẩu', false);
+        } else {
+            showAdminMsg(data.error || 'Không thể cập nhật mật khẩu', true);
+        }
+    } catch (e) {
+        showAdminMsg('Lỗi kết nối server', true);
+    }
+}
+
+async function deleteAdminAccount(id) {
+    if (!confirm('Xóa tài khoản này?')) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/admin/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+            loadAdminAccounts();
+        } else {
+            showAdminMsg(data.error || 'Không thể xóa tài khoản', true);
+        }
+    } catch (e) {
+        showAdminMsg('Lỗi kết nối server', true);
+    }
+}
+
+function showAdminMsg(message, isError) {
+    const el = document.getElementById('adminMsg');
+    if (!el) return;
+    el.textContent = message;
+    el.classList.remove('hidden');
+    el.classList.toggle('text-red-700', !!isError);
+    el.classList.toggle('border-red-200', !!isError);
+    el.classList.toggle('bg-red-50', !!isError);
+    el.classList.toggle('text-green-700', !isError);
+    el.classList.toggle('border-green-200', !isError);
+    el.classList.toggle('bg-green-50', !isError);
+}
+
 // ==================== HELPERS ====================
 
 // ==================== FORMS (BIỂU MẪU / GIẤY TỜ) ====================
@@ -1895,6 +2087,14 @@ window.closeFormModal = closeFormModal;
 window.editForm       = editForm;
 window.saveForm       = saveForm;
 window.deleteForm     = deleteForm;
+
+// ==================== ADMIN ACCOUNTS (window) ====================
+window.loadAdminAccounts  = loadAdminAccounts;
+window.createAdminAccount = createAdminAccount;
+window.toggleAdminActive  = toggleAdminActive;
+window.generateAdminResetLink = generateAdminResetLink;
+window.resetAdminPassword = resetAdminPassword;
+window.deleteAdminAccount = deleteAdminAccount;
 
 // ==================== CATEGORIES (window) ====================
 window.loadCategories      = loadCategories;

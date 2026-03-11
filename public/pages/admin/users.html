@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chưa trả lời - CELRAS TVU Admin</title>
+    <title>Tài khoản - CELRAS TVU Admin</title>
     <link rel="icon" type="image/png" href="/DuAnChatbotThuVien/public/assets/images/logo2.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -18,16 +18,10 @@
         .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:35;backdrop-filter:blur(4px)}
         .sidebar-overlay.active{display:block}
         .mobile-topbar{display:none}
-        .data-table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
-        .data-table thead th{padding:14px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;border-bottom:2px solid #e2e8f0;letter-spacing:.05em;background:linear-gradient(180deg,#f8fafc,#f1f5f9)}
-        .data-table tbody tr{transition:all .15s}
-        .data-table tbody tr:hover{background:#f0f9ff}
-        .data-table tbody td{padding:14px 16px;color:#374151;vertical-align:top;border-bottom:1px solid #f1f5f9}
-        .badge{display:inline-flex;align-items:center;padding:4px 12px;border-radius:9999px;font-size:12px;font-weight:600}
-        .badge-green,.badge-success{background:#dcfce7;color:#15803d}
-        .badge-yellow,.badge-warning{background:#fef9c3;color:#a16207}
-        .badge-red,.badge-danger{background:#fee2e2;color:#dc2626}
-        .badge-blue,.badge-info{background:#dbeafe;color:#1d4ed8}
+        .form-group{margin-bottom:12px}
+        .form-group label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px}
+        .form-group input{display:block;width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:12px;font-size:14px;color:#111827;background:#fafbfc;outline:none;transition:all .2s;font-family:inherit}
+        .form-group input:focus{border-color:#0ea5e9;box-shadow:0 0 0 4px rgba(14,165,233,.1);background:#fff}
         @media(max-width:768px){
             .admin-sidebar{transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1)}
             .admin-sidebar.open{transform:translateX(0)}
@@ -49,7 +43,7 @@
             <button onclick="toggleSidebar()" class="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-100 transition-colors text-gray-600">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
-            <span class="font-bold text-gray-800 text-sm truncate">Chưa trả lời</span>
+            <span class="font-bold text-gray-800 text-sm truncate">Tài khoản</span>
         </div>
         <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
@@ -68,8 +62,8 @@
                 <a href="datasets.html" class="nav-item" data-page="datasets"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>Tải dữ liệu</a>
                 <a href="forms.html" class="nav-item" data-page="forms"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Biểu mẫu / Giấy tờ</a>
                 <a href="settings.html" class="nav-item" data-page="settings"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Cài đặt giao diện</a>
-                <a href="unanswered.html" class="nav-item active" data-page="unanswered"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>Chưa trả lời</a>
-                <a href="users.html" class="nav-item nav-admin-only" data-page="users"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-4-4h-3m-4 6H2v-2a4 4 0 014-4h3m2-4a4 4 0 10-8 0 4 4 0 008 0zm6 0a3 3 0 10-6 0 3 3 0 006 0z"/></svg>Tài khoản</a>
+                <a href="unanswered.html" class="nav-item" data-page="unanswered"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>Chưa trả lời</a>
+                <a href="users.html" class="nav-item nav-admin-only active" data-page="users"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-4-4h-3m-4 6H2v-2a4 4 0 014-4h3m2-4a4 4 0 10-8 0 4 4 0 008 0zm6 0a3 3 0 10-6 0 3 3 0 006 0z"/></svg>Tài khoản</a>
             </nav>
             <div class="px-5 py-3.5 border-t border-white/10">
                 <div class="flex items-center gap-3">
@@ -88,40 +82,66 @@
             <!-- Header -->
             <div class="admin-header flex items-center justify-between mb-8">
                 <div>
-                    <h1 class="text-2xl font-extrabold text-gray-900">Câu hỏi chưa trả lời</h1>
-                    <p class="text-sm text-gray-500 mt-1">Danh sách câu hỏi mà chatbot chưa có câu trả lời phù hợp</p>
+                    <h1 class="text-2xl font-extrabold text-gray-900">Tài khoản</h1>
+                    <p class="text-sm text-gray-500 mt-1">Thêm tài khoản Google và cấp mật khẩu cho người dùng</p>
                 </div>
             </div>
 
-            <!-- Info Banner -->
-            <div class="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-2xl border border-amber-200/60 p-5 mb-6 flex items-start gap-3">
-                <div class="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md shadow-amber-500/20">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-                </div>
-                <div>
-                    <p class="text-sm font-semibold text-gray-800 mb-0.5">Lưu ý</p>
-                    <p class="text-xs text-gray-600 leading-relaxed">Đây là các câu hỏi mà người dùng đã hỏi nhưng chatbot không tìm được câu trả lời phù hợp. Bạn nên <strong>tạo câu trả lời</strong> cho các câu hỏi này để cải thiện chatbot.</p>
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-lg overflow-hidden mb-6">
+                <div class="h-1 bg-gradient-to-r from-sky-400 to-blue-600"></div>
+                <div class="p-6">
+                    <h2 class="text-lg font-bold text-gray-900 mb-2">Thêm tài khoản</h2>
+                    <p class="text-xs text-gray-500 mb-4">Khi người dùng quên mật khẩu, bạn có thể tạo link đặt lại từ danh sách bên dưới.</p>
+                    <div id="adminMsg" class="hidden text-sm px-4 py-3 rounded-xl mb-4 border"></div>
+                    <form onsubmit="createAdminAccount(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="form-group">
+                            <label>Email <span class="text-red-500">*</span></label>
+                            <input type="email" id="adminEmail" placeholder="tennguoidung@gmail.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Họ tên <span class="text-red-500">*</span></label>
+                            <input type="text" id="adminName" placeholder="Nguyễn Văn A" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Mật khẩu <span class="text-red-500">*</span></label>
+                            <input type="password" id="adminPassword" placeholder="Ít nhất 6 ký tự" minlength="6" required>
+                        </div>
+                        <div class="md:col-span-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
+                            <p class="text-xs text-amber-700 leading-relaxed">Tài khoản được tạo có quyền thao tác như admin nhưng không quản lý tài khoản.</p>
+                            <button type="submit" class="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500 to-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-sky-500/25 hover:shadow-xl transition-all duration-300 w-full sm:w-auto">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                Tạo tài khoản
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
-            <!-- Unanswered Table -->
             <div class="bg-white rounded-2xl border border-gray-100 shadow-lg overflow-hidden">
-                <div class="h-1 bg-gradient-to-r from-amber-400 to-orange-500"></div>
-                <div class="overflow-x-auto">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th class="w-8">#</th>
-                                <th>Câu hỏi</th>
-                                <th>Số lần hỏi</th>
-                                <th>Lần cuối hỏi</th>
-                                <th class="w-28 text-center">Thao tác</th>
-                            </tr>
-                        </thead>
-                        <tbody id="unansweredBody">
-                            <tr><td colspan="5" class="text-center py-12 text-gray-400"><div class="flex flex-col items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span>Tuyệt vời! Không có câu hỏi nào chưa trả lời 🎉</span></div></td></tr>
-                        </tbody>
-                    </table>
+                <div class="h-1 bg-gradient-to-r from-emerald-400 to-green-500"></div>
+                <div class="p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-bold text-gray-900">Danh sách tài khoản</h2>
+                        <button onclick="loadAdminAccounts()" class="text-sm text-sky-600 hover:text-sky-800 font-semibold">Làm mới</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm data-table">
+                            <thead class="text-gray-500 border-b border-gray-100">
+                                <tr>
+                                    <th class="text-left py-2 pr-3">#</th>
+                                    <th class="text-left py-2 pr-3">Email</th>
+                                    <th class="text-left py-2 pr-3">Họ tên</th>
+                                    <th class="text-left py-2 pr-3">Vai trò</th>
+                                    <th class="text-left py-2 pr-3">Trạng thái</th>
+                                    <th class="text-left py-2 pr-3">Đăng nhập</th>
+                                    <th class="text-left py-2 pr-3">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminsBody">
+                                <tr><td colspan="7" class="py-8 text-center text-gray-400">Đang tải...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -131,8 +151,14 @@
     <script src="/DuAnChatbotThuVien/public/assets/js/admin.js?v=20260310"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            await loadAdminPage('unanswered');
-            loadUnanswered();
+            const admin = await loadAdminPage('users');
+            if (!admin) return;
+            const isAccountManager = admin.role === 'admin' || admin.role === 'super_admin';
+            if (!isAccountManager) {
+                window.location.href = '/DuAnChatbotThuVien/public/pages/admin/dashboard.html';
+                return;
+            }
+            loadAdminAccounts();
         });
     </script>
 </body>

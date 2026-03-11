@@ -117,7 +117,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                 </div>
                 <h2 class="text-xl font-bold text-gray-800">Quên mật khẩu</h2>
-                <p class="text-sm text-gray-500 text-center mt-1">Nhập email để nhận link đặt lại mật khẩu</p>
+                <p class="text-sm text-gray-500 text-center mt-1">Nhập email để nhận link đặt lại mật khẩu. Nếu không nhận được, vui lòng liên hệ quản trị để cấp link.</p>
             </div>
 
             <div id="forgotMessage" class="hidden text-sm p-3 rounded-lg mb-4 border"></div>
@@ -362,6 +362,7 @@
                     'token_failed': 'Không thể lấy token từ Google. Vui lòng thử lại.',
                     'user_info_failed': 'Không thể lấy thông tin người dùng từ Google.',
                     'inactive': 'Tài khoản của bạn đã bị vô hiệu hóa.',
+                    'not_allowed': 'Tài khoản chưa được phân quyền truy cập. Vui lòng liên hệ quản trị.',
                 };
                 showMsg('loginMessage', errorMessages[error] || 'Đã có lỗi xảy ra.');
             }
