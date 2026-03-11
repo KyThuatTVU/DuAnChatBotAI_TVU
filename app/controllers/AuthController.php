@@ -64,6 +64,10 @@ class AuthController extends BaseController
             'full_name' => $userInfo['name'],
             'avatar_url' => $avatarUrl,
         ]);
+        if (!$adminId) {
+            header('Location: ' . FRONTEND_URL . '/login.html?error=not_allowed');
+            exit;
+        }
 
         // Check if admin is active
         $admin = $this->adminModel->getById($adminId);

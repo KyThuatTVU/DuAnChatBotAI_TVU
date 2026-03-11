@@ -41,15 +41,31 @@ class AdminModel extends BaseModel
             return $existing['id'];
         }
 
-        return $this->create([
-            'google_id' => $googleData['google_id'],
-            'email' => $googleData['email'],
-            'full_name' => $googleData['full_name'],
-            'avatar_url' => $googleData['avatar_url'],
-            'role' => 'admin',
-            'is_active' => 1,
-            'last_login' => date('Y-m-d H:i:s'),
-        ]);
+        // Chỉ cho phép Google login nếu email đã được phân quyền sẵn
+        $existingByEmail = $this->findByEmail($googleData['email']);
+        if ($existingByEmail) {
+            $this->update($existingByEmail['id'], [
+                'google_id' => $googleData['google_id'],
+                'full_name' => $googleData['full_name'],
+                'avatar_url' => $googleData['avatar_url'],
+                'last_login' => date('Y-m-d H:i:s'),
+            ]);
+            return $existingByEmail['id'];
+        }
+
+        return null;
+    }
+
+    /**
+     * Lấy danh sách admin (ẩn thông tin nhạy cảm)
+     */
+    public function getAllSafe()
+    {
+        $sql = "SELECT id, google_id, email, full_name, avatar_url, role, is_active, last_login, created_at 
+                FROM {$this->table} ORDER BY id DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll();
     }
 
     /**

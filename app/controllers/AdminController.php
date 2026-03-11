@@ -8,6 +8,7 @@ class AdminController extends BaseController
     private $chatModel;
     private $settingModel;
     private $formModel;
+    private $adminModel;
 
     public function __construct()
     {
@@ -16,6 +17,20 @@ class AdminController extends BaseController
         $this->chatModel     = $this->model('ChatModel');
         $this->settingModel  = $this->model('SettingModel');
         $this->formModel     = $this->model('FormModel');
+        $this->adminModel    = $this->model('AdminModel');
+    }
+
+    /**
+     * Chỉ admin/super_admin mới được quản lý tài khoản
+     */
+    private function requireAccountManager()
+    {
+        $this->requireAuth();
+        $role = $_SESSION['admin_role'] ?? '';
+        if (!in_array($role, ['admin', 'super_admin'], true)) {
+            $this->json(['error' => 'Forbidden'], 403);
+        }
+        return $_SESSION['admin_id'];
     }
 
     /**
@@ -1462,5 +1477,162 @@ class AdminController extends BaseController
             'success' => true,
             'message' => 'Đã thêm từ vào từ điển',
         ]);
+    }
+
+    // ==================== ADMIN ACCOUNTS ====================
+
+    /**
+     * GET /api/admin/admins - Danh sách tài khoản
+     * POST /api/admin/admins - Thêm tài khoản mới (role editor)
+     */
+    public function admins()
+    {
+        $this->requireAccountManager();
+
+        if ($this->getMethod() === 'POST') {
+            return $this->createAdminAccount();
+        }
+
+        $admins = $this->adminModel->getAllSafe();
+        $this->json(['admins' => $admins]);
+    }
+
+    /**
+     * PUT /api/admin/admin/{id} - Cập nhật tài khoản
+     * DELETE /api/admin/admin/{id} - Xóa tài khoản
+     */
+    public function admin($id = null)
+    {
+        $this->requireAccountManager();
+
+        $adminId = intval($id);
+        if (!$adminId) {
+            $this->json(['error' => 'ID không hợp lệ'], 400);
+        }
+
+        if ($this->getMethod() === 'PUT') {
+            return $this->updateAdminAccount($adminId);
+        }
+
+        if ($this->getMethod() === 'DELETE') {
+            return $this->deleteAdminAccount($adminId);
+        }
+
+        $this->json(['error' => 'Method not allowed'], 405);
+    }
+
+    private function createAdminAccount()
+    {
+        $input = $this->getJsonInput();
+        $email = trim($input['email'] ?? '');
+        $fullName = trim($input['full_name'] ?? '');
+        $password = $input['password'] ?? '';
+
+        if (empty($email) || empty($fullName) || empty($password)) {
+            $this->json(['error' => 'Vui lòng nhập đầy đủ email, họ tên và mật khẩu'], 400);
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->json(['error' => 'Email không hợp lệ'], 400);
+        }
+
+        if (strlen($password) < 6) {
+            $this->json(['error' => 'Mật khẩu phải có ít nhất 6 ký tự'], 400);
+        }
+
+        if ($this->adminModel->findByEmail($email)) {
+            $this->json(['error' => 'Email đã tồn tại trong hệ thống'], 409);
+        }
+
+        $hashed = password_hash($password, PASSWORD_DEFAULT);
+
+        $newId = $this->adminModel->create([
+            'google_id' => null,
+            'email' => $email,
+            'password' => $hashed,
+            'full_name' => sanitize($fullName),
+            'avatar_url' => null,
+            'role' => 'editor',
+            'is_active' => 1,
+            'last_login' => null,
+        ]);
+
+        $this->json(['success' => true, 'id' => $newId]);
+    }
+
+    private function updateAdminAccount(int $adminId)
+    {
+        $input = $this->getJsonInput();
+        $currentId = $_SESSION['admin_id'] ?? 0;
+
+        if ($adminId === $currentId && isset($input['is_active']) && !$input['is_active']) {
+            $this->json(['error' => 'Không thể vô hiệu hóa chính mình'], 400);
+        }
+
+        $update = [];
+        if (isset($input['full_name'])) {
+            $name = trim($input['full_name']);
+            if ($name !== '') {
+                $update['full_name'] = sanitize($name);
+            }
+        }
+        if (isset($input['is_active'])) {
+            $update['is_active'] = $input['is_active'] ? 1 : 0;
+        }
+
+        if (!empty($input['password'])) {
+            if (strlen($input['password']) < 6) {
+                $this->json(['error' => 'Mật khẩu phải có ít nhất 6 ký tự'], 400);
+            }
+            $update['password'] = password_hash($input['password'], PASSWORD_DEFAULT);
+        }
+
+        if (empty($update)) {
+            $this->json(['error' => 'Không có dữ liệu cần cập nhật'], 400);
+        }
+
+        $this->adminModel->update($adminId, $update);
+        $this->json(['success' => true]);
+    }
+
+    private function deleteAdminAccount(int $adminId)
+    {
+        $currentId = $_SESSION['admin_id'] ?? 0;
+        if ($adminId === $currentId) {
+            $this->json(['error' => 'Không thể xóa chính mình'], 400);
+        }
+
+        $this->adminModel->delete($adminId);
+        $this->json(['success' => true]);
+    }
+
+    /**
+     * POST /api/admin/adminResetLink/{id} - Tạo link đặt lại mật khẩu cho tài khoản
+     */
+    public function adminResetLink($id = null)
+    {
+        $this->requireAccountManager();
+
+        if ($this->getMethod() !== 'POST') {
+            $this->json(['error' => 'Method not allowed'], 405);
+        }
+
+        $adminId = intval($id);
+        if (!$adminId) {
+            $this->json(['error' => 'ID không hợp lệ'], 400);
+        }
+
+        $admin = $this->adminModel->getById($adminId);
+        if (!$admin) {
+            $this->json(['error' => 'Tài khoản không tồn tại'], 404);
+        }
+
+        $result = $this->adminModel->createResetToken($admin['email']);
+        if (!$result) {
+            $this->json(['error' => 'Không thể tạo link đặt lại mật khẩu'], 500);
+        }
+
+        $resetLink = FRONTEND_URL . '/login.html?reset_token=' . $result['token'];
+        $this->json(['success' => true, 'reset_link' => $resetLink]);
     }
 }

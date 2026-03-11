@@ -119,6 +119,9 @@ async function initChatbot() {
 
     // Khôi phục lịch sử trò chuyện từ phiên làm việc hiện tại
     ChatHistory.restore();
+
+    // Cập nhật trạng thái nút micro theo khả năng hỗ trợ
+    setupVoiceButtonSupport();
 }
 
 /**
@@ -693,17 +696,54 @@ async function logout() {
 let recognition = null;
 let isListening = false;
 
+function getSpeechRecognitionClass() {
+    return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function isSecureSpeechContext() {
+    if (window.isSecureContext) return true;
+    const host = window.location.hostname;
+    return host === 'localhost' || host === '127.0.0.1';
+}
+
+function setVoiceButtonDisabled(disabled, title) {
+    const voiceBtn = document.getElementById('voiceBtn');
+    if (!voiceBtn) return;
+
+    voiceBtn.disabled = !!disabled;
+    voiceBtn.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+
+    if (title) voiceBtn.title = title;
+    if (disabled) {
+        voiceBtn.style.opacity = '0.55';
+        voiceBtn.style.cursor = 'not-allowed';
+    } else {
+        voiceBtn.style.opacity = '';
+        voiceBtn.style.cursor = '';
+    }
+}
+
+function setupVoiceButtonSupport() {
+    const SpeechRecognition = getSpeechRecognitionClass();
+    if (!SpeechRecognition) {
+        const msg = typeof t === 'function' ? t('voice_not_supported') : 'Trình duyệt không hỗ trợ nhận diện giọng nói';
+        setVoiceButtonDisabled(true, msg);
+        return;
+    }
+    if (!isSecureSpeechContext()) {
+        const msg = typeof t === 'function' ? t('voice_requires_https') : 'Tìm kiếm giọng nói chỉ hoạt động trên HTTPS hoặc localhost.';
+        setVoiceButtonDisabled(true, msg);
+        return;
+    }
+    setVoiceButtonDisabled(false);
+}
+
 /**
  * Khởi tạo Speech Recognition API
  */
-function initSpeechRecognition() {
-    // Check browser support
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (!SpeechRecognition) {
-        console.warn('Speech Recognition API not supported');
-        return null;
-    }
+function initSpeechRecognition(SpeechRecognitionClass) {
+    const SpeechRecognition = SpeechRecognitionClass || getSpeechRecognitionClass();
+    if (!SpeechRecognition) return null;
 
     recognition = new SpeechRecognition();
     
@@ -754,10 +794,22 @@ function initSpeechRecognition() {
         
         if (event.error === 'no-speech') {
             errorMsg = typeof t === 'function' ? t('voice_no_speech') : 'Không nhận được giọng nói. Vui lòng thử lại.';
-        } else if (event.error === 'not-allowed') {
-            errorMsg = typeof t === 'function' 
-                ? 'Microphone access denied. Please allow microphone permission.' 
-                : 'Quyền truy cập microphone bị từ chối. Vui lòng cho phép quyền truy cập.';
+        } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            if (!isSecureSpeechContext()) {
+                errorMsg = typeof t === 'function' ? t('voice_requires_https') : 'Tìm kiếm giọng nói chỉ hoạt động trên HTTPS hoặc localhost.';
+            } else {
+                errorMsg = typeof t === 'function'
+                    ? t('voice_permission_denied')
+                    : 'Quyền truy cập microphone bị từ chối. Vui lòng cho phép quyền truy cập.';
+            }
+        } else if (event.error === 'audio-capture') {
+            errorMsg = typeof t === 'function'
+                ? t('voice_audio_capture')
+                : 'Không tìm thấy microphone. Vui lòng kiểm tra thiết bị.';
+        } else if (event.error === 'network') {
+            errorMsg = typeof t === 'function'
+                ? t('voice_network_error')
+                : 'Lỗi mạng khi nhận diện giọng nói. Vui lòng thử lại.';
         }
         
         // Hiển thị thông báo lỗi
@@ -787,16 +839,26 @@ function toggleVoiceInput() {
  * Bắt đầu nhận diện giọng nói
  */
 function startVoiceInput() {
-    // Khởi tạo recognition nếu chưa có
-    if (!recognition) {
-        recognition = initSpeechRecognition();
-    }
-
-    if (!recognition) {
+    const SpeechRecognition = getSpeechRecognitionClass();
+    if (!SpeechRecognition) {
         const msg = typeof t === 'function' ? t('voice_not_supported') : 'Trình duyệt không hỗ trợ nhận diện giọng nói';
         showVoiceError(msg);
+        setVoiceButtonDisabled(true, msg);
         return;
     }
+    if (!isSecureSpeechContext()) {
+        const msg = typeof t === 'function' ? t('voice_requires_https') : 'Tìm kiếm giọng nói chỉ hoạt động trên HTTPS hoặc localhost.';
+        showVoiceError(msg);
+        setVoiceButtonDisabled(true, msg);
+        return;
+    }
+
+    // Khởi tạo recognition nếu chưa có
+    if (!recognition) {
+        recognition = initSpeechRecognition(SpeechRecognition);
+    }
+
+    if (!recognition) return;
 
     // Cập nhật ngôn ngữ theo currentLang
     const lang = (typeof currentLang !== 'undefined' && currentLang === 'en') ? 'en-US' : 'vi-VN';
