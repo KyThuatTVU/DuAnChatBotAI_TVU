@@ -339,8 +339,33 @@ function _renderMessage(sender, text, forms = []) {
         ? "/DuAnChatbotThuVien/public/assets/images/logo1.png"
         : "/DuAnChatbotThuVien/public/assets/images/US.jpg";
 
-    // Render nội dung text (safe), giữ xuống dòng
-    const safeText = escapeHtml(text).replace(/\n/g, '<br>');
+    // Render nội dung text
+    let safeText;
+    if (sender === 'bot') {
+        // Bot message: kiểm tra xem có phải HTML từ Quill không
+        const hasHtmlTags = /<\/?[a-z][\s\S]*>/i.test(text);
+        
+        if (hasHtmlTags) {
+            // Có HTML tags → kiểm tra xem có formatting thực sự không
+            const hasFormatting = /<(strong|em|u|b|i|ul|ol|h1|h2|h3|blockquote|code)/.test(text);
+            
+            if (hasFormatting) {
+                // Có formatting thực sự → giữ HTML
+                safeText = text;
+            } else {
+                // Chỉ có <p> đơn giản → lấy text thuần
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = text;
+                safeText = tempDiv.textContent.replace(/\n/g, '<br>');
+            }
+        } else {
+            // Text thuần → giữ xuống dòng
+            safeText = escapeHtml(text).replace(/\n/g, '<br>');
+        }
+    } else {
+        // User message → luôn escape
+        safeText = escapeHtml(text).replace(/\n/g, '<br>');
+    }
 
     // Render form links nếu có
     let formsHtml = '';

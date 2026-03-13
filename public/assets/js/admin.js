@@ -701,6 +701,60 @@ async function loadDashboardStats() {
 // ==================== QUESTIONS ====================
 
 let allQuestions = [];
+let quillAnswerVi = null;
+let quillAnswerEn = null;
+
+// Khởi tạo Quill editors
+function initQuillEditors() {
+    if (!document.getElementById('answerTextEditor')) return;
+    
+    const toolbarOptions = [
+        ['bold', 'italic', 'underline', 'strike'],
+        ['blockquote', 'code-block'],
+        [{ 'header': 1 }, { 'header': 2 }],
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+        [{ 'indent': '-1'}, { 'indent': '+1' }],
+        [{ 'size': ['small', false, 'large', 'huge'] }],
+        [{ 'color': [] }, { 'background': [] }],
+        [{ 'align': [] }],
+        ['link'],
+        ['clean']
+    ];
+    
+    // Editor tiếng Việt
+    if (!quillAnswerVi) {
+        quillAnswerVi = new Quill('#answerTextEditor', {
+            theme: 'snow',
+            modules: {
+                toolbar: toolbarOptions
+            },
+            placeholder: 'Nhập câu trả lời tiếng Việt...'
+        });
+        
+        // Sync với textarea ẩn
+        quillAnswerVi.on('text-change', function() {
+            const html = quillAnswerVi.root.innerHTML;
+            document.getElementById('answerText').value = html === '<p><br></p>' ? '' : html;
+        });
+    }
+    
+    // Editor tiếng Anh
+    if (!quillAnswerEn) {
+        quillAnswerEn = new Quill('#answerTextEnEditor', {
+            theme: 'snow',
+            modules: {
+                toolbar: toolbarOptions
+            },
+            placeholder: 'Nhập câu trả lời tiếng Anh (nếu có)...'
+        });
+        
+        // Sync với textarea ẩn
+        quillAnswerEn.on('text-change', function() {
+            const html = quillAnswerEn.root.innerHTML;
+            document.getElementById('answerTextEn').value = html === '<p><br></p>' ? '' : html;
+        });
+    }
+}
 
 async function loadQuestions() {
     try {
@@ -770,9 +824,14 @@ function openAddModal(categoryId = null) {
     document.getElementById('modalTitle').textContent = 'Thêm câu hỏi mới';
     document.getElementById('questionId').value = '';
     document.getElementById('questionText').value = '';
-    document.getElementById('answerText').value = '';
-    document.getElementById('answerTextEn').value = '';
     document.getElementById('keywordsInput').value = '';
+    
+    // Khởi tạo Quill editors nếu chưa có
+    initQuillEditors();
+    
+    // Clear Quill editors
+    if (quillAnswerVi) quillAnswerVi.setContents([]);
+    if (quillAnswerEn) quillAnswerEn.setContents([]);
     
     // Nếu không truyền categoryId, kiểm tra filter danh mục hiện tại
     if (!categoryId) {
@@ -809,8 +868,20 @@ async function editQuestion(id) {
             document.getElementById('questionId').value = q.id;
             document.getElementById('questionCategory').value = q.category_id || '';
             document.getElementById('questionText').value = q.question_text;
-            document.getElementById('answerText').value = q.answer_text;
-            document.getElementById('answerTextEn').value = q.answer_text_en || '';
+            
+            // Khởi tạo Quill editors nếu chưa có
+            initQuillEditors();
+            
+            // Set nội dung cho Quill editors
+            if (quillAnswerVi) {
+                const answerHtml = q.answer_text || '';
+                quillAnswerVi.root.innerHTML = answerHtml;
+            }
+            if (quillAnswerEn) {
+                const answerEnHtml = q.answer_text_en || '';
+                quillAnswerEn.root.innerHTML = answerEnHtml;
+            }
+            
             document.getElementById('questionModal').classList.add('active');
             // Bắt đầu theo dõi thay đổi để lưu draft
             FormDraftManager.watchFields('question', QUESTION_DRAFT_FIELDS);
@@ -822,6 +893,17 @@ async function editQuestion(id) {
 
 async function saveQuestion(event) {
     event.preventDefault();
+    
+    // Sync Quill content to hidden textareas trước khi lấy giá trị
+    if (quillAnswerVi) {
+        const html = quillAnswerVi.root.innerHTML;
+        document.getElementById('answerText').value = html === '<p><br></p>' ? '' : html;
+    }
+    if (quillAnswerEn) {
+        const html = quillAnswerEn.root.innerHTML;
+        document.getElementById('answerTextEn').value = html === '<p><br></p>' ? '' : html;
+    }
+    
     const id = document.getElementById('questionId').value;
     const payload = {
         category_id: document.getElementById('questionCategory').value || null,
