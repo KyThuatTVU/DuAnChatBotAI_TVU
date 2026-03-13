@@ -348,6 +348,8 @@ const AdminSPA = {
             await loadCategoriesForSelect();
             await loadQuestions();
             PageStateManager.restoreAndWatch('questions', ['#searchInput', '#filterCategory', '#filterSource'], () => { try { filterQuestions(); } catch(e){} });
+            // Luôn gọi filterQuestions() để apply filter (hoặc hiển thị tất cả nếu không có filter)
+            filterQuestions();
             const _pq = sessionStorage.getItem('celras_pendingQuestion');
             if (_pq) {
                 sessionStorage.removeItem('celras_pendingQuestion');
@@ -705,7 +707,8 @@ async function loadQuestions() {
         const res = await fetch(`${ADMIN_API}/admin/questions`);
         const data = await res.json();
         allQuestions = data.questions || [];
-        renderQuestions(allQuestions);
+        // Không render ngay, để filterQuestions() xử lý
+        // renderQuestions(allQuestions);
     } catch (e) {
         console.error('Failed to load questions:', e);
     }
@@ -763,13 +766,28 @@ function filterQuestions() {
 
 const QUESTION_DRAFT_FIELDS = ['questionId', 'questionCategory', 'questionText', 'answerText', 'answerTextEn', 'keywordsInput'];
 
-function openAddModal() {
+function openAddModal(categoryId = null) {
     document.getElementById('modalTitle').textContent = 'Thêm câu hỏi mới';
     document.getElementById('questionId').value = '';
     document.getElementById('questionText').value = '';
     document.getElementById('answerText').value = '';
     document.getElementById('answerTextEn').value = '';
     document.getElementById('keywordsInput').value = '';
+    
+    // Nếu không truyền categoryId, kiểm tra filter danh mục hiện tại
+    if (!categoryId) {
+        const filterCategoryEl = document.getElementById('filterCategory');
+        if (filterCategoryEl && filterCategoryEl.value) {
+            categoryId = filterCategoryEl.value;
+        }
+    }
+    
+    // Set danh mục nếu có
+    const questionCategoryEl = document.getElementById('questionCategory');
+    if (questionCategoryEl) {
+        questionCategoryEl.value = categoryId || '';
+    }
+    
     document.getElementById('questionModal').classList.add('active');
     // Bắt đầu theo dõi thay đổi để lưu draft
     FormDraftManager.watchFields('question', QUESTION_DRAFT_FIELDS);
@@ -831,7 +849,8 @@ async function saveQuestion(event) {
             }
             
             closeModal();
-            loadQuestions();
+            await loadQuestions();
+            filterQuestions();
         } else if (data.duplicate) {
             // Phát hiện trùng lặp - hỏi user có muốn thêm hay không
             const matchLabel = data.match_type === 'question' ? 'câu hỏi' : 'câu trả lời';
@@ -854,7 +873,8 @@ async function saveQuestion(event) {
                     }
                     
                     closeModal();
-                    loadQuestions();
+                    await loadQuestions();
+                    filterQuestions();
                 } else {
                     alert(data2.error || 'Lỗi khi lưu');
                 }
