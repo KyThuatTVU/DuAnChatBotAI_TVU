@@ -114,7 +114,7 @@ class ChatController extends BaseController
                 $this->chatModel->saveUnanswered($session['id'], $message);
             } else {
                 // Không tìm thấy câu trả lời chính xác → tìm câu hỏi liên quan
-                $relatedQuestions = $this->questionModel->findRelatedQuestions($message, 20);
+                $relatedQuestions = $this->questionModel->findRelatedQuestions($message, 5);
 
                 if (!empty($relatedQuestions)) {
                     // Có câu hỏi liên quan → đưa ra để người dùng chọn

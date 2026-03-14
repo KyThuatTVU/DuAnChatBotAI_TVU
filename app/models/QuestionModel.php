@@ -20,8 +20,8 @@ class QuestionModel extends BaseModel
     }
 
     /**
-     * Tìm câu trả lời phù hợp nhất (FULLTEXT search + kiểm tra ngữ cảnh)
-     * Trả về false nếu câu hỏi quá mơ hồ hoặc không tìm thấy match chính xác
+     * Tìm câu trả lời phù hợp nhất
+     * Phiên bản đơn giản: chỉ dùng FULLTEXT search
      */
     public function findAnswer($userMessage)
     {
@@ -32,7 +32,12 @@ class QuestionModel extends BaseModel
             return false;
         }
 
-        // 1. Tìm chính xác (exact match) - so khớp toàn bộ câu hỏi
+        // 0.5 Kiểm tra spam
+        if ($this->isSpam($userMessage)) {
+            return false;
+        }
+
+        // 1. Tìm chính xác (exact match)
         $sql = "SELECT * FROM {$this->table} 
                 WHERE is_active = 1 AND LOWER(TRIM(question_text)) = LOWER(TRIM(?))
                 LIMIT 1";
@@ -44,63 +49,20 @@ class QuestionModel extends BaseModel
             return $result;
         }
 
-        // 2. Kiểm tra xem có bao nhiêu câu hỏi chứa các từ khóa từ câu hỏi người dùng
-        // Nếu có nhiều câu → hiển thị danh sách thay vì trả lời 1 câu
-        $keywords = $this->extractKeywordsFromMessage($userMessage);
-        if (!empty($keywords)) {
-            $countSql = "SELECT COUNT(DISTINCT q.id) as total FROM {$this->table} q
-                        WHERE q.is_active = 1 AND (";
-            $conditions = [];
-            $params = [];
-            
-            foreach ($keywords as $keyword) {
-                $conditions[] = "LOWER(q.question_text) LIKE CONCAT('%', LOWER(?), '%')";
-                $params[] = $keyword;
-            }
-            
-            $countSql .= implode(" OR ", $conditions) . ")";
-            $countStmt = $this->db->prepare($countSql);
-            $countStmt->execute($params);
-            $count = $countStmt->fetch()['total'];
-            
-            // Nếu có nhiều hơn 1 câu hỏi chứa các từ khóa này → câu hỏi quá mơ hồ
-            if ($count > 1) {
-                return false;
-            }
-        }
-
-        // 3. Tìm bằng FULLTEXT (chỉ khi tin nhắn đủ dài - tối thiểu 15 ký tự)
-        // Để tránh match quá rộng với câu hỏi ngắn
-        // Tăng ngưỡng relevance lên 2.0 để chỉ match những câu rất liên quan
-        if ($messageLength >= 15) {
+        // 2. Tìm bằng FULLTEXT (hiểu ngữ cảnh tốt nhất)
+        if ($messageLength >= 5) {
             $sql = "SELECT q.*, MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE) as relevance
                     FROM {$this->table} q 
                     WHERE q.is_active = 1 
                     AND MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE)
-                    HAVING relevance > 2.0
+                    HAVING relevance > 0.5
                     ORDER BY relevance DESC 
                     LIMIT 1";
             $stmt = $this->db->prepare($sql);
             $stmt->execute([$userMessage, $userMessage]);
             $result = $stmt->fetch();
 
-            if ($result) {
-                return $result;
-            }
-        }
-
-        // 4. Tìm bằng LIKE - chỉ khi tin nhắn đủ dài (>= 20 ký tự) để tránh match quá rộng
-        if ($messageLength >= 20) {
-            $sql = "SELECT * FROM {$this->table} 
-                    WHERE is_active = 1 AND (
-                        LOWER(question_text) LIKE CONCAT('%', LOWER(?), '%')
-                    )
-                    LIMIT 1";
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([$userMessage]);
-            $result = $stmt->fetch();
-
-            if ($result) {
+            if ($result && $result['relevance'] > 1.0) {
                 return $result;
             }
         }
@@ -110,58 +72,60 @@ class QuestionModel extends BaseModel
     }
 
     /**
-     * Trích xuất các từ khóa chính từ câu hỏi (loại bỏ stop words)
+     * Kiểm tra xem tin nhắn có phải spam không
      */
-    private function extractKeywordsFromMessage(string $message): array
+    private function isSpam($message)
     {
-        $stopWords = [
-            // Từ hỏi
-            'gì', 'nào', 'đâu', 'sao', 'không', 'có', 'bao', 'nhiêu', 'mấy',
-            'thế', 'làm', 'bằng',
-            // Từ nối / chức năng
-            'là', 'và', 'của', 'cho', 'với', 'trong', 'ngoài', 'trên', 'dưới',
-            'từ', 'đến', 'được', 'bị', 'để', 'rằng', 'mà', 'thì', 'cũng',
-            'đã', 'sẽ', 'đang', 'vẫn', 'còn', 'nếu', 'khi', 'hay', 'hoặc',
-            'này', 'kia', 'đó', 'ấy', 'nọ',
-            // Đại từ
-            'tôi', 'mình', 'bạn', 'em', 'anh', 'chị',
-            // Từ phổ biến khác
-            'các', 'những', 'một', 'hai', 'ba', 'mỗi', 'tất', 'cả',
-            'rất', 'quá', 'lắm', 'nhất', 'hơn',
-            'xin', 'vui', 'lòng', 'ơi', 'nhé', 'nha', 'ạ', 'hả',
-            'muốn', 'cần', 'phải', 'nên', 'thể',
-            'hỏi', 'biết', 'hãy',
-        ];
-
-        $message = mb_strtolower(trim($message));
-        // Loại bỏ dấu câu
-        $message = preg_replace('/[?!.,;:]+/u', '', $message);
-
-        // Tách từ
-        $words = preg_split('/\s+/u', $message);
-
-        $keywords = [];
-        foreach ($words as $word) {
-            $word = trim($word);
-            if (mb_strlen($word) < 2) continue;
-            if (in_array($word, $stopWords)) continue;
-            $keywords[] = $word;
+        $message = trim($message);
+        $messageLength = mb_strlen($message);
+        
+        // 1. Tin nhắn quá ngắn (< 2 ký tự)
+        if ($messageLength < 2) {
+            return true;
         }
-
-        return $keywords;
+        
+        // 2. Chỉ chứa ký tự lặp lại (aaaa, ????, 1111)
+        if (preg_match('/^(.)\1+$/u', $message)) {
+            return true;
+        }
+        
+        // 3. Chỉ chứa số
+        if (preg_match('/^\d+$/', $message)) {
+            return true;
+        }
+        
+        // 4. Chỉ chứa ký tự đặc biệt
+        if (preg_match('/^[^\w\s]+$/u', $message)) {
+            return true;
+        }
+        
+        // 5. Lặp lại cùng 1 từ nhiều lần (abc abc abc)
+        $words = preg_split('/\s+/u', $message);
+        if (count($words) > 2) {
+            $uniqueWords = array_unique($words);
+            // Nếu > 70% từ giống nhau → spam
+            if (count($uniqueWords) / count($words) < 0.3) {
+                return true;
+            }
+        }
+        
+        // 6. Chứa quá nhiều ký tự lặp liên tiếp (aaabbbccc)
+        if (preg_match('/(.)\1{4,}/u', $message)) {
+            return true;
+        }
+        
+        return false;
     }
 
     /**
-     * Tìm các câu hỏi liên quan (dùng khi câu hỏi quá vắng tắt)
-     * Trả về danh sách câu hỏi để người dùng chọn
-     * Không duyệt từ khóa để tránh match nhầm
+     * Tìm các câu hỏi liên quan (dùng khi không tìm thấy exact match)
      */
-    public function findRelatedQuestions($userMessage, $limit = 20)
+    public function findRelatedQuestions($userMessage, $limit = 5)
     {
         $messageLength = mb_strlen(trim($userMessage));
         $results = [];
 
-        // 1. Tìm bằng FULLTEXT (nếu đủ dài) - ngưỡng thấp hơn để linh hoạt hơn
+        // 1. Tìm bằng FULLTEXT
         if ($messageLength >= 3) {
             $sql = "SELECT q.*, MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE) as relevance
                     FROM {$this->table} q 
@@ -175,7 +139,7 @@ class QuestionModel extends BaseModel
             $results = $stmt->fetchAll();
         }
 
-        // 2. Nếu không có kết quả FULLTEXT, tìm bằng LIKE rộng hơn
+        // 2. Nếu không có kết quả, tìm bằng LIKE
         if (empty($results) && $messageLength >= 3) {
             $sql = "SELECT * FROM {$this->table} 
                     WHERE is_active = 1 AND (
@@ -191,48 +155,17 @@ class QuestionModel extends BaseModel
     }
 
     /**
-     * Trích xuất từ khóa nội dung (loại bỏ stop words tiếng Việt)
-     * Giữ lại các từ chủ đề quan trọng để so sánh ngữ cảnh
+     * Lấy câu hỏi theo ID
      */
-    private function extractContentWords(string $message): array
+    public function getById($id)
     {
-        $stopWords = [
-            // Từ hỏi
-            'gì', 'nào', 'đâu', 'sao', 'không', 'có', 'bao', 'nhiêu', 'mấy',
-            'thế', 'nào', 'làm', 'thế', 'nào', 'bằng',
-            // Từ nối / chức năng
-            'là', 'và', 'của', 'cho', 'với', 'trong', 'ngoài', 'trên', 'dưới',
-            'từ', 'đến', 'được', 'bị', 'để', 'rằng', 'mà', 'thì', 'cũng',
-            'đã', 'sẽ', 'đang', 'vẫn', 'còn', 'nếu', 'khi', 'hay', 'hoặc',
-            'này', 'kia', 'đó', 'ấy', 'nọ',
-            // Đại từ
-            'tôi', 'mình', 'bạn', 'em', 'anh', 'chị',
-            // Từ phổ biến khác
-            'các', 'những', 'một', 'hai', 'ba', 'mỗi', 'tất', 'cả',
-            'rất', 'quá', 'lắm', 'nhất', 'hơn',
-            'xin', 'vui', 'lòng', 'ơi', 'nhé', 'nha', 'ạ', 'hả',
-            'muốn', 'cần', 'phải', 'nên', 'thể',
-            'hỏi', 'biết', 'cho', 'hãy',
-            // Dấu câu và ký tự đặc biệt
-            'lâu', 'bao lâu',
-        ];
-
-        $message = mb_strtolower(trim($message));
-        // Loại bỏ dấu câu
-        $message = preg_replace('/[?!.,;:]+/u', '', $message);
-
-        // Tách từ
-        $words = preg_split('/\s+/u', $message);
-
-        $contentWords = [];
-        foreach ($words as $word) {
-            $word = trim($word);
-            if (mb_strlen($word) < 2) continue;
-            if (in_array($word, $stopWords)) continue;
-            $contentWords[] = $word;
-        }
-
-        return $contentWords;
+        $sql = "SELECT q.*, c.name as category_name 
+                FROM {$this->table} q 
+                LEFT JOIN categories c ON q.category_id = c.id 
+                WHERE q.id = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$id]);
+        return $stmt->fetch();
     }
 
     /**
@@ -240,7 +173,60 @@ class QuestionModel extends BaseModel
      */
     public function getByCategory($categoryId)
     {
-        return $this->getAll('category_id = ? AND is_active = 1', [$categoryId]);
+        $sql = "SELECT * FROM {$this->table} 
+                WHERE is_active = 1 AND category_id = ? 
+                ORDER BY created_at DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$categoryId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Thêm câu hỏi mới
+     */
+    public function create($data)
+    {
+        $sql = "INSERT INTO {$this->table} 
+                (category_id, question_text, answer_text, answer_text_en, source_type, created_by) 
+                VALUES (?, ?, ?, ?, ?, ?)";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
+            $data['category_id'],
+            $data['question_text'],
+            $data['answer_text'],
+            $data['answer_text_en'] ?? null,
+            $data['source_type'] ?? 'manual',
+            $data['created_by'] ?? null
+        ]);
+        return $this->db->lastInsertId();
+    }
+
+    /**
+     * Cập nhật câu hỏi
+     */
+    public function update($id, $data)
+    {
+        $sql = "UPDATE {$this->table} 
+                SET category_id = ?, question_text = ?, answer_text = ?, answer_text_en = ? 
+                WHERE id = ?";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([
+            $data['category_id'],
+            $data['question_text'],
+            $data['answer_text'],
+            $data['answer_text_en'] ?? null,
+            $id
+        ]);
+    }
+
+    /**
+     * Xóa câu hỏi
+     */
+    public function delete($id)
+    {
+        $sql = "DELETE FROM {$this->table} WHERE id = ?";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([$id]);
     }
 
     /**
