@@ -783,10 +783,10 @@ function renderQuestions(questions) {
             <td data-label="#" class="text-gray-500">${i + 1}</td>
             <td data-label="Câu hỏi">
                 <div class="font-medium text-sm">${escapeHtml(q.question_text.substring(0, 80))}${q.question_text.length > 80 ? '...' : ''}</div>
-                <div class="text-xs text-gray-400 mt-1">${escapeHtml(q.answer_text.substring(0, 60))}...</div>
+                <div class="text-xs text-gray-400 mt-1">${stripHtml(q.answer_text).substring(0, 60)}...</div>
             </td>
             <td data-label="Câu trả lời" class="hidden md:table-cell">
-                <div class="text-xs text-gray-600">${escapeHtml(q.answer_text.substring(0, 100))}${q.answer_text.length > 100 ? '...' : ''}</div>
+                <div class="text-xs text-gray-600">${stripHtml(q.answer_text).substring(0, 100)}${q.answer_text.length > 100 ? '...' : ''}</div>
             </td>
             <td data-label="Danh mục"><span class="badge badge-info">${q.category_name || 'Chưa phân loại'}</span></td>
             <td data-label="Nguồn"><span class="badge ${q.source_type === 'manual' ? 'badge-success' : 'badge-warning'}">${q.source_type === 'manual' ? 'Nhập tay' : q.source_type.toUpperCase()}</span></td>
@@ -2458,6 +2458,16 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+/**
+ * Loại bỏ HTML tags và chỉ giữ text thuần
+ */
+function stripHtml(html) {
+    if (!html) return '';
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    return div.textContent || div.innerText || '';
 }
 
 // Đảm bảo các hàm forms có thể truy cập từ toàn cục
