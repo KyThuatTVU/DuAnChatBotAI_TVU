@@ -37,12 +37,14 @@ class QuestionModel extends BaseModel
             return false;
         }
 
-        // 1. Tìm chính xác (exact match)
+        // 1. Tìm chính xác (exact match) - chuẩn hóa bỏ dấu câu
+        $normalizedMessage = $this->normalizeMessage($userMessage);
         $sql = "SELECT * FROM {$this->table} 
-                WHERE is_active = 1 AND LOWER(TRIM(question_text)) = LOWER(TRIM(?))
+                WHERE is_active = 1 
+                AND LOWER(TRIM(REGEXP_REPLACE(question_text, '[?!.,;:]+$', ''))) = LOWER(?)
                 LIMIT 1";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$userMessage]);
+        $stmt->execute([$normalizedMessage]);
         $result = $stmt->fetch();
 
         if ($result) {
@@ -69,6 +71,19 @@ class QuestionModel extends BaseModel
 
         // Không tìm thấy câu trả lời phù hợp
         return false;
+    }
+
+    /**
+     * Chuẩn hóa tin nhắn: loại bỏ dấu câu cuối, khoảng trắng thừa
+     */
+    private function normalizeMessage($message)
+    {
+        $message = trim($message);
+        // Loại bỏ dấu câu ở cuối (?, !, ., ,, ;, :)
+        $message = preg_replace('/[?!.,;:]+$/', '', $message);
+        // Loại bỏ khoảng trắng thừa
+        $message = preg_replace('/\s+/', ' ', $message);
+        return trim($message);
     }
 
     /**
