@@ -69,4 +69,19 @@ class FormModel extends BaseModel
         $stmt->execute($params);
         return $stmt->fetchAll();
     }
+
+    /**
+     * Xóa nhiều biểu mẫu cùng lúc
+     */
+    public function deleteMultiple($ids)
+    {
+        if (empty($ids) || !is_array($ids)) {
+            return false;
+        }
+        
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $sql = "DELETE FROM {$this->table} WHERE id IN ($placeholders)";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute($ids);
+    }
 }

@@ -29,6 +29,11 @@
     .sidebar-overlay.active {
         display: block;
     }
+    
+    /* --- Mobile Select Bar --- */
+    .mobile-select-bar {
+        display: flex !important;
+    }
 
     /* --- Header --- */
     .admin-header {
@@ -39,6 +44,10 @@
     }
     .admin-header h1 {
         font-size: 17px !important;
+    }
+    /* Ẩn nút xóa nhiều trên desktop header khi ở mobile */
+    #deleteMultipleBtn {
+        display: none !important;
     }
 
     /* --- Stat cards (Dashboard) --- */
@@ -93,6 +102,16 @@
     /* Ẩn cột # trên mobile */
     .data-table tbody td[data-label="#"] {
         display: none !important;
+    }
+    /* Hiển thị checkbox chọn trên mobile */
+    .data-table tbody td[data-label="Chọn"] {
+        display: flex !important;
+        padding: 8px 0 !important;
+        border-bottom: 1px solid #f1f5f9;
+        margin-bottom: 6px;
+    }
+    .data-table tbody td[data-label="Chọn"]::before {
+        content: "Chọn";
     }
     /* Cột thao tác: full width */
     .data-table tbody td[data-label="Thao tác"],

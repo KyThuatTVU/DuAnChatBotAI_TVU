@@ -351,6 +351,58 @@ class AdminController extends BaseController
         $this->json(['question' => $question]);
     }
 
+    /**
+     * POST /api/admin/questions/delete-multiple - Xóa nhiều câu hỏi
+     */
+    public function deleteMultipleQuestions()
+    {
+        $this->requireAuth();
+
+        if ($this->getMethod() !== 'POST') {
+            $this->json(['error' => 'Method not allowed'], 405);
+        }
+
+        $input = $this->getJsonInput();
+        $ids = $input['ids'] ?? [];
+
+        if (empty($ids) || !is_array($ids)) {
+            $this->json(['error' => 'Danh sách ID không hợp lệ'], 400);
+        }
+
+        // Validate IDs
+        $ids = array_filter($ids, function($id) {
+            return is_numeric($id) && $id > 0;
+        });
+
+        if (empty($ids)) {
+            $this->json(['error' => 'Không có ID hợp lệ'], 400);
+        }
+
+        $db = Database::getInstance()->getConnection();
+        
+        try {
+            // Xóa từ khóa liên quan trước
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $db->prepare("DELETE FROM keywords WHERE question_id IN ($placeholders)");
+            $stmt->execute($ids);
+
+            // Xóa câu hỏi
+            $result = $this->questionModel->deleteMultiple($ids);
+            
+            if ($result) {
+                $this->json([
+                    'success' => true,
+                    'message' => 'Đã xóa ' . count($ids) . ' câu hỏi',
+                    'deleted_count' => count($ids)
+                ]);
+            } else {
+                $this->json(['error' => 'Không thể xóa câu hỏi'], 500);
+            }
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Lỗi: ' . $e->getMessage()], 500);
+        }
+    }
+
     // ==================== CATEGORIES ====================
 
     /**
@@ -404,6 +456,57 @@ class AdminController extends BaseController
 
         $category = $this->categoryModel->getById($id);
         $this->json(['category' => $category]);
+    }
+
+    /**
+     * POST /api/admin/deleteMultipleCategories - Xóa nhiều danh mục
+     */
+    public function deleteMultipleCategories()
+    {
+        $this->requireAuth();
+
+        if ($this->getMethod() !== 'POST') {
+            $this->json(['error' => 'Method not allowed'], 405);
+        }
+
+        $input = $this->getJsonInput();
+        $ids = $input['ids'] ?? [];
+
+        if (empty($ids) || !is_array($ids)) {
+            $this->json(['error' => 'Danh sách ID không hợp lệ'], 400);
+        }
+
+        $ids = array_filter($ids, function($id) {
+            return is_numeric($id) && $id > 0;
+        });
+
+        if (empty($ids)) {
+            $this->json(['error' => 'Không có ID hợp lệ'], 400);
+        }
+
+        $db = Database::getInstance()->getConnection();
+        
+        try {
+            // Gỡ liên kết với câu hỏi (set category_id = NULL)
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $db->prepare("UPDATE questions SET category_id = NULL WHERE category_id IN ($placeholders)");
+            $stmt->execute($ids);
+
+            // Xóa danh mục
+            $result = $this->categoryModel->deleteMultiple($ids);
+            
+            if ($result) {
+                $this->json([
+                    'success' => true,
+                    'message' => 'Đã xóa ' . count($ids) . ' danh mục',
+                    'deleted_count' => count($ids)
+                ]);
+            } else {
+                $this->json(['error' => 'Không thể xóa danh mục'], 500);
+            }
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Lỗi: ' . $e->getMessage()], 500);
+        }
     }
 
     // ==================== SETTINGS ====================
@@ -1293,6 +1396,53 @@ class AdminController extends BaseController
         $this->json(['success' => true]);
     }
 
+    /**
+     * POST /api/admin/deleteMultipleUnanswered - Xóa nhiều câu hỏi chưa trả lời
+     */
+    public function deleteMultipleUnanswered()
+    {
+        $this->requireAuth();
+
+        if ($this->getMethod() !== 'POST') {
+            $this->json(['error' => 'Method not allowed'], 405);
+        }
+
+        $input = $this->getJsonInput();
+        $ids = $input['ids'] ?? [];
+
+        if (empty($ids) || !is_array($ids)) {
+            $this->json(['error' => 'Danh sách ID không hợp lệ'], 400);
+        }
+
+        $ids = array_filter($ids, function($id) {
+            return is_numeric($id) && $id > 0;
+        });
+
+        if (empty($ids)) {
+            $this->json(['error' => 'Không có ID hợp lệ'], 400);
+        }
+
+        $db = Database::getInstance()->getConnection();
+        
+        try {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $db->prepare("DELETE FROM unanswered_questions WHERE id IN ($placeholders)");
+            $result = $stmt->execute($ids);
+            
+            if ($result) {
+                $this->json([
+                    'success' => true,
+                    'message' => 'Đã xóa ' . count($ids) . ' câu hỏi chưa trả lời',
+                    'deleted_count' => count($ids)
+                ]);
+            } else {
+                $this->json(['error' => 'Không thể xóa'], 500);
+            }
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Lỗi: ' . $e->getMessage()], 500);
+        }
+    }
+
     // ==================== FORMS (BIỂU MẪU) ====================
 
     /**
@@ -1357,6 +1507,49 @@ class AdminController extends BaseController
 
         $form = $this->formModel->getById($id);
         $this->json(['form' => $form]);
+    }
+
+    /**
+     * POST /api/admin/deleteMultipleForms - Xóa nhiều biểu mẫu
+     */
+    public function deleteMultipleForms()
+    {
+        $this->requireAuth();
+
+        if ($this->getMethod() !== 'POST') {
+            $this->json(['error' => 'Method not allowed'], 405);
+        }
+
+        $input = $this->getJsonInput();
+        $ids = $input['ids'] ?? [];
+
+        if (empty($ids) || !is_array($ids)) {
+            $this->json(['error' => 'Danh sách ID không hợp lệ'], 400);
+        }
+
+        $ids = array_filter($ids, function($id) {
+            return is_numeric($id) && $id > 0;
+        });
+
+        if (empty($ids)) {
+            $this->json(['error' => 'Không có ID hợp lệ'], 400);
+        }
+
+        try {
+            $result = $this->formModel->deleteMultiple($ids);
+            
+            if ($result) {
+                $this->json([
+                    'success' => true,
+                    'message' => 'Đã xóa ' . count($ids) . ' biểu mẫu',
+                    'deleted_count' => count($ids)
+                ]);
+            } else {
+                $this->json(['error' => 'Không thể xóa biểu mẫu'], 500);
+            }
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Lỗi: ' . $e->getMessage()], 500);
+        }
     }
 
     // ==================== KEYWORDS ====================

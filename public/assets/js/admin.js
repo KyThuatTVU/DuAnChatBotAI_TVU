@@ -771,12 +771,15 @@ async function loadQuestions() {
 function renderQuestions(questions) {
     const tbody = document.getElementById('questionsBody');
     if (!questions.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">Chưa có câu hỏi nào</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-400">Chưa có câu hỏi nào</td></tr>';
         return;
     }
 
     tbody.innerHTML = questions.map((q, i) => `
         <tr>
+            <td data-label="Chọn" class="text-center">
+                <input type="checkbox" class="question-checkbox w-4 h-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500 cursor-pointer" data-id="${q.id}" onchange="updateSelectedCount()">
+            </td>
             <td data-label="#" class="text-gray-500">${i + 1}</td>
             <td data-label="Câu hỏi">
                 <div class="font-medium text-sm">${escapeHtml(q.question_text.substring(0, 80))}${q.question_text.length > 80 ? '...' : ''}</div>
@@ -802,6 +805,17 @@ function renderQuestions(questions) {
             </td>
         </tr>
     `).join('');
+    
+    // Reset select all checkboxes (cả desktop và mobile)
+    const selectAllDesktop = document.getElementById('selectAllQuestions');
+    const selectAllMobile = document.getElementById('selectAllQuestionsMobile');
+    if (selectAllDesktop) {
+        selectAllDesktop.checked = false;
+    }
+    if (selectAllMobile) {
+        selectAllMobile.checked = false;
+    }
+    updateSelectedCount();
 }
 
 function filterQuestions() {
@@ -1073,6 +1087,134 @@ async function deleteQuestion(id) {
     }
 }
 
+/**
+ * Chọn/bỏ chọn tất cả câu hỏi
+ */
+function toggleSelectAll(checkbox) {
+    const checkboxes = document.querySelectorAll('.question-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+    
+    // Đồng bộ cả 2 checkbox "Chọn tất cả" (desktop và mobile)
+    const selectAllDesktop = document.getElementById('selectAllQuestions');
+    const selectAllMobile = document.getElementById('selectAllQuestionsMobile');
+    if (selectAllDesktop && selectAllMobile) {
+        selectAllDesktop.checked = checkbox.checked;
+        selectAllMobile.checked = checkbox.checked;
+    }
+    
+    updateSelectedCount();
+}
+
+/**
+ * Cập nhật số lượng câu hỏi đã chọn và hiển thị/ẩn nút xóa
+ */
+function updateSelectedCount() {
+    const checkboxes = document.querySelectorAll('.question-checkbox:checked');
+    const count = checkboxes.length;
+    
+    // Desktop
+    const deleteBtn = document.getElementById('deleteMultipleBtn');
+    const countSpan = document.getElementById('selectedCount');
+    
+    if (countSpan) {
+        countSpan.textContent = count;
+    }
+    
+    if (deleteBtn) {
+        if (count > 0) {
+            deleteBtn.classList.remove('hidden');
+            deleteBtn.classList.add('inline-flex');
+        } else {
+            deleteBtn.classList.add('hidden');
+            deleteBtn.classList.remove('inline-flex');
+        }
+    }
+    
+    // Mobile
+    const deleteBtnMobile = document.getElementById('deleteMultipleBtnMobile');
+    const countSpanMobile = document.getElementById('selectedCountMobile');
+    
+    if (countSpanMobile) {
+        countSpanMobile.textContent = count;
+    }
+    
+    if (deleteBtnMobile) {
+        if (count > 0) {
+            deleteBtnMobile.classList.remove('hidden');
+            deleteBtnMobile.classList.add('inline-flex');
+        } else {
+            deleteBtnMobile.classList.add('hidden');
+            deleteBtnMobile.classList.remove('inline-flex');
+        }
+    }
+    
+    // Cập nhật trạng thái checkbox "Chọn tất cả"
+    const selectAllDesktop = document.getElementById('selectAllQuestions');
+    const selectAllMobile = document.getElementById('selectAllQuestionsMobile');
+    const allCheckboxes = document.querySelectorAll('.question-checkbox');
+    
+    if (allCheckboxes.length > 0) {
+        const allChecked = count === allCheckboxes.length;
+        const someChecked = count > 0 && count < allCheckboxes.length;
+        
+        if (selectAllDesktop) {
+            selectAllDesktop.checked = allChecked;
+            selectAllDesktop.indeterminate = someChecked;
+        }
+        
+        if (selectAllMobile) {
+            selectAllMobile.checked = allChecked;
+            selectAllMobile.indeterminate = someChecked;
+        }
+    }
+}
+
+/**
+ * Xóa nhiều câu hỏi đã chọn
+ */
+async function deleteMultipleQuestions() {
+    const checkboxes = document.querySelectorAll('.question-checkbox:checked');
+    const ids = Array.from(checkboxes).map(cb => parseInt(cb.getAttribute('data-id')));
+    
+    if (ids.length === 0) {
+        alert('Vui lòng chọn ít nhất một câu hỏi để xóa');
+        return;
+    }
+    
+    const confirmMsg = `Bạn có chắc muốn xóa ${ids.length} câu hỏi đã chọn?\n\nHành động này không thể hoàn tác!`;
+    if (!confirm(confirmMsg)) return;
+    
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/deleteMultipleQuestions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            alert(data.message || `Đã xóa ${ids.length} câu hỏi thành công`);
+            // Reset checkbox "Chọn tất cả"
+            const selectAllCheckbox = document.getElementById('selectAllQuestions');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = false;
+            }
+            // Tải lại danh sách
+            await loadQuestions();
+            // Áp dụng lại filter nếu có
+            filterQuestions();
+        } else {
+            alert(data.error || 'Có lỗi xảy ra khi xóa câu hỏi');
+        }
+    } catch (e) {
+        console.error('Error deleting multiple questions:', e);
+        alert('Lỗi khi xóa câu hỏi');
+    }
+}
+
 // ==================== CATEGORIES ====================
 
 let _categoriesData = [];
@@ -1203,6 +1345,42 @@ async function deleteCategory(id) {
         loadCategories();
     } catch (e) {
         alert('Lỗi khi xóa');
+    }
+}
+
+/**
+ * Xóa nhiều danh mục đã chọn
+ */
+async function deleteMultipleCategories() {
+    const checkboxes = document.querySelectorAll('.category-checkbox:checked');
+    const ids = Array.from(checkboxes).map(cb => parseInt(cb.getAttribute('data-id')));
+    
+    if (ids.length === 0) {
+        alert('Vui lòng chọn ít nhất một danh mục để xóa');
+        return;
+    }
+    
+    const confirmMsg = `Bạn có chắc muốn xóa ${ids.length} danh mục đã chọn?\n\nCác câu hỏi thuộc danh mục này sẽ bị gỡ liên kết.`;
+    if (!confirm(confirmMsg)) return;
+    
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/deleteMultipleCategories`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            alert(data.message || `Đã xóa ${ids.length} danh mục thành công`);
+            await loadCategories();
+        } else {
+            alert(data.error || 'Có lỗi xảy ra khi xóa danh mục');
+        }
+    } catch (e) {
+        console.error('Error deleting multiple categories:', e);
+        alert('Lỗi khi xóa danh mục');
     }
 }
 
@@ -1848,6 +2026,42 @@ async function deleteUnanswered(btn) {
     }
 }
 
+/**
+ * Xóa nhiều câu hỏi chưa trả lời đã chọn
+ */
+async function deleteMultipleUnanswered() {
+    const checkboxes = document.querySelectorAll('.unanswered-checkbox:checked');
+    const ids = Array.from(checkboxes).map(cb => parseInt(cb.getAttribute('data-id')));
+    
+    if (ids.length === 0) {
+        alert('Vui lòng chọn ít nhất một câu hỏi để xóa');
+        return;
+    }
+    
+    const confirmMsg = `Bạn có chắc muốn xóa ${ids.length} câu hỏi chưa trả lời đã chọn?`;
+    if (!confirm(confirmMsg)) return;
+    
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/deleteMultipleUnanswered`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            alert(data.message || `Đã xóa ${ids.length} câu hỏi thành công`);
+            await loadUnanswered();
+        } else {
+            alert(data.error || 'Có lỗi xảy ra khi xóa');
+        }
+    } catch (e) {
+        console.error('Error deleting multiple unanswered:', e);
+        alert('Lỗi khi xóa');
+    }
+}
+
 // ==================== ADMIN ACCOUNTS ====================
 
 async function loadAdminAccounts() {
@@ -2168,6 +2382,42 @@ async function deleteForm(id) {
         else alert(data.error || 'Lỗi khi xóa');
     } catch (e) {
         alert('Lỗi kết nối server');
+    }
+}
+
+/**
+ * Xóa nhiều biểu mẫu đã chọn
+ */
+async function deleteMultipleForms() {
+    const checkboxes = document.querySelectorAll('.form-checkbox:checked');
+    const ids = Array.from(checkboxes).map(cb => parseInt(cb.getAttribute('data-id')));
+    
+    if (ids.length === 0) {
+        alert('Vui lòng chọn ít nhất một biểu mẫu để xóa');
+        return;
+    }
+    
+    const confirmMsg = `Bạn có chắc muốn xóa ${ids.length} biểu mẫu đã chọn?`;
+    if (!confirm(confirmMsg)) return;
+    
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/deleteMultipleForms`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            alert(data.message || `Đã xóa ${ids.length} biểu mẫu thành công`);
+            await loadForms();
+        } else {
+            alert(data.error || 'Có lỗi xảy ra khi xóa biểu mẫu');
+        }
+    } catch (e) {
+        console.error('Error deleting multiple forms:', e);
+        alert('Lỗi khi xóa biểu mẫu');
     }
 }
 
