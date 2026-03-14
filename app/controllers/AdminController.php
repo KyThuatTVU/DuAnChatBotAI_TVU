@@ -452,6 +452,7 @@ class AdminController extends BaseController
                     'is_active' => $input['is_active']
                 ]);
                 $this->json(['success' => true]);
+                return;
             }
             
             // Cập nhật đầy đủ thông tin
@@ -462,6 +463,7 @@ class AdminController extends BaseController
                 'is_active' => $input['is_active'] ?? 1,
             ]);
             $this->json(['success' => true]);
+            return;
         }
 
         $category = $this->categoryModel->getById($id);
