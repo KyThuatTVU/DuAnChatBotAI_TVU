@@ -37,14 +37,17 @@ class QuestionModel extends BaseModel
             return false;
         }
 
-        // 1. Tìm chính xác (exact match) - chuẩn hóa bỏ dấu câu
+        // Chuẩn hóa tin nhắn (loại bỏ dấu câu)
         $normalizedMessage = $this->normalizeMessage($userMessage);
+
+        // 1. Tìm chính xác (exact match) - so sánh cả bản gốc và bản chuẩn hóa
         $sql = "SELECT * FROM {$this->table} 
                 WHERE is_active = 1 
-                AND LOWER(TRIM(REGEXP_REPLACE(question_text, '[?!.,;:]+$', ''))) = LOWER(?)
+                AND (LOWER(TRIM(question_text)) = LOWER(TRIM(?))
+                     OR LOWER(TRIM(question_text)) = LOWER(?))
                 LIMIT 1";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$normalizedMessage]);
+        $stmt->execute([$userMessage, $normalizedMessage]);
         $result = $stmt->fetch();
 
         if ($result) {
@@ -61,7 +64,7 @@ class QuestionModel extends BaseModel
                     ORDER BY relevance DESC 
                     LIMIT 1";
             $stmt = $this->db->prepare($sql);
-            $stmt->execute([$userMessage, $userMessage]);
+            $stmt->execute([$normalizedMessage, $normalizedMessage]);
             $result = $stmt->fetch();
 
             if ($result && $result['relevance'] > 1.0) {
