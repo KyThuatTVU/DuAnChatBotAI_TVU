@@ -445,6 +445,16 @@ class AdminController extends BaseController
 
         if ($this->getMethod() === 'PUT') {
             $input = $this->getJsonInput();
+            
+            // Nếu chỉ cập nhật is_active (toggle status)
+            if (isset($input['is_active']) && count($input) === 1) {
+                $this->categoryModel->update($id, [
+                    'is_active' => $input['is_active']
+                ]);
+                $this->json(['success' => true]);
+            }
+            
+            // Cập nhật đầy đủ thông tin
             $this->categoryModel->update($id, [
                 'name' => sanitize($input['name']),
                 'description' => $input['description'] ?? '',
