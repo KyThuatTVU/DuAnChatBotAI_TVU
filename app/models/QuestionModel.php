@@ -37,17 +37,20 @@ class QuestionModel extends BaseModel
             return false;
         }
 
-        // Chuẩn hóa tin nhắn (loại bỏ dấu câu)
+        // Chuẩn hóa tin nhắn (loại bỏ dấu câu và chuyển về chữ thường)
         $normalizedMessage = $this->normalizeMessage($userMessage);
+        $lowerMessage = mb_strtolower($normalizedMessage);
+        
+        // Đếm số từ trong câu hỏi
+        $wordCount = count(preg_split('/\s+/u', trim($lowerMessage)));
 
-        // 1. Tìm chính xác (exact match) - so sánh cả bản gốc và bản chuẩn hóa
+        // 1. Tìm chính xác (exact match) - so sánh không phân biệt hoa thường
         $sql = "SELECT * FROM {$this->table} 
                 WHERE is_active = 1 
-                AND (LOWER(TRIM(question_text)) = LOWER(TRIM(?))
-                     OR LOWER(TRIM(question_text)) = LOWER(?))
+                AND LOWER(TRIM(question_text)) = ?
                 LIMIT 1";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$userMessage, $normalizedMessage]);
+        $stmt->execute([$lowerMessage]);
         $result = $stmt->fetch();
 
         if ($result) {
@@ -55,19 +58,38 @@ class QuestionModel extends BaseModel
         }
 
         // 2. Tìm bằng FULLTEXT (hiểu ngữ cảnh tốt nhất)
-        if ($messageLength >= 5) {
+        if ($messageLength >= 3) {
             $sql = "SELECT q.*, MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE) as relevance
                     FROM {$this->table} q 
                     WHERE q.is_active = 1 
                     AND MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE)
-                    HAVING relevance > 0.5
+                    HAVING relevance > 0.3
                     ORDER BY relevance DESC 
                     LIMIT 1";
             $stmt = $this->db->prepare($sql);
             $stmt->execute([$normalizedMessage, $normalizedMessage]);
             $result = $stmt->fetch();
 
-            if ($result && $result['relevance'] > 1.0) {
+            // Với câu hỏi dài (>= 10 ký tự hoặc >= 3 từ), chấp nhận relevance thấp hơn
+            $minRelevance = ($messageLength >= 15 || $wordCount >= 4) ? 0.5 : 1.5;
+            
+            if ($result && $result['relevance'] >= $minRelevance) {
+                return $result;
+            }
+        }
+
+        // 3. KHÔNG dùng LIKE cho câu hỏi vắn tắt (< 15 ký tự hoặc < 3 từ)
+        // Vì sẽ khớp quá nhiều kết quả không chính xác
+        if ($messageLength >= 15 && $wordCount >= 3) {
+            $sql = "SELECT * FROM {$this->table} 
+                    WHERE is_active = 1 
+                    AND LOWER(question_text) LIKE CONCAT('%', ?, '%')
+                    LIMIT 1";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$lowerMessage]);
+            $result = $stmt->fetch();
+
+            if ($result) {
                 return $result;
             }
         }
@@ -137,13 +159,20 @@ class QuestionModel extends BaseModel
 
     /**
      * Tìm các câu hỏi liên quan (dùng khi không tìm thấy exact match)
+     * Sử dụng thuật toán kết hợp: FULLTEXT + TF-IDF + Levenshtein Distance
      */
     public function findRelatedQuestions($userMessage, $limit = 5)
     {
         $messageLength = mb_strlen(trim($userMessage));
+        $normalizedMessage = $this->normalizeMessage($userMessage);
+        $lowerMessage = mb_strtolower($normalizedMessage);
+        
+        // Tách từ khóa từ câu hỏi người dùng
+        $userKeywords = $this->extractKeywords($lowerMessage);
+        
         $results = [];
 
-        // 1. Tìm bằng FULLTEXT
+        // 1. Tìm bằng FULLTEXT (nhanh nhất, dùng index)
         if ($messageLength >= 3) {
             $sql = "SELECT q.*, MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE) as relevance
                     FROM {$this->table} q 
@@ -153,23 +182,150 @@ class QuestionModel extends BaseModel
                     ORDER BY relevance DESC 
                     LIMIT ?";
             $stmt = $this->db->prepare($sql);
-            $stmt->execute([$userMessage, $userMessage, $limit]);
+            $stmt->execute([$normalizedMessage, $normalizedMessage, $limit * 3]);
             $results = $stmt->fetchAll();
         }
 
-        // 2. Nếu không có kết quả, tìm bằng LIKE
-        if (empty($results) && $messageLength >= 3) {
-            $sql = "SELECT * FROM {$this->table} 
-                    WHERE is_active = 1 AND (
-                        LOWER(question_text) LIKE CONCAT('%', LOWER(?), '%')
-                    )
-                    LIMIT ?";
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([$userMessage, $limit]);
-            $results = $stmt->fetchAll();
+        // 2. Nếu không có kết quả, tìm bằng LIKE với từng từ khóa
+        if (empty($results) && !empty($userKeywords)) {
+            $conditions = [];
+            $params = [];
+            
+            foreach ($userKeywords as $keyword) {
+                if (mb_strlen($keyword) >= 2) {
+                    $conditions[] = "LOWER(question_text) LIKE ?";
+                    $params[] = "%{$keyword}%";
+                }
+            }
+            
+            if (!empty($conditions)) {
+                $sql = "SELECT * FROM {$this->table} 
+                        WHERE is_active = 1 AND (" . implode(' OR ', $conditions) . ")
+                        LIMIT ?";
+                $params[] = $limit * 3;
+                $stmt = $this->db->prepare($sql);
+                $stmt->execute($params);
+                $results = $stmt->fetchAll();
+            }
+        }
+
+        // 3. Tính điểm tương đồng cho từng kết quả (TF-IDF + Levenshtein)
+        if (!empty($results)) {
+            foreach ($results as &$result) {
+                $questionKeywords = $this->extractKeywords(mb_strtolower($result['question_text']));
+                
+                // Tính điểm dựa trên số từ khóa trùng khớp (TF-IDF đơn giản)
+                $matchScore = $this->calculateKeywordMatchScore($userKeywords, $questionKeywords);
+                
+                // Tính khoảng cách Levenshtein (chuẩn hóa 0-1)
+                $levenshteinScore = $this->calculateLevenshteinScore($lowerMessage, mb_strtolower($result['question_text']));
+                
+                // Điểm tổng hợp (70% keyword match + 30% Levenshtein)
+                $result['similarity_score'] = ($matchScore * 0.7) + ($levenshteinScore * 0.3);
+                
+                // Nếu có relevance từ FULLTEXT, kết hợp thêm
+                if (isset($result['relevance'])) {
+                    $result['similarity_score'] = ($result['similarity_score'] * 0.7) + ($result['relevance'] * 0.3);
+                }
+            }
+            
+            // Sắp xếp theo điểm tương đồng giảm dần
+            usort($results, function($a, $b) {
+                return $b['similarity_score'] <=> $a['similarity_score'];
+            });
+            
+            // Lọc kết quả có điểm >= 0.2 và giới hạn số lượng
+            $results = array_filter($results, function($r) {
+                return $r['similarity_score'] >= 0.2;
+            });
+            
+            $results = array_slice($results, 0, $limit);
         }
 
         return $results;
+    }
+
+    /**
+     * Trích xuất từ khóa từ câu hỏi (loại bỏ stop words)
+     */
+    private function extractKeywords($text)
+    {
+        // Danh sách stop words tiếng Việt
+        $stopWords = [
+            'là', 'của', 'và', 'có', 'được', 'trong', 'ở', 'tại', 'với', 'cho',
+            'để', 'từ', 'đến', 'về', 'như', 'khi', 'nào', 'đâu', 'sao', 'gì',
+            'thế', 'nào', 'không', 'các', 'những', 'một', 'này', 'đó', 'thì',
+            'hay', 'hoặc', 'nhưng', 'mà', 'nếu', 'vì', 'do', 'bởi', 'theo',
+            'the', 'a', 'an', 'is', 'are', 'was', 'were', 'in', 'on', 'at',
+            'to', 'for', 'of', 'and', 'or', 'but', 'if', 'what', 'where', 'when'
+        ];
+        
+        // Tách từ
+        $words = preg_split('/\s+/u', $text);
+        
+        // Loại bỏ stop words và từ quá ngắn
+        $keywords = array_filter($words, function($word) use ($stopWords) {
+            return mb_strlen($word) >= 2 && !in_array($word, $stopWords);
+        });
+        
+        return array_values($keywords);
+    }
+
+    /**
+     * Tính điểm khớp từ khóa (TF-IDF đơn giản)
+     * Trả về giá trị 0-1
+     */
+    private function calculateKeywordMatchScore($userKeywords, $questionKeywords)
+    {
+        if (empty($userKeywords) || empty($questionKeywords)) {
+            return 0;
+        }
+        
+        $matchCount = 0;
+        $totalWeight = 0;
+        
+        foreach ($userKeywords as $userWord) {
+            $totalWeight += 1;
+            
+            foreach ($questionKeywords as $qWord) {
+                // Khớp chính xác
+                if ($userWord === $qWord) {
+                    $matchCount += 1;
+                    break;
+                }
+                // Khớp một phần (substring)
+                elseif (mb_strpos($qWord, $userWord) !== false || mb_strpos($userWord, $qWord) !== false) {
+                    $matchCount += 0.5;
+                    break;
+                }
+            }
+        }
+        
+        return $totalWeight > 0 ? $matchCount / $totalWeight : 0;
+    }
+
+    /**
+     * Tính điểm Levenshtein (khoảng cách chỉnh sửa)
+     * Trả về giá trị 0-1 (1 = giống nhau hoàn toàn)
+     */
+    private function calculateLevenshteinScore($str1, $str2)
+    {
+        $maxLen = max(mb_strlen($str1), mb_strlen($str2));
+        
+        if ($maxLen === 0) {
+            return 1;
+        }
+        
+        // Giới hạn độ dài để tránh tính toán quá lâu
+        if ($maxLen > 200) {
+            $str1 = mb_substr($str1, 0, 200);
+            $str2 = mb_substr($str2, 0, 200);
+            $maxLen = 200;
+        }
+        
+        $distance = levenshtein($str1, $str2);
+        
+        return 1 - ($distance / $maxLen);
     }
 
     /**

@@ -113,14 +113,23 @@ class ChatController extends BaseController
                 $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
                 $this->chatModel->saveUnanswered($session['id'], $message);
             } else {
-                // Không tìm thấy câu trả lời chính xác → tìm câu hỏi liên quan
-                $relatedQuestions = $this->questionModel->findRelatedQuestions($message, 5);
+                // Kiểm tra xem câu hỏi có vắn tắt/chung chung không
+                $isVague = $this->isVagueQuestion($message);
+                
+                // Tìm câu hỏi liên quan với thuật toán cải tiến
+                $relatedQuestions = $this->questionModel->findRelatedQuestions($message, $isVague ? 8 : 5);
 
                 if (!empty($relatedQuestions)) {
                     // Có câu hỏi liên quan → đưa ra để người dùng chọn
-                    $botReply = $lang === 'en'
-                        ? "I couldn't find an exact answer. Here are some related questions you might be interested in:"
-                        : "Mình không tìm thấy câu trả lời chính xác. Dưới đây là một số câu hỏi liên quan bạn có thể quan tâm:";
+                    if ($isVague) {
+                        $botReply = $lang === 'en'
+                            ? "Your question is quite general. Here are some related questions that might help:"
+                            : "Câu hỏi của bạn khá chung chung. Dưới đây là một số câu hỏi liên quan có thể giúp bạn:";
+                    } else {
+                        $botReply = $lang === 'en'
+                            ? "I couldn't find an exact answer. Here are some related questions you might be interested in:"
+                            : "Mình không tìm thấy câu trả lời chính xác. Dưới đây là một số câu hỏi liên quan bạn có thể quan tâm:";
+                    }
                     $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
                 } else {
                     // Không có câu hỏi liên quan → thông báo không tìm thấy
@@ -294,6 +303,57 @@ class ChatController extends BaseController
         }
 
         // Nếu không có từ khóa nào → không liên quan
+        return false;
+    }
+
+    /**
+     * Kiểm tra xem câu hỏi có vắn tắt/chung chung không
+     * Câu hỏi vắn tắt: chỉ 1-2 từ, không có động từ, không có từ nghi vấn
+     */
+    private function isVagueQuestion(string $message): bool
+    {
+        $messageLower = mb_strtolower(trim($message));
+        $messageLength = mb_strlen($messageLower);
+        
+        // 1. Câu hỏi quá ngắn (< 10 ký tự)
+        if ($messageLength < 10) {
+            return true;
+        }
+        
+        // 2. Chỉ có 1-2 từ
+        $words = preg_split('/\s+/u', $messageLower);
+        if (count($words) <= 2) {
+            return true;
+        }
+        
+        // 3. Không có từ nghi vấn và không có động từ
+        $questionWords = ['gì', 'nào', 'đâu', 'sao', 'thế nào', 'như thế nào', 'bao giờ', 'khi nào', 
+                          'ai', 'what', 'where', 'when', 'who', 'how', 'why', 'which'];
+        $verbs = ['là', 'có', 'được', 'nằm', 'ở', 'mở', 'đóng', 'mượn', 'trả', 'đăng ký', 
+                  'tìm', 'tra cứu', 'làm', 'thực hiện'];
+        
+        $hasQuestionWord = false;
+        $hasVerb = false;
+        
+        foreach ($questionWords as $qw) {
+            if (mb_strpos($messageLower, $qw) !== false) {
+                $hasQuestionWord = true;
+                break;
+            }
+        }
+        
+        foreach ($verbs as $verb) {
+            if (mb_strpos($messageLower, $verb) !== false) {
+                $hasVerb = true;
+                break;
+            }
+        }
+        
+        // Nếu không có từ nghi vấn và không có động từ → câu hỏi vắn tắt
+        if (!$hasQuestionWord && !$hasVerb) {
+            return true;
+        }
+        
         return false;
     }
 }
