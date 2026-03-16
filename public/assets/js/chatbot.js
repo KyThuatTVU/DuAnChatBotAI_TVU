@@ -271,6 +271,10 @@ async function sendMessage() {
             }),
         });
 
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+
         const data = await res.json();
 
         // Đợi đủ thời gian tối thiểu để typing indicator hiển thị tự nhiên
@@ -296,6 +300,7 @@ async function sendMessage() {
             appendMessage('bot', data.error || (typeof t === 'function' ? t('error_occurred') : 'Đã có lỗi xảy ra. Vui lòng thử lại.'));
         }
     } catch (e) {
+        console.error('Chat error:', e);
         const elapsed = Date.now() - typingStart;
         if (elapsed < MIN_TYPING_MS) {
             await new Promise(r => setTimeout(r, MIN_TYPING_MS - elapsed));
@@ -303,6 +308,9 @@ async function sendMessage() {
         hideTypingIndicator();
         appendMessage('bot', typeof t === 'function' ? t('cannot_connect') : 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.');
     }
+    
+    // Re-enable send button
+    document.getElementById('sendBtn').disabled = false;
 }
 
 /**

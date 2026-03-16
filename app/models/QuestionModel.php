@@ -170,6 +170,9 @@ class QuestionModel extends BaseModel
         // Tách từ khóa từ câu hỏi người dùng
         $userKeywords = $this->extractKeywords($lowerMessage);
         
+        // Kiểm tra ngữ cảnh: câu hỏi có liên quan đến thư viện không?
+        $isLibraryContext = $this->checkLibraryContext($lowerMessage, $userKeywords);
+        
         $results = [];
 
         // 1. Tìm bằng FULLTEXT (nhanh nhất, dùng index)
@@ -186,8 +189,8 @@ class QuestionModel extends BaseModel
             $results = $stmt->fetchAll();
         }
 
-        // 2. Nếu không có kết quả, tìm bằng LIKE với từng từ khóa
-        if (empty($results) && !empty($userKeywords)) {
+        // 2. Nếu không có kết quả, tìm bằng LIKE với từng từ khóa (chỉ khi có ngữ cảnh thư viện)
+        if (empty($results) && !empty($userKeywords) && $isLibraryContext) {
             $conditions = [];
             $params = [];
             
@@ -209,7 +212,7 @@ class QuestionModel extends BaseModel
             }
         }
 
-        // 3. Tính điểm tương đồng cho từng kết quả (TF-IDF + Levenshtein)
+        // 3. Tính điểm tương đồng cho từng kết quả (TF-IDF + Levenshtein + Context)
         if (!empty($results)) {
             foreach ($results as &$result) {
                 $questionKeywords = $this->extractKeywords(mb_strtolower($result['question_text']));
@@ -220,12 +223,20 @@ class QuestionModel extends BaseModel
                 // Tính khoảng cách Levenshtein (chuẩn hóa 0-1)
                 $levenshteinScore = $this->calculateLevenshteinScore($lowerMessage, mb_strtolower($result['question_text']));
                 
-                // Điểm tổng hợp (70% keyword match + 30% Levenshtein)
-                $result['similarity_score'] = ($matchScore * 0.7) + ($levenshteinScore * 0.3);
+                // Tính điểm ngữ cảnh (semantic similarity)
+                $contextScore = $this->calculateContextScore($lowerMessage, mb_strtolower($result['question_text']));
+                
+                // Điểm tổng hợp (50% keyword + 20% Levenshtein + 30% context)
+                $result['similarity_score'] = ($matchScore * 0.5) + ($levenshteinScore * 0.2) + ($contextScore * 0.3);
                 
                 // Nếu có relevance từ FULLTEXT, kết hợp thêm
                 if (isset($result['relevance'])) {
                     $result['similarity_score'] = ($result['similarity_score'] * 0.7) + ($result['relevance'] * 0.3);
+                }
+                
+                // Penalty nếu câu hỏi người dùng không có ngữ cảnh thư viện
+                if (!$isLibraryContext) {
+                    $result['similarity_score'] *= 0.3; // Giảm 70% điểm
                 }
             }
             
@@ -243,6 +254,138 @@ class QuestionModel extends BaseModel
         }
 
         return $results;
+    }
+    
+    /**
+     * Kiểm tra ngữ cảnh: câu hỏi có liên quan đến thư viện không?
+     */
+    private function checkLibraryContext($message, $keywords)
+    {
+        // Từ khóa liên quan đến thư viện
+        $libraryKeywords = [
+            'thư viện', 'library', 'sách', 'book', 'mượn', 'borrow', 'trả', 'return',
+            'đọc', 'read', 'tài liệu', 'document', 'học liệu', 'celras', 'tvu',
+            'tra vinh', 'đại học', 'university', 'sinh viên', 'student',
+            'giảng viên', 'teacher', 'giáo viên', 'phòng', 'room', 'tầng', 'floor',
+            'giờ mở cửa', 'opening hours', 'thẻ', 'card', 'đăng ký', 'register',
+            'luận văn', 'thesis', 'nghiên cứu', 'research', 'tạp chí', 'journal',
+            'cơ sở dữ liệu', 'database', 'tra cứu', 'search', 'wifi', 'máy tính', 'computer',
+            'photocopy', 'in ấn', 'print', 'scan', 'dịch vụ', 'service'
+        ];
+        
+        // Kiểm tra xem có từ khóa thư viện nào trong câu hỏi không
+        foreach ($libraryKeywords as $libKeyword) {
+            if (mb_strpos($message, $libKeyword) !== false) {
+                return true;
+            }
+        }
+        
+        // Kiểm tra xem có ít nhất 2 từ khóa trùng với từ khóa thư viện không
+        $matchCount = 0;
+        foreach ($keywords as $keyword) {
+            foreach ($libraryKeywords as $libKeyword) {
+                if ($keyword === $libKeyword || mb_strpos($libKeyword, $keyword) !== false) {
+                    $matchCount++;
+                    break;
+                }
+            }
+        }
+        
+        return $matchCount >= 2;
+    }
+    
+    /**
+     * Tính điểm ngữ cảnh (semantic similarity) dựa trên cấu trúc câu
+     */
+    private function calculateContextScore($userMessage, $questionText)
+    {
+        $score = 0.0;
+        
+        // 1. Kiểm tra cấu trúc câu hỏi (có từ nghi vấn không?)
+        $questionWords = ['gì', 'nào', 'đâu', 'sao', 'thế nào', 'như thế nào', 'bao giờ', 'khi nào', 
+                          'ai', 'what', 'where', 'when', 'who', 'how', 'why', 'which'];
+        
+        $userHasQuestion = false;
+        $dbHasQuestion = false;
+        
+        foreach ($questionWords as $qw) {
+            if (mb_strpos($userMessage, $qw) !== false) $userHasQuestion = true;
+            if (mb_strpos($questionText, $qw) !== false) $dbHasQuestion = true;
+        }
+        
+        // Cả hai đều là câu hỏi → +0.3
+        if ($userHasQuestion && $dbHasQuestion) {
+            $score += 0.3;
+        }
+        
+        // 2. Kiểm tra động từ chính (hành động)
+        $actionVerbs = [
+            'mượn', 'trả', 'đăng ký', 'tìm', 'tra cứu', 'đọc', 'xem', 'tải', 'download',
+            'borrow', 'return', 'register', 'search', 'find', 'read', 'view', 'download',
+            'in', 'print', 'photocopy', 'scan', 'gia hạn', 'renew', 'đặt', 'reserve'
+        ];
+        
+        $userActions = [];
+        $dbActions = [];
+        
+        foreach ($actionVerbs as $verb) {
+            if (mb_strpos($userMessage, $verb) !== false) $userActions[] = $verb;
+            if (mb_strpos($questionText, $verb) !== false) $dbActions[] = $verb;
+        }
+        
+        // Có động từ chung → +0.4
+        $commonActions = array_intersect($userActions, $dbActions);
+        if (!empty($commonActions)) {
+            $score += 0.4;
+        }
+        
+        // 3. Kiểm tra danh từ chính (đối tượng)
+        $mainNouns = [
+            'sách', 'book', 'tài liệu', 'document', 'luận văn', 'thesis',
+            'thẻ', 'card', 'phòng', 'room', 'tầng', 'floor', 'giờ', 'hour',
+            'dịch vụ', 'service', 'wifi', 'máy tính', 'computer', 'database'
+        ];
+        
+        $userNouns = [];
+        $dbNouns = [];
+        
+        foreach ($mainNouns as $noun) {
+            if (mb_strpos($userMessage, $noun) !== false) $userNouns[] = $noun;
+            if (mb_strpos($questionText, $noun) !== false) $dbNouns[] = $noun;
+        }
+        
+        // Có danh từ chung → +0.3
+        $commonNouns = array_intersect($userNouns, $dbNouns);
+        if (!empty($commonNouns)) {
+            $score += 0.3;
+        }
+        
+        return min($score, 1.0); // Giới hạn tối đa 1.0
+    }
+
+    /**
+     * Lấy tất cả câu hỏi đang hoạt động (để Gemini phân tích)
+     */
+    public function getAllActiveQuestions()
+    {
+        $sql = "SELECT id, question_text, answer_text, answer_text_en, category_id 
+                FROM {$this->table} 
+                WHERE is_active = 1 
+                ORDER BY priority DESC, id ASC
+                LIMIT 100"; // Giới hạn 100 câu phổ biến nhất
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Trích xuất từ khóa từ câu hỏi (loại bỏ stop words) - Public wrapper
+     */
+    public function extractKeywordsPublic($text)
+    {
+        $normalized = $this->normalizeMessage($text);
+        $lower = mb_strtolower($normalized);
+        return $this->extractKeywords($lower);
     }
 
     /**

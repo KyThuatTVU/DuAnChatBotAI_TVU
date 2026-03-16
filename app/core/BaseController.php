@@ -20,7 +20,8 @@ class BaseController
      */
     protected function getJsonInput()
     {
-        return json_decode(file_get_contents('php://input'), true) ?? [];
+        $input = file_get_contents('php://input');
+        return json_decode($input, true) ?? [];
     }
 
     /**
