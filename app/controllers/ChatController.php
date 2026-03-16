@@ -39,120 +39,175 @@ class ChatController extends BaseController
      * POST /api/chat/send - Gửi tin nhắn và nhận trả lời
      */
     public function send()
-    {
-        if ($this->getMethod() !== 'POST') {
-            $this->json(['error' => 'Method not allowed'], 405);
-        }
+{
+    if ($this->getMethod() !== 'POST') {
+        $this->json(['error' => 'Method not allowed'], 405);
+    }
 
-        $input = $this->getJsonInput();
-        $message = trim($input['message'] ?? '');
-        $sessionToken = $input['session_token'] ?? '';
-        $lang = $input['lang'] ?? 'vi';
+    $input        = $this->getJsonInput();
+    $message      = trim($input['message'] ?? '');
+    $sessionToken = $input['session_token'] ?? '';
+    $lang         = $input['lang'] ?? 'vi';
 
-        if (empty($message)) {
-            $this->json(['error' => $lang === 'en' ? 'Message cannot be empty' : 'Tin nhắn không được để trống'], 400);
-        }
+    if (empty($message)) {
+        $this->json([
+            'error' => $lang === 'en'
+                ? 'Message cannot be empty'
+                : 'Tin nhắn không được để trống'
+        ], 400);
+    }
 
-        if (mb_strlen($message) > 3000) {
-            $this->json(['error' => $lang === 'en' ? 'Message must not exceed 3000 characters' : 'Tin nhắn không được vượt quá 3000 ký tự'], 400);
-        }
+    if (mb_strlen($message) > 3000) {
+        $this->json([
+            'error' => $lang === 'en'
+                ? 'Message must not exceed 3000 characters'
+                : 'Tin nhắn không được vượt quá 3000 ký tự'
+        ], 400);
+    }
 
-        // Tìm hoặc tạo session
-        $session = null;
-        if ($sessionToken) {
-            $session = $this->chatModel->findByToken($sessionToken);
-        }
-        if (!$session) {
-            $sessionId = $this->chatModel->createSession(
-                $_SERVER['REMOTE_ADDR'] ?? '',
-                $_SERVER['HTTP_USER_AGENT'] ?? ''
-            );
-            $session = $this->chatModel->getById($sessionId);
-        }
+    // Tìm hoặc tạo session
+    $session = null;
+    if ($sessionToken) {
+        $session = $this->chatModel->findByToken($sessionToken);
+    }
+    if (!$session) {
+        $sessionId = $this->chatModel->createSession(
+            $_SERVER['REMOTE_ADDR'] ?? '',
+            $_SERVER['HTTP_USER_AGENT'] ?? ''
+        );
+        $session = $this->chatModel->getById($sessionId);
+    }
 
-        // Lưu tin nhắn người dùng
-        $this->chatModel->saveMessage($session['id'], 'user', $message);
+    // Lưu tin nhắn người dùng
+    $this->chatModel->saveMessage($session['id'], 'user', $message);
 
-        // Kiểm tra xem câu hỏi có liên quan đến thư viện không
-        $isRelevant = $this->isLibraryRelated($message);
+    // ===== 1. Tầng lọc TOXIC =====
+    if ($this->isToxic($message)) {
+        $botReply = $lang === 'en'
+            ? "I'd like to keep our conversation respectful. Please avoid using offensive language. You can ask me anything related to the CELRAS TVU Library, its services, books, or study resources."
+            : "Mình mong muốn giữ cuộc trò chuyện lịch sự và tôn trọng nhé. Vui lòng tránh sử dụng những từ ngữ không phù hợp. Bạn có thể hỏi mình về thư viện CELRAS TVU, sách, dịch vụ hoặc tài nguyên học tập.";
 
-        // Tìm câu trả lời
-        $answer = $this->questionModel->findAnswer($message);
-        $settings = $this->settingModel->getPublicSettings();
-
-        // Tìm biểu mẫu liên quan
-        $matchedForms = $this->formModel->findMatchingForms($message);
-
-        // Biến để lưu danh sách câu hỏi gợi ý (nếu câu hỏi vắng tắt)
-        $relatedQuestions = [];
-
-        if ($answer) {
-            // Use English answer if lang=en and answer_text_en is available
-            if ($lang === 'en' && !empty($answer['answer_text_en'])) {
-                $botReply = $answer['answer_text_en'];
-            } else {
-                $botReply = $answer['answer_text'];
-            }
-
-            // Loại bỏ câu hỏi bị lồng ở đầu câu trả lời (nếu có)
-            $botReply = $this->stripEmbeddedQuestion($botReply, $message);
-
-            $this->chatModel->saveMessage($session['id'], 'bot', $botReply, $answer['id'], 1.0);
-        } elseif (!empty($matchedForms)) {
-            $botReply = $lang === 'en'
-                ? 'Here are the forms/documents related to your request. Please click the link to download or fill in the information:'
-                : 'Dưới đây là biểu mẫu / giấy tờ liên quan đến yêu cầu của bạn. Vui lòng nhấn vào link để tải về hoặc điền thông tin:';
-            $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
-        } else {
-            // Kiểm tra độ liên quan trước khi tìm related questions
-            if (!$isRelevant) {
-                // Câu hỏi không liên quan đến thư viện
-                $botReply = $lang === 'en'
-                    ? "Hi there! 😊 I'm the CELRAS TVU Library chatbot, so I can only help with questions about the library.\n\nI can assist you with:\n📚 Library services and hours\n📖 Borrowing and returning books\n🏢 Library facilities and locations\n📋 Forms and procedures\n\nFeel free to ask me anything about the library!"
-                    : "Xin chào bạn! 😊 Mình là chatbot của Trung tâm Học liệu CELRAS TVU, nên mình chỉ có thể hỗ trợ các câu hỏi liên quan đến thư viện thôi nhé.\n\nMình có thể giúp bạn về:\n📚 Dịch vụ và giờ mở cửa thư viện\n📖 Mượn và trả sách\n🏢 Cơ sở vật chất và vị trí các phòng\n📋 Biểu mẫu và thủ tục\n\nHãy hỏi mình bất cứ điều gì về thư viện nhé!";
-                $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
-                $this->chatModel->saveUnanswered($session['id'], $message);
-            } else {
-                // Kiểm tra xem câu hỏi có vắn tắt/chung chung không
-                $isVague = $this->isVagueQuestion($message);
-                
-                // Tìm câu hỏi liên quan với thuật toán cải tiến
-                $relatedQuestions = $this->questionModel->findRelatedQuestions($message, $isVague ? 8 : 5);
-
-                if (!empty($relatedQuestions)) {
-                    // Có câu hỏi liên quan → đưa ra để người dùng chọn
-                    if ($isVague) {
-                        $botReply = $lang === 'en'
-                            ? "Your question is quite general. Here are some related questions that might help:"
-                            : "Câu hỏi của bạn khá chung chung. Dưới đây là một số câu hỏi liên quan có thể giúp bạn:";
-                    } else {
-                        $botReply = $lang === 'en'
-                            ? "I couldn't find an exact answer. Here are some related questions you might be interested in:"
-                            : "Mình không tìm thấy câu trả lời chính xác. Dưới đây là một số câu hỏi liên quan bạn có thể quan tâm:";
-                    }
-                    $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
-                } else {
-                    // Không có câu hỏi liên quan → thông báo không tìm thấy
-                    if ($lang === 'en') {
-                        $botReply = "Sorry, I couldn't find an answer to your question. 😊\n\nYou can try:\n📌 Rephrasing your question\n📌 Browsing the categories on the left\n📌 Contacting us directly:\n📧 Email: trungtamhoclieu@tvu.edu.vn\n📞 Phone: 0294 3855 246 (ext. 142)\n\nWe're happy to help!";
-                    } else {
-                        $botReply = $settings['no_answer_message'];
-                    }
-                    $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
-                    $this->chatModel->saveUnanswered($session['id'], $message);
-                }
-            }
-        }
+        $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
 
         $this->json([
-            'success'          => true,
-            'reply'            => $botReply,
-            'forms'            => $matchedForms,
-            'related_questions' => $relatedQuestions,
-            'session_token'    => $session['session_token'],
-            'matched'          => ($answer || !empty($matchedForms)) ? true : false,
+            'success'           => true,
+            'reply'             => $botReply,
+            'forms'             => [],
+            'related_questions' => [],
+            'session_token'     => $session['session_token'],
+            'matched'           => false,
         ]);
     }
+
+    $settings = $this->settingModel->getPublicSettings();
+
+    // ===== 2. Tầng FORM (biểu mẫu) =====
+    $matchedForms = $this->formModel->findMatchingForms($message);
+    if (!empty($matchedForms)) {
+        $botReply = $lang === 'en'
+            ? 'Here are the forms/documents related to your request. Please click the link to download or fill in the information:'
+            : 'Dưới đây là biểu mẫu / giấy tờ liên quan đến yêu cầu của bạn. Vui lòng nhấn vào link để tải về hoặc điền thông tin:';
+
+        $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
+
+        $this->json([
+            'success'           => true,
+            'reply'             => $botReply,
+            'forms'             => $matchedForms,
+            'related_questions' => [],
+            'session_token'     => $session['session_token'],
+            'matched'           => true,
+        ]);
+    }
+
+    // ===== 3. Tầng Q&A trong DB – scoring 3 mức =====
+    $relatedQuestions = $this->questionModel->findRelatedQuestions($message, 8);
+    $top              = $relatedQuestions[0] ?? null;
+    $topScore         = isset($top['similarity_score']) ? (float) $top['similarity_score'] : 0.0;
+
+    // Ngưỡng điểm
+    $HIGH_THRESHOLD = 0.75; // đủ ý → trả lời 1 câu
+    $LOW_THRESHOLD  = 0.40; // chung chung → đưa list
+
+    // 3.1. Đủ giống 1 câu trong DB → trả lời trực tiếp
+    if ($top && $topScore >= $HIGH_THRESHOLD) {
+        if ($lang === 'en' && !empty($top['answer_text_en'])) {
+            $botReply = $top['answer_text_en'];
+        } else {
+            $botReply = $top['answer_text'];
+        }
+
+        $botReply = $this->stripEmbeddedQuestion($botReply, $message);
+
+        $this->chatModel->saveMessage(
+            $session['id'],
+            'bot',
+            $botReply,
+            $top['id'],
+            $topScore
+        );
+
+        $this->json([
+            'success'           => true,
+            'reply'             => $botReply,
+            'forms'             => [],
+            'related_questions' => [],
+            'session_token'     => $session['session_token'],
+            'matched'           => true,
+        ]);
+    }
+
+    // 3.2. Có liên quan nhưng chưa đủ chắc chắn → chỉ gợi ý list câu hỏi
+    if ($topScore >= $LOW_THRESHOLD && !empty($relatedQuestions)) {
+        $isVague = $this->isVagueQuestion($message);
+
+        if ($isVague) {
+            $botReply = $lang === 'en'
+                ? "Your question is quite general. Here are some related questions that might help:"
+                : "Câu hỏi của bạn khá chung chung. Dưới đây là một số câu hỏi liên quan có thể giúp bạn:";
+        } else {
+            $botReply = $lang === 'en'
+                ? "I couldn't find an exact answer. Here are some related questions you might be interested in:"
+                : "Mình không tìm thấy câu trả lời chính xác. Dưới đây là một số câu hỏi liên quan bạn có thể quan tâm:";
+        }
+
+        $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
+
+        $this->json([
+            'success'           => true,
+            'reply'             => $botReply,
+            'forms'             => [],
+            'related_questions' => $relatedQuestions,
+            'session_token'     => $session['session_token'],
+            'matched'           => false,
+        ]);
+    }
+
+    // ===== 4. Không câu nào trong DB đủ điểm → thử Gemini, rồi fallback =====
+    $geminiReply = $this->generateWithGemini($message, $lang);
+
+    if ($geminiReply !== null) {
+        $botReply = $geminiReply;
+        $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
+    } else {
+        if ($lang === 'en') {
+            $botReply = "Sorry, I couldn't find an answer to your question. 😊\n\nYou can try:\n📌 Rephrasing your question\n📌 Browsing the categories on the left\n📌 Contacting us directly:\n📧 Email: trungtamhoclieu@tvu.edu.vn\n📞 Phone: 0294 3855 246 (ext. 142)\n\nWe're happy to help!";
+        } else {
+            $botReply = $settings['no_answer_message'];
+        }
+        $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
+        $this->chatModel->saveUnanswered($session['id'], $message);
+    }
+
+    $this->json([
+        'success'           => true,
+        'reply'             => $botReply,
+        'forms'             => [],
+        'related_questions' => [],
+        'session_token'     => $session['session_token'],
+        'matched'           => false,
+    ]);
+}
 
     /**
      * POST /api/chat/new - Tạo cuộc trò chuyện mới
@@ -252,57 +307,45 @@ class ChatController extends BaseController
     }
 
     /**
-     * Kiểm tra xem câu hỏi có liên quan đến thư viện không
-     * Dựa trên các từ khóa chủ đề của thư viện
+     * Kiểm tra xem câu hỏi có nằm trong "miền kiến thức của hệ thống" hay không.
+     *
+     * Theo yêu cầu:
+     * - Không đoán chủ đề trước, không hard-code từ khóa thư viện hay từ khóa "ngoài thư viện".
+     * - Thay vào đó, dùng chính dữ liệu Q&A trong DB (thuật toán TF-IDF + Levenshtein +
+     *   N-gram trong QuestionModel::findRelatedQuestions) để xem câu hỏi người dùng
+     *   có đủ giống với bất kỳ câu hỏi nào trong hệ thống hay không.
+     * - Nếu không có câu nào đủ giống → coi là "ngoài hệ thống" và chỉ trả lời message chung.
      */
     private function isLibraryRelated(string $message): bool
     {
-        $messageLower = mb_strtolower($message);
+        $messageLower = mb_strtolower(trim($message));
 
-        // Danh sách từ khóa liên quan đến thư viện
-        $libraryKeywords = [
-            // Từ khóa chính
-            'thư viện', 'library', 'học liệu', 'celras', 'tvu',
-            
-            // Dịch vụ
-            'sách', 'book', 'mượn', 'trả', 'borrow', 'return', 'gia hạn', 'renew',
-            'đọc', 'read', 'tài liệu', 'document', 'giáo trình', 'luận văn', 'thesis',
-            
-            // Địa điểm
-            'phòng', 'room', 'tầng', 'floor', 'khu', 'area', 'vị trí', 'location',
-            'đâu', 'where', 'nằm', 'ở đâu',
-            
-            // Thời gian
-            'giờ', 'hour', 'mở cửa', 'đóng cửa', 'open', 'close', 'thời gian',
-            
-            // Thủ tục
-            'đăng ký', 'register', 'thẻ', 'card', 'biểu mẫu', 'form', 'hồ sơ',
-            'thủ tục', 'procedure', 'quy định', 'regulation', 'quy trình',
-            
-            // Cơ sở vật chất
-            'máy tính', 'computer', 'wifi', 'internet', 'in ấn', 'print',
-            'photocopy', 'scan', 'thiết bị', 'equipment',
-            
-            // Dịch vụ khác
-            'hỗ trợ', 'support', 'tư vấn', 'consult', 'hướng dẫn', 'guide',
-            'tìm kiếm', 'search', 'tra cứu', 'lookup',
-            
-            // Người dùng
-            'sinh viên', 'student', 'giảng viên', 'teacher', 'lecturer',
-            
-            // Các phòng cụ thể
-            'nội sinh', 'ngoại sinh', 'tự học', 'nghiên cứu', 'đọc báo',
-            'multimedia', 'kho', 'lưu trữ',
+        // 1. Lọc nhanh các câu chứa từ tục tĩu/spam rõ ràng
+        $badWords = [
+            'đm', 'dm', 'vl', 'vcl', 'cc', 'lồn', 'cặc', 'đéo', 'đ.m',
+            'fuck', 'shit', 'ngu', 'ngốc', 'đần', 'khùng', 'điên', 'loz'
         ];
+        foreach ($badWords as $bad) {
+            if ($bad !== '' && mb_strpos($messageLower, $bad) !== false) {
+                return false;
+            }
+        }
 
-        // Kiểm tra xem có từ khóa nào xuất hiện trong câu hỏi không
-        foreach ($libraryKeywords as $keyword) {
-            if (mb_strpos($messageLower, $keyword) !== false) {
+        // 2. Dùng thuật toán tìm câu hỏi liên quan trên toàn bộ DB.
+        $candidates = $this->questionModel->findRelatedQuestions($message, 3);
+        if (empty($candidates)) {
+            return false;
+        }
+
+        // 3. Nếu có ít nhất một câu hỏi trong DB có similarity_score đủ cao
+        //    (dựa trên TF-IDF + Levenshtein + N-gram) thì coi là "nằm trong hệ thống".
+        foreach ($candidates as $row) {
+            if (isset($row['similarity_score']) && (float) $row['similarity_score'] >= 0.4) {
                 return true;
             }
         }
 
-        // Nếu không có từ khóa nào → không liên quan
+        // Không câu nào trong DB đủ gần → coi là ngoài hệ thống
         return false;
     }
 
@@ -355,5 +398,113 @@ class ChatController extends BaseController
         }
         
         return false;
+    }
+
+    /**
+     * Kiểm tra tin nhắn có độc hại/toxic (chửi bới, xúc phạm) hay không.
+     * Dùng blacklist + Regex ranh giới Unicode để tránh khớp nhầm từ con trong từ dài.
+     */
+    private function isToxic(string $message): bool
+    {
+        $text = mb_strtolower(trim($message));
+        if ($text === '') return false;
+
+        // Các cụm/toxic phổ biến (có thể mở rộng dần)
+        $toxicPhrases = [
+            'ông nội mày',
+            'ông nội nhà mày',
+            'đồ ngu',
+            'đồ điên',
+            'mày ngu',
+            'mày điên',
+            'thằng ngu',
+            'con ngu',
+            'đm',
+            'đmm',
+            'dm',
+            'vcl',
+            'vl',
+            'cặc',
+            'lồn',
+            'đéo',
+            'fuck',
+            'shit',
+        ];
+
+        // Ranh giới theo chữ cái Unicode: không cho dính vào từ dài
+        $escaped = array_map('preg_quote', $toxicPhrases);
+        $pattern = '/(?<!\p{L})(' . implode('|', $escaped) . ')(?!\p{L})/iu';
+
+        return preg_match($pattern, $text) === 1;
+    }
+
+    /**
+     * Gọi Gemini (qua GEMINI_API_KEY) để tạo câu trả lời khi DB không có kết quả.
+     * Trả về string nếu thành công, hoặc null nếu lỗi / hết key / không cấu hình.
+     */
+    private function generateWithGemini(string $message, string $lang = 'vi'): ?string
+    {
+        $apiKey = getenv('GEMINI_API_KEY') ?: ($_ENV['GEMINI_API_KEY'] ?? '');
+        if (!$apiKey) {
+            return null;
+        }
+
+        // Endpoint Gemini generative language API (HTTP v1beta)
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' . urlencode($apiKey);
+
+        // Prompt hướng mô hình trả lời trong phạm vi thư viện
+        $systemInstruction = $lang === 'en'
+            ? "You are a virtual assistant for the CELRAS TVU Library. Only answer questions related to the library, its services, opening hours, borrowing/returning books, facilities, and study resources at Tra Vinh University. If the question is clearly unrelated to the library, politely say that you can only answer library-related questions."
+            : "Bạn là trợ lý ảo cho Trung tâm Học liệu CELRAS TVU. Chỉ trả lời các câu hỏi liên quan đến thư viện, dịch vụ thư viện, giờ mở cửa, mượn/trả sách, cơ sở vật chất và tài nguyên học tập tại Trường Đại học Trà Vinh. Nếu câu hỏi rõ ràng không liên quan đến thư viện, hãy lịch sự thông báo rằng bạn chỉ có thể trả lời các câu hỏi liên quan đến thư viện.";
+
+        $body = [
+            'system_instruction' => [
+                'parts' => [
+                    ['text' => $systemInstruction],
+                ],
+            ],
+            'contents' => [
+                [
+                    'role'  => 'user',
+                    'parts' => [
+                        ['text' => $message],
+                    ],
+                ],
+            ],
+            'generationConfig' => [
+                'temperature' => 0.3,
+                'maxOutputTokens' => 512,
+            ],
+        ];
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json; charset=utf-8'],
+            CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_UNICODE),
+            CURLOPT_TIMEOUT => 10,
+        ]);
+
+        $response = curl_exec($ch);
+        if ($response === false) {
+            curl_close($ch);
+            return null;
+        }
+
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode < 200 || $httpCode >= 300) {
+            // Có thể là hết quota / key invalid → fallback
+            return null;
+        }
+
+        $data = json_decode($response, true);
+        if (!isset($data['candidates'][0]['content']['parts'][0]['text'])) {
+            return null;
+        }
+
+        return trim($data['candidates'][0]['content']['parts'][0]['text']);
     }
 }
