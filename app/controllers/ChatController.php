@@ -120,79 +120,32 @@ class ChatController extends BaseController
         ]);
     }
 
-    // ===== 3. Tầng Q&A - Dùng Gemini AI để tìm câu hỏi phù hợp =====
-    
-    // Bước 1: Lấy tất cả câu hỏi từ DB để Gemini phân tích
-    $allQuestions = $this->questionModel->getAllActiveQuestions();
-    
-    // Bước 2: Dùng Gemini để tìm câu hỏi phù hợp nhất
-    $geminiMatch = $this->findBestQuestionWithGemini($message, $allQuestions, $lang);
-    
-    if ($geminiMatch !== null) {
-        // Gemini tìm thấy câu hỏi phù hợp
-        if ($geminiMatch['match_type'] === 'exact') {
-            // Trả lời trực tiếp
-            $question = $geminiMatch['question'];
-            
-            $botReply = $question['answer_text'];
-            
-            $botReply = $this->stripEmbeddedQuestion($botReply, $message);
-            
-            $this->chatModel->saveMessage(
-                $session['id'],
-                'bot',
-                $botReply,
-                $question['id'],
-                $geminiMatch['confidence']
-            );
-            
-            $this->json([
-                'success'           => true,
-                'reply'             => $botReply,
-                'forms'             => [],
-                'related_questions' => [],
-                'session_token'     => $session['session_token'],
-                'matched'           => true,
-            ]);
-        } elseif ($geminiMatch['match_type'] === 'related') {
-            // Đưa ra list câu hỏi gợi ý
-            $botReply = $geminiMatch['message'];
-            $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
-            
-            $this->json([
-                'success'           => true,
-                'reply'             => $botReply,
-                'forms'             => [],
-                'related_questions' => $geminiMatch['suggestions'],
-                'session_token'     => $session['session_token'],
-                'matched'           => false,
-            ]);
-        } elseif ($geminiMatch['match_type'] === 'irrelevant') {
-            // Câu hỏi không liên quan → dùng Gemini trả lời thông minh
-            $botReply = $this->generateSmartReplyWithGemini($message, $lang);
-            $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
-            
-            $this->json([
-                'success'           => true,
-                'reply'             => $botReply,
-                'forms'             => [],
-                'related_questions' => [],
-                'session_token'     => $session['session_token'],
-                'matched'           => false,
-            ]);
-        }
-    }
-
-    // ===== 4. Fallback: Gemini không khả dụng → dùng thuật toán cũ =====
+    // ===== 3. Tầng Q&A trong DB – scoring 3 mức =====
     $relatedQuestions = $this->questionModel->findRelatedQuestions($message, 8);
     $top              = $relatedQuestions[0] ?? null;
     $topScore         = isset($top['similarity_score']) ? (float) $top['similarity_score'] : 0.0;
 
-    if ($top && $topScore >= 0.70) {
-        $botReply = $top['answer_text'];
+    // Ngưỡng điểm (điều chỉnh cho thuật toán mới)
+    $HIGH_THRESHOLD = 0.60; // >= 60% → trả lời trực tiếp
+    $LOW_THRESHOLD  = 0.30; // >= 30% → hiển thị list
+
+    // 3.1. Đủ giống 1 câu trong DB → trả lời trực tiếp
+    if ($top && $topScore >= $HIGH_THRESHOLD) {
+        if ($lang === 'en' && !empty($top['answer_text_en'])) {
+            $botReply = $top['answer_text_en'];
+        } else {
+            $botReply = $top['answer_text'];
+        }
 
         $botReply = $this->stripEmbeddedQuestion($botReply, $message);
-        $this->chatModel->saveMessage($session['id'], 'bot', $botReply, $top['id'], $topScore);
+
+        $this->chatModel->saveMessage(
+            $session['id'],
+            'bot',
+            $botReply,
+            $top['id'],
+            $topScore
+        );
 
         $this->json([
             'success'           => true,
@@ -204,10 +157,19 @@ class ChatController extends BaseController
         ]);
     }
 
-    if ($topScore >= 0.35 && !empty($relatedQuestions)) {
-        $botReply = $lang === 'en'
-            ? "I found some related questions. Please select one to get a detailed answer:"
-            : "Mình tìm thấy một số câu hỏi liên quan. Vui lòng chọn câu hỏi để nhận câu trả lời chi tiết:";
+    // 3.2. Có liên quan nhưng chưa đủ chắc chắn → chỉ gợi ý list câu hỏi
+    if ($topScore >= $LOW_THRESHOLD && !empty($relatedQuestions)) {
+        $isVague = $this->isVagueQuestion($message);
+
+        if ($isVague) {
+            $botReply = $lang === 'en'
+                ? "Your question is quite general. Here are some related questions that might help:"
+                : "Câu hỏi của bạn khá chung chung. Dưới đây là một số câu hỏi liên quan có thể giúp bạn:";
+        } else {
+            $botReply = $lang === 'en'
+                ? "I couldn't find an exact answer. Here are some related questions you might be interested in:"
+                : "Mình không tìm thấy câu trả lời chính xác. Dưới đây là một số câu hỏi liên quan bạn có thể quan tâm:";
+        }
 
         $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
 
@@ -221,14 +183,21 @@ class ChatController extends BaseController
         ]);
     }
 
-    // Không tìm thấy gì
-    if ($lang === 'en') {
-        $botReply = "Sorry, I couldn't find an answer to your question. 😊\n\nYou can try:\n📌 Rephrasing your question\n📌 Browsing the categories on the left\n📌 Contacting us directly:\n📧 Email: trungtamhoclieu@tvu.edu.vn\n📞 Phone: 0294 3855 246 (ext. 142)\n\nWe're happy to help!";
+    // ===== 4. Không câu nào trong DB đủ điểm → thử Gemini, rồi fallback =====
+    $geminiReply = $this->generateWithGemini($message, $lang);
+
+    if ($geminiReply !== null) {
+        $botReply = $geminiReply;
+        $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
     } else {
-        $botReply = $settings['no_answer_message'];
+        if ($lang === 'en') {
+            $botReply = "Sorry, I couldn't find an answer to your question. 😊\n\nYou can try:\n📌 Rephrasing your question\n📌 Browsing the categories on the left\n📌 Contacting us directly:\n📧 Email: trungtamhoclieu@tvu.edu.vn\n📞 Phone: 0294 3855 246 (ext. 142)\n\nWe're happy to help!";
+        } else {
+            $botReply = $settings['no_answer_message'];
+        }
+        $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
+        $this->chatModel->saveUnanswered($session['id'], $message);
     }
-    $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
-    $this->chatModel->saveUnanswered($session['id'], $message);
 
     $this->json([
         'success'           => true,
@@ -305,198 +274,6 @@ class ChatController extends BaseController
         }
         $messages = $this->chatModel->getMessages($session['id']);
         $this->json(['messages' => $messages]);
-    }
-
-    /**
-     * Dùng Gemini AI để tìm câu hỏi phù hợp nhất trong DB
-     * Trả về: ['match_type' => 'exact'|'related'|'irrelevant', 'question' => ..., 'confidence' => ...]
-     */
-    private function findBestQuestionWithGemini(string $userMessage, array $allQuestions, string $lang = 'vi'): ?array
-    {
-        $apiKey = getenv('GEMINI_API_KEY') ?: ($_ENV['GEMINI_API_KEY'] ?? '');
-        if (!$apiKey || empty($allQuestions)) {
-            return null;
-        }
-
-        // Chuẩn bị danh sách câu hỏi cho Gemini
-        $questionList = [];
-        foreach ($allQuestions as $idx => $q) {
-            $questionList[] = ($idx + 1) . ". " . $q['question_text'];
-        }
-        $questionListText = implode("\n", array_slice($questionList, 0, 50)); // Giới hạn 50 câu để tránh quá dài
-
-        $systemPrompt = $lang === 'en'
-            ? "You are an AI assistant for CELRAS TVU Library. Analyze the user's question and find the most relevant question from the database.\n\nDatabase questions:\n{$questionListText}\n\nInstructions:\n1. If the user's question matches exactly or very closely with a database question, respond with: EXACT|<question_number>|<confidence_0-100>\n2. If the question is related but not exact, respond with: RELATED|<question_numbers_comma_separated>|<message>\n3. If the question is completely irrelevant to the library, respond with: IRRELEVANT|<reason>\n\nExamples:\n- User: \"How to borrow books?\" → EXACT|5|95\n- User: \"books\" → RELATED|3,5,7|Your question is quite general. Here are some related questions:\n- User: \"What should I eat today?\" → IRRELEVANT|This question is not related to library services"
-            : "Bạn là trợ lý AI cho Thư viện CELRAS TVU. Phân tích câu hỏi của người dùng và tìm câu hỏi phù hợp nhất từ cơ sở dữ liệu.\n\nDanh sách câu hỏi trong DB:\n{$questionListText}\n\nHướng dẫn:\n1. Nếu câu hỏi người dùng khớp chính xác hoặc rất gần với câu hỏi trong DB, trả về: EXACT|<số_thứ_tự_câu_hỏi>|<độ_tin_cậy_0-100>\n2. Nếu câu hỏi liên quan nhưng không chính xác, trả về: RELATED|<các_số_thứ_tự_phân_cách_bằng_dấu_phẩy>|<thông_báo>\n3. Nếu câu hỏi hoàn toàn không liên quan đến thư viện, trả về: IRRELEVANT|<lý_do>\n\nVí dụ:\n- User: \"Làm thế nào để mượn sách?\" → EXACT|5|95\n- User: \"sách\" → RELATED|3,5,7|Câu hỏi của bạn khá chung chung. Dưới đây là một số câu hỏi liên quan:\n- User: \"Hôm nay ăn gì?\" → IRRELEVANT|Câu hỏi này không liên quan đến dịch vụ thư viện";
-
-        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' . urlencode($apiKey);
-
-        $body = [
-            'system_instruction' => [
-                'parts' => [
-                    ['text' => $systemPrompt],
-                ],
-            ],
-            'contents' => [
-                [
-                    'role'  => 'user',
-                    'parts' => [
-                        ['text' => $userMessage],
-                    ],
-                ],
-            ],
-            'generationConfig' => [
-                'temperature' => 0.2,
-                'maxOutputTokens' => 256,
-            ],
-        ];
-
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json; charset=utf-8'],
-            CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_UNICODE),
-            CURLOPT_TIMEOUT => 10,
-        ]);
-
-        $response = curl_exec($ch);
-        if ($response === false) {
-            curl_close($ch);
-            return null;
-        }
-
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($httpCode < 200 || $httpCode >= 300) {
-            return null;
-        }
-
-        $data = json_decode($response, true);
-        if (!isset($data['candidates'][0]['content']['parts'][0]['text'])) {
-            return null;
-        }
-
-        $geminiResponse = trim($data['candidates'][0]['content']['parts'][0]['text']);
-        
-        // Parse response
-        $parts = explode('|', $geminiResponse);
-        if (count($parts) < 2) {
-            return null;
-        }
-
-        $matchType = strtolower(trim($parts[0]));
-
-        if ($matchType === 'exact' && count($parts) >= 3) {
-            $questionNumber = (int) trim($parts[1]);
-            $confidence = (float) trim($parts[2]) / 100;
-            
-            if ($questionNumber > 0 && $questionNumber <= count($allQuestions)) {
-                return [
-                    'match_type' => 'exact',
-                    'question' => $allQuestions[$questionNumber - 1],
-                    'confidence' => $confidence,
-                ];
-            }
-        } elseif ($matchType === 'related' && count($parts) >= 3) {
-            $questionNumbers = array_map('intval', explode(',', trim($parts[1])));
-            $message = trim($parts[2]);
-            
-            $suggestions = [];
-            foreach ($questionNumbers as $num) {
-                if ($num > 0 && $num <= count($allQuestions)) {
-                    $suggestions[] = $allQuestions[$num - 1];
-                }
-            }
-            
-            return [
-                'match_type' => 'related',
-                'message' => $message,
-                'suggestions' => array_slice($suggestions, 0, 5),
-            ];
-        } elseif ($matchType === 'irrelevant') {
-            return [
-                'match_type' => 'irrelevant',
-                'reason' => isset($parts[1]) ? trim($parts[1]) : '',
-            ];
-        }
-
-        return null;
-    }
-
-    /**
-     * Dùng Gemini để trả lời thông minh cho câu hỏi không liên quan
-     */
-    private function generateSmartReplyWithGemini(string $message, string $lang = 'vi'): string
-    {
-        $apiKey = getenv('GEMINI_API_KEY') ?: ($_ENV['GEMINI_API_KEY'] ?? '');
-        if (!$apiKey) {
-            return $lang === 'en'
-                ? "I'm sorry, but I can only answer questions related to the CELRAS TVU Library. Your question seems to be about a different topic. Please ask me about library services, books, borrowing, or study resources."
-                : "Xin lỗi bạn, mình chỉ có thể trả lời các câu hỏi liên quan đến Thư viện CELRAS TVU. Câu hỏi của bạn có vẻ thuộc chủ đề khác. Vui lòng hỏi mình về dịch vụ thư viện, sách, mượn trả, hoặc tài nguyên học tập nhé.";
-        }
-
-        $systemInstruction = $lang === 'en'
-            ? "You are a friendly AI assistant for CELRAS TVU Library. The user asked a question that is NOT related to library services. Politely explain that you can only help with library-related questions, and suggest what topics you can help with (borrowing books, library hours, services, facilities, etc.). Keep your response warm, friendly, and helpful. Maximum 3 sentences."
-            : "Bạn là trợ lý AI thân thiện của Thư viện CELRAS TVU. Người dùng đã hỏi một câu hỏi KHÔNG liên quan đến dịch vụ thư viện. Hãy lịch sự giải thích rằng bạn chỉ có thể giúp các câu hỏi liên quan đến thư viện, và gợi ý những chủ đề bạn có thể hỗ trợ (mượn sách, giờ mở cửa, dịch vụ, cơ sở vật chất, v.v.). Giữ câu trả lời ấm áp, thân thiện và hữu ích. Tối đa 3 câu.";
-
-        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' . urlencode($apiKey);
-
-        $body = [
-            'system_instruction' => [
-                'parts' => [
-                    ['text' => $systemInstruction],
-                ],
-            ],
-            'contents' => [
-                [
-                    'role'  => 'user',
-                    'parts' => [
-                        ['text' => $message],
-                    ],
-                ],
-            ],
-            'generationConfig' => [
-                'temperature' => 0.7,
-                'maxOutputTokens' => 256,
-            ],
-        ];
-
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json; charset=utf-8'],
-            CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_UNICODE),
-            CURLOPT_TIMEOUT => 10,
-        ]);
-
-        $response = curl_exec($ch);
-        if ($response === false) {
-            curl_close($ch);
-            return $lang === 'en'
-                ? "I'm sorry, but I can only answer questions related to the CELRAS TVU Library."
-                : "Xin lỗi bạn, mình chỉ có thể trả lời các câu hỏi liên quan đến Thư viện CELRAS TVU.";
-        }
-
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($httpCode < 200 || $httpCode >= 300) {
-            return $lang === 'en'
-                ? "I'm sorry, but I can only answer questions related to the CELRAS TVU Library."
-                : "Xin lỗi bạn, mình chỉ có thể trả lời các câu hỏi liên quan đến Thư viện CELRAS TVU.";
-        }
-
-        $data = json_decode($response, true);
-        if (!isset($data['candidates'][0]['content']['parts'][0]['text'])) {
-            return $lang === 'en'
-                ? "I'm sorry, but I can only answer questions related to the CELRAS TVU Library."
-                : "Xin lỗi bạn, mình chỉ có thể trả lời các câu hỏi liên quan đến Thư viện CELRAS TVU.";
-        }
-
-        return trim($data['candidates'][0]['content']['parts'][0]['text']);
     }
 
     /**
@@ -588,15 +365,17 @@ class ChatController extends BaseController
         
         // 2. Chỉ có 1-2 từ
         $words = preg_split('/\s+/u', $messageLower);
-        if (count($words) <= 2) {
+        $wordCount = count($words);
+        
+        if ($wordCount <= 2) {
             return true;
         }
         
-        // 3. Không có từ nghi vấn và không có động từ
+        // 3. Kiểm tra từ nghi vấn và động từ
         $questionWords = ['gì', 'nào', 'đâu', 'sao', 'thế nào', 'như thế nào', 'bao giờ', 'khi nào', 
                           'ai', 'what', 'where', 'when', 'who', 'how', 'why', 'which'];
         $verbs = ['là', 'có', 'được', 'nằm', 'ở', 'mở', 'đóng', 'mượn', 'trả', 'đăng ký', 
-                  'tìm', 'tra cứu', 'làm', 'thực hiện'];
+                  'tìm', 'tra cứu', 'làm', 'thực hiện', 'gia hạn', 'đặt', 'yêu cầu'];
         
         $hasQuestionWord = false;
         $hasVerb = false;
@@ -615,8 +394,36 @@ class ChatController extends BaseController
             }
         }
         
-        // Nếu không có từ nghi vấn và không có động từ → câu hỏi vắn tắt
+        // 4. Tính tỷ lệ từ khóa quan trọng
+        $stopWords = ['là', 'của', 'và', 'có', 'được', 'trong', 'ở', 'tại', 'với', 'cho',
+                      'để', 'từ', 'đến', 'về', 'như', 'khi', 'nào', 'đâu', 'sao', 'gì',
+                      'thế', 'không', 'các', 'những', 'một', 'này', 'đó', 'thì'];
+        
+        $contentWords = array_filter($words, function($word) use ($stopWords) {
+            return mb_strlen($word) >= 2 && !in_array($word, $stopWords);
+        });
+        
+        $keywordRatio = count($contentWords) / $wordCount;
+        
+        // 5. Phán đoán câu mơ hồ
+        // Trường hợp 1: Không có từ nghi vấn và không có động từ
         if (!$hasQuestionWord && !$hasVerb) {
+            return true;
+        }
+        
+        // Trường hợp 2: Chỉ có 1-2 từ khóa nội dung (ví dụ: "tự học ở đâu" → chỉ có "tự học")
+        if (count($contentWords) <= 2 && $wordCount >= 3) {
+            return true;
+        }
+        
+        // Trường hợp 3: Tỷ lệ từ khóa quá cao (>85%) và không có động từ
+        // Ví dụ: "phòng tự học" (100% từ khóa, không có động từ)
+        if ($keywordRatio > 0.85 && !$hasVerb) {
+            return true;
+        }
+        
+        // Trường hợp 4: Câu ngắn (3-4 từ) nhưng không có ngữ cảnh rõ ràng
+        if ($wordCount <= 4 && !$hasQuestionWord) {
             return true;
         }
         

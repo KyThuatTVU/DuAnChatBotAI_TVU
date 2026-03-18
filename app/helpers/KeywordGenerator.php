@@ -99,9 +99,9 @@ class KeywordGenerator
     ];
 
     /**
-     * Tạo từ khóa tự động từ câu hỏi
+     * Tạo từ khóa tự động từ câu hỏi (có trọng số)
      * @param string $questionText Nội dung câu hỏi
-     * @return array ['vi' => [...], 'en' => [...]]
+     * @return array ['vi' => [['keyword' => '...', 'weight' => 8.0], ...], 'en' => [...]]
      */
     public static function generate(string $questionText): array
     {
@@ -115,7 +115,7 @@ class KeywordGenerator
     }
 
     /**
-     * Trích xuất từ khóa tiếng Việt từ câu hỏi
+     * Trích xuất từ khóa tiếng Việt từ câu hỏi (có trọng số)
      */
     private static function extractVietnameseKeywords(string $text): array
     {
@@ -129,26 +129,32 @@ class KeywordGenerator
         $words = preg_split('/\s+/u', $text);
         
         $keywords = [];
-        $phrases = [];
         
-        // Trích xuất cụm từ 2-3 từ (quan trọng hơn từ đơn)
-        for ($i = 0; $i < count($words) - 1; $i++) {
-            // Cụm 2 từ
-            $phrase2 = $words[$i] . ' ' . $words[$i + 1];
-            if (self::isValidPhrase($phrase2)) {
-                $phrases[] = $phrase2;
-            }
-            
-            // Cụm 3 từ
-            if ($i < count($words) - 2) {
-                $phrase3 = $words[$i] . ' ' . $words[$i + 1] . ' ' . $words[$i + 2];
-                if (self::isValidPhrase($phrase3)) {
-                    $phrases[] = $phrase3;
-                }
+        // Trích xuất cụm từ 4 từ (trọng số cao nhất: 10.0)
+        for ($i = 0; $i < count($words) - 3; $i++) {
+            $phrase4 = $words[$i] . ' ' . $words[$i + 1] . ' ' . $words[$i + 2] . ' ' . $words[$i + 3];
+            if (self::isValidPhrase($phrase4)) {
+                $keywords[] = ['keyword' => $phrase4, 'weight' => 10.0];
             }
         }
         
-        // Trích xuất từ đơn
+        // Trích xuất cụm từ 3 từ (trọng số: 9.0)
+        for ($i = 0; $i < count($words) - 2; $i++) {
+            $phrase3 = $words[$i] . ' ' . $words[$i + 1] . ' ' . $words[$i + 2];
+            if (self::isValidPhrase($phrase3)) {
+                $keywords[] = ['keyword' => $phrase3, 'weight' => 9.0];
+            }
+        }
+        
+        // Trích xuất cụm từ 2 từ (trọng số: 7.0)
+        for ($i = 0; $i < count($words) - 1; $i++) {
+            $phrase2 = $words[$i] . ' ' . $words[$i + 1];
+            if (self::isValidPhrase($phrase2)) {
+                $keywords[] = ['keyword' => $phrase2, 'weight' => 7.0];
+            }
+        }
+        
+        // Trích xuất từ đơn (trọng số: 5.0)
         foreach ($words as $word) {
             $word = trim($word);
             
@@ -161,15 +167,24 @@ class KeywordGenerator
             // Bỏ từ chỉ có số
             if (preg_match('/^\d+$/', $word)) continue;
             
-            $keywords[] = $word;
+            $keywords[] = ['keyword' => $word, 'weight' => 5.0];
         }
         
-        // Ưu tiên cụm từ, sau đó đến từ đơn
-        $result = array_merge($phrases, $keywords);
+        // Loại bỏ trùng lặp (giữ trọng số cao nhất)
+        $uniqueKeywords = [];
+        foreach ($keywords as $item) {
+            $kw = $item['keyword'];
+            if (!isset($uniqueKeywords[$kw]) || $uniqueKeywords[$kw]['weight'] < $item['weight']) {
+                $uniqueKeywords[$kw] = $item;
+            }
+        }
         
-        // Loại bỏ trùng lặp và giới hạn số lượng
-        $result = array_unique($result);
-        $result = array_values($result);
+        $result = array_values($uniqueKeywords);
+        
+        // Sắp xếp theo trọng số giảm dần
+        usort($result, function($a, $b) {
+            return $b['weight'] <=> $a['weight'];
+        });
         
         // Giới hạn tối đa 15 từ khóa tiếng Việt
         return array_slice($result, 0, 15);
@@ -197,16 +212,19 @@ class KeywordGenerator
     }
 
     /**
-     * Dịch từ khóa tiếng Việt sang tiếng Anh
+     * Dịch từ khóa tiếng Việt sang tiếng Anh (giữ trọng số)
      */
     private static function translateToEnglish(array $viKeywords): array
     {
         $enKeywords = [];
         
-        foreach ($viKeywords as $viKeyword) {
+        foreach ($viKeywords as $item) {
+            $viKeyword = $item['keyword'];
+            $weight = $item['weight'];
+            
             // Tìm trong từ điển
             if (isset(self::$viToEnDict[$viKeyword])) {
-                $enKeywords[] = self::$viToEnDict[$viKeyword];
+                $enKeywords[] = ['keyword' => self::$viToEnDict[$viKeyword], 'weight' => $weight];
                 continue;
             }
             
@@ -226,16 +244,23 @@ class KeywordGenerator
             
             // Nếu dịch được toàn bộ cụm từ
             if ($allTranslated && !empty($translatedWords)) {
-                $enKeywords[] = implode(' ', $translatedWords);
+                $enKeywords[] = ['keyword' => implode(' ', $translatedWords), 'weight' => $weight];
             }
         }
         
-        // Loại bỏ trùng lặp
-        $enKeywords = array_unique($enKeywords);
-        $enKeywords = array_values($enKeywords);
+        // Loại bỏ trùng lặp (giữ trọng số cao nhất)
+        $uniqueKeywords = [];
+        foreach ($enKeywords as $item) {
+            $kw = $item['keyword'];
+            if (!isset($uniqueKeywords[$kw]) || $uniqueKeywords[$kw]['weight'] < $item['weight']) {
+                $uniqueKeywords[$kw] = $item;
+            }
+        }
+        
+        $result = array_values($uniqueKeywords);
         
         // Giới hạn tối đa 10 từ khóa tiếng Anh
-        return array_slice($enKeywords, 0, 10);
+        return array_slice($result, 0, 10);
     }
 
     /**
