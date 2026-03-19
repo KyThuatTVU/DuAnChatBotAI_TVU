@@ -353,7 +353,50 @@ const AdminSPA = {
             const _pq = sessionStorage.getItem('celras_pendingQuestion');
             if (_pq) {
                 sessionStorage.removeItem('celras_pendingQuestion');
-                try { openAddModal(); const _t = document.getElementById('questionText'); if (_t) _t.value = _pq; } catch(e) {}
+                
+                // Hàm đợi Quill load xong
+                const waitForQuill = (callback, maxAttempts = 20) => {
+                    let attempts = 0;
+                    const checkQuill = setInterval(() => {
+                        attempts++;
+                        if (typeof Quill !== 'undefined') {
+                            clearInterval(checkQuill);
+                            callback();
+                        } else if (attempts >= maxAttempts) {
+                            clearInterval(checkQuill);
+                            console.error('Quill không load được sau', maxAttempts, 'lần thử');
+                        }
+                    }, 100);
+                };
+                
+                // Đợi Quill load xong từ CDN
+                waitForQuill(() => {
+                    try {
+                        // Mở modal
+                        openAddModal();
+                        
+                        // Đợi modal mở và Quill khởi tạo xong
+                        setTimeout(() => {
+                            const _t = document.getElementById('questionText');
+                            if (_t) {
+                                _t.value = _pq;
+                                _t.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                            
+                            // Kiểm tra và khởi tạo lại Quill nếu cần
+                            if (typeof quillAnswerVi === 'undefined' || !quillAnswerVi) {
+                                console.log('Khởi tạo Quill editors...');
+                                try {
+                                    initQuillEditors();
+                                } catch(e) {
+                                    console.error('Error initializing Quill:', e);
+                                }
+                            }
+                        }, 300);
+                    } catch(e) {
+                        console.error('Error opening modal with pending question:', e);
+                    }
+                });
             } else {
                 setTimeout(() => { try { checkQuestionDraft(); } catch(e){} }, 800);
             }
@@ -2026,11 +2069,15 @@ function renderUnanswered(items) {
 
     tbody.innerHTML = items.map((item, i) => {
         const safeQuestion = escapeHtml(item.question_text);
+        // Giới hạn độ dài hiển thị: tối đa 100 ký tự
+        const displayQuestion = item.question_text.length > 100 
+            ? escapeHtml(item.question_text.substring(0, 100)) + '...' 
+            : safeQuestion;
         const dateDisplay = item.created_at ? new Date(item.created_at).toLocaleString('vi-VN') : '';
         return `
         <tr>
             <td data-label="#">${i + 1}</td>
-            <td data-label="Câu hỏi" class="font-medium">${safeQuestion}</td>
+            <td data-label="Câu hỏi" class="font-medium" title="${safeQuestion}">${displayQuestion}</td>
             <td data-label="Số lần hỏi"><span class="badge badge-warning">${item.frequency} lần</span></td>
             <td data-label="Trạng thái">${item.is_resolved ? '<span class="badge badge-success">Đã xử lý</span>' : '<span class="badge badge-danger">Chưa xử lý</span>'}</td>
             <td data-label="Ngày" class="text-sm text-gray-500">${dateDisplay}</td>

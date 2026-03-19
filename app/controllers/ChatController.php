@@ -126,9 +126,9 @@ class ChatController extends BaseController
     $topScore         = isset($top['similarity_score']) ? (float) $top['similarity_score'] : 0.0;
 
     // Ngưỡng điểm (điều chỉnh cho thuật toán mới)
-    $HIGH_THRESHOLD = 0.60; // >= 60% → trả lời trực tiếp
+    $HIGH_THRESHOLD = 0.70; // >= 70% → trả lời trực tiếp (TĂNG từ 60%)
     $EXACT_THRESHOLD = 0.85; // >= 85% → coi như exact match, trả lời luôn
-    $LOW_THRESHOLD  = 0.20; // >= 20% → hiển thị list
+    $LOW_THRESHOLD  = 0.50; // >= 50% → hiển thị list (TĂNG từ 20%)
 
     // Kiểm tra xem câu hỏi có vắn tắt/chung chung không
     $isVague = $this->isVagueQuestion($message);
@@ -415,15 +415,16 @@ class ChatController extends BaseController
      */
     private function isVagueQuestion(string $message): bool
     {
+        require_once __DIR__ . '/../helpers/ContextAnalyzer.php';
+        
         $messageLower = mb_strtolower(trim($message));
         $messageLength = mb_strlen($messageLower);
         
-        // 1. Câu hỏi quá ngắn (< 10 ký tự)
-        if ($messageLength < 10) {
+        // 1. Câu hỏi quá ngắn (< 8 ký tự) hoặc chỉ 1-2 từ
+        if ($messageLength < 8) {
             return true;
         }
         
-        // 2. Chỉ có 1-2 từ
         $words = preg_split('/\s+/u', $messageLower);
         $wordCount = count($words);
         
@@ -431,63 +432,96 @@ class ChatController extends BaseController
             return true;
         }
         
-        // 3. Kiểm tra từ nghi vấn và động từ
-        $questionWords = ['gì', 'nào', 'đâu', 'sao', 'thế nào', 'như thế nào', 'bao giờ', 'khi nào', 
-                          'ai', 'what', 'where', 'when', 'who', 'how', 'why', 'which'];
-        $verbs = ['là', 'có', 'được', 'nằm', 'ở', 'mở', 'đóng', 'mượn', 'trả', 'đăng ký', 
-                  'tìm', 'tra cứu', 'làm', 'thực hiện', 'gia hạn', 'đặt', 'yêu cầu'];
+        // 2. Phân tích ngữ cảnh bằng ContextAnalyzer
+        $context = ContextAnalyzer::analyze($message);
+        $importantWords = $context['important_words'];
+        $importantWordCount = count($importantWords);
         
-        $hasQuestionWord = false;
-        $hasVerb = false;
+        // 3. Tính "độ cụ thể" của câu hỏi dựa trên ngữ nghĩa
+        $specificityScore = 0;
         
-        foreach ($questionWords as $qw) {
-            if (mb_strpos($messageLower, $qw) !== false) {
-                $hasQuestionWord = true;
-                break;
+        // 3.1. Số lượng từ quan trọng (không phải stop words)
+        // Càng nhiều từ quan trọng → càng cụ thể
+        if ($importantWordCount >= 4) {
+            $specificityScore += 3; // Rất cụ thể
+        } elseif ($importantWordCount >= 3) {
+            $specificityScore += 2; // Khá cụ thể
+        } elseif ($importantWordCount >= 2) {
+            $specificityScore += 1; // Hơi cụ thể
+        }
+        // Nếu < 2 từ quan trọng → không cộng điểm
+        
+        // 3.2. Độ dài trung bình của từ quan trọng
+        // Từ dài thường mang nhiều thông tin hơn (ví dụ: "đăng ký" vs "có")
+        if (!empty($importantWords)) {
+            $avgLength = 0;
+            foreach ($importantWords as $word) {
+                $avgLength += mb_strlen($word);
+            }
+            $avgLength = $avgLength / $importantWordCount;
+            
+            if ($avgLength >= 4) {
+                $specificityScore += 2; // Từ dài → cụ thể
+            } elseif ($avgLength >= 3) {
+                $specificityScore += 1;
             }
         }
         
-        foreach ($verbs as $verb) {
-            if (mb_strpos($messageLower, $verb) !== false) {
-                $hasVerb = true;
+        // 3.3. Có chứa số (thời gian, số lượng, tầng...) → rất cụ thể
+        if (preg_match('/\d+/', $messageLower)) {
+            $specificityScore += 2;
+        }
+        
+        // 3.4. Độ dài câu hỏi
+        // Câu dài thường chứa nhiều thông tin hơn
+        if ($messageLength >= 30) {
+            $specificityScore += 2;
+        } elseif ($messageLength >= 20) {
+            $specificityScore += 1;
+        }
+        
+        // 3.5. Tỷ lệ từ quan trọng / tổng số từ
+        // Tỷ lệ cao → câu súc tích, có nhiều thông tin
+        $importantRatio = $importantWordCount / $wordCount;
+        if ($importantRatio >= 0.6) {
+            $specificityScore += 2;
+        } elseif ($importantRatio >= 0.4) {
+            $specificityScore += 1;
+        }
+        
+        // 3.6. Có n-gram dài (cụm từ 3-4 từ) → câu có cấu trúc rõ ràng
+        $ngrams = $context['ngrams'];
+        $hasLongNgram = false;
+        foreach ($ngrams as $ngram) {
+            $ngramWords = explode(' ', $ngram);
+            if (count($ngramWords) >= 3) {
+                $hasLongNgram = true;
                 break;
             }
         }
-        
-        // 4. Tính tỷ lệ từ khóa quan trọng
-        $stopWords = ['là', 'của', 'và', 'có', 'được', 'trong', 'ở', 'tại', 'với', 'cho',
-                      'để', 'từ', 'đến', 'về', 'như', 'khi', 'nào', 'đâu', 'sao', 'gì',
-                      'thế', 'không', 'các', 'những', 'một', 'này', 'đó', 'thì'];
-        
-        $contentWords = array_filter($words, function($word) use ($stopWords) {
-            return mb_strlen($word) >= 2 && !in_array($word, $stopWords);
-        });
-        
-        $keywordRatio = count($contentWords) / $wordCount;
-        
-        // 5. Phán đoán câu mơ hồ
-        // Trường hợp 1: Không có từ nghi vấn và không có động từ
-        if (!$hasQuestionWord && !$hasVerb) {
-            return true;
+        if ($hasLongNgram) {
+            $specificityScore += 1;
         }
         
-        // Trường hợp 2: Chỉ có 1-2 từ khóa nội dung (ví dụ: "tự học ở đâu" → chỉ có "tự học")
-        if (count($contentWords) <= 2 && $wordCount >= 3) {
-            return true;
+        // 4. Phán đoán dựa trên điểm số
+        // Điểm >= 6: Câu CỤ THỂ (không chung chung)
+        // Điểm < 6: Câu CHUNG CHUNG
+        if ($specificityScore >= 6) {
+            return false; // KHÔNG chung chung
         }
         
-        // Trường hợp 3: Tỷ lệ từ khóa quá cao (>85%) và không có động từ
-        // Ví dụ: "phòng tự học" (100% từ khóa, không có động từ)
-        if ($keywordRatio > 0.85 && !$hasVerb) {
-            return true;
+        // 5. Trường hợp đặc biệt: Câu quá ngắn và ít từ quan trọng
+        if ($wordCount <= 3 && $importantWordCount <= 1) {
+            return true; // Chung chung
         }
         
-        // Trường hợp 4: Câu ngắn (3-4 từ) nhưng không có ngữ cảnh rõ ràng
-        if ($wordCount <= 4 && !$hasQuestionWord) {
-            return true;
+        // 6. Mặc định: Nếu có >= 3 từ quan trọng → coi là cụ thể
+        if ($importantWordCount >= 3) {
+            return false; // KHÔNG chung chung
         }
         
-        return false;
+        // Còn lại: Chung chung
+        return true;
     }
 
     /**

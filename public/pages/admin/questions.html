@@ -251,28 +251,52 @@
     <script src="/DuAnChatbotThuVien/public/assets/js/loading.js"></script>
     <script src="/DuAnChatbotThuVien/public/assets/js/admin.js?v=20260314"></script>
     <script>
+        // Hàm đợi Quill load xong
+        function waitForQuill(callback, maxAttempts = 20) {
+            let attempts = 0;
+            const checkQuill = setInterval(() => {
+                attempts++;
+                if (typeof Quill !== 'undefined') {
+                    clearInterval(checkQuill);
+                    callback();
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(checkQuill);
+                    console.error('Quill không load được sau', maxAttempts, 'lần thử');
+                }
+            }, 100);
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
             await loadAdminPage('questions');
             await loadCategoriesForSelect();
             await loadQuestions();
             PageStateManager.restoreAndWatch('questions', ['#searchInput', '#filterCategory', '#filterSource'], () => { try { filterQuestions(); } catch(e){} });
+            
             // Kiểm tra có câu hỏi chờ tạo từ trang "Chưa trả lời"
             const _pq = sessionStorage.getItem('celras_pendingQuestion');
             if (_pq) {
                 sessionStorage.removeItem('celras_pendingQuestion');
-                // Đợi một chút để đảm bảo Quill đã load xong
-                setTimeout(() => {
-                    try { 
-                        openAddModal(); 
-                        // Đợi thêm để Quill khởi tạo xong
-                        setTimeout(() => {
-                            const _t = document.getElementById('questionText'); 
-                            if (_t) _t.value = _pq;
-                        }, 200);
-                    } catch(e) {
-                        console.error('Error opening modal:', e);
-                    }
-                }, 300);
+                
+                // Đợi Quill load xong từ CDN
+                waitForQuill(() => {
+                    // Mở modal
+                    openAddModal();
+                    
+                    // Đợi modal mở và Quill khởi tạo xong
+                    setTimeout(() => {
+                        const _t = document.getElementById('questionText');
+                        if (_t) {
+                            _t.value = _pq;
+                            _t.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                        
+                        // Kiểm tra và khởi tạo lại Quill nếu cần
+                        if (typeof quillAnswerVi === 'undefined' || !quillAnswerVi) {
+                            console.log('Khởi tạo Quill editors...');
+                            initQuillEditors();
+                        }
+                    }, 300);
+                });
             } else {
                 setTimeout(() => checkQuestionDraft(), 800);
             }
