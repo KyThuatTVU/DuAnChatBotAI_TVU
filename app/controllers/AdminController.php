@@ -1334,12 +1334,14 @@ class AdminController extends BaseController
      */
     private function saveAutoKeywords(\PDO $db, int $questionId, array $autoKeywords): void
     {
-        $stmt = $db->prepare("INSERT INTO keywords (question_id, keyword, is_auto, language) VALUES (?, ?, 1, ?)");
+        $stmt = $db->prepare("INSERT INTO keywords (question_id, keyword, is_auto, language, weight) VALUES (?, ?, 1, ?, ?)");
         
         // Lưu từ khóa tiếng Việt
-        foreach ($autoKeywords['vi'] as $keyword) {
+        foreach ($autoKeywords['vi'] as $item) {
             try {
-                $stmt->execute([$questionId, $keyword, 'vi']);
+                $keyword = is_array($item) ? $item['keyword'] : $item;
+                $weight = is_array($item) && isset($item['weight']) ? $item['weight'] : 5.0;
+                $stmt->execute([$questionId, $keyword, 'vi', $weight]);
             } catch (\Exception $e) {
                 // Bỏ qua nếu trùng
                 continue;
@@ -1347,9 +1349,11 @@ class AdminController extends BaseController
         }
         
         // Lưu từ khóa tiếng Anh
-        foreach ($autoKeywords['en'] as $keyword) {
+        foreach ($autoKeywords['en'] as $item) {
             try {
-                $stmt->execute([$questionId, $keyword, 'en']);
+                $keyword = is_array($item) ? $item['keyword'] : $item;
+                $weight = is_array($item) && isset($item['weight']) ? $item['weight'] : 5.0;
+                $stmt->execute([$questionId, $keyword, 'en', $weight]);
             } catch (\Exception $e) {
                 // Bỏ qua nếu trùng
                 continue;

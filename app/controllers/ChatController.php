@@ -127,10 +127,14 @@ class ChatController extends BaseController
 
     // Ngưỡng điểm (điều chỉnh cho thuật toán mới)
     $HIGH_THRESHOLD = 0.60; // >= 60% → trả lời trực tiếp
-    $LOW_THRESHOLD  = 0.30; // >= 30% → hiển thị list
+    $EXACT_THRESHOLD = 0.85; // >= 85% → coi như exact match, trả lời luôn
+    $LOW_THRESHOLD  = 0.20; // >= 20% → hiển thị list
 
-    // 3.1. Đủ giống 1 câu trong DB → trả lời trực tiếp
-    if ($top && $topScore >= $HIGH_THRESHOLD) {
+    // Kiểm tra xem câu hỏi có vắn tắt/chung chung không
+    $isVague = $this->isVagueQuestion($message);
+
+    // 3.1. Nếu có EXACT MATCH (điểm rất cao) → Trả lời trực tiếp, bất kể vắn hay dài
+    if ($top && $topScore >= $EXACT_THRESHOLD) {
         if ($lang === 'en' && !empty($top['answer_text_en'])) {
             $botReply = $top['answer_text_en'];
         } else {
@@ -157,19 +161,75 @@ class ChatController extends BaseController
         ]);
     }
 
-    // 3.2. Có liên quan nhưng chưa đủ chắc chắn → chỉ gợi ý list câu hỏi
-    if ($topScore >= $LOW_THRESHOLD && !empty($relatedQuestions)) {
-        $isVague = $this->isVagueQuestion($message);
+    // 3.2. Nếu câu hỏi VẮNG TẮT và CÓ related questions → CHỈ hiển thị list
+    if ($isVague && $topScore >= $LOW_THRESHOLD && !empty($relatedQuestions)) {
+        $botReply = $lang === 'en'
+            ? "Your question is quite general. Here are some related questions that might help:"
+            : "Câu hỏi của bạn khá chung chung. Dưới đây là một số câu hỏi liên quan có thể giúp bạn:";
 
-        if ($isVague) {
-            $botReply = $lang === 'en'
-                ? "Your question is quite general. Here are some related questions that might help:"
-                : "Câu hỏi của bạn khá chung chung. Dưới đây là một số câu hỏi liên quan có thể giúp bạn:";
+        $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
+
+        $this->json([
+            'success'           => true,
+            'reply'             => $botReply,
+            'forms'             => [],
+            'related_questions' => $relatedQuestions,
+            'session_token'     => $session['session_token'],
+            'matched'           => false,
+        ]);
+    }
+
+    // 3.3. Nếu câu hỏi VẮNG TẮT nhưng KHÔNG có related questions → Yêu cầu hỏi cụ thể hơn
+    if ($isVague && ($topScore < $LOW_THRESHOLD || empty($relatedQuestions))) {
+        $botReply = $lang === 'en'
+            ? "Your question is too general. Could you please be more specific? For example:\n• What information are you looking for?\n• Which service do you need help with?\n\nYou can also browse the categories on the left or contact us directly."
+            : "Câu hỏi của bạn quá chung chung. Bạn có thể hỏi cụ thể hơn được không? Ví dụ:\n• Bạn đang tìm thông tin gì?\n• Bạn cần hỗ trợ về dịch vụ nào?\n\nBạn cũng có thể xem các danh mục bên trái hoặc liên hệ trực tiếp với chúng mình nhé.";
+
+        $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
+
+        $this->json([
+            'success'           => true,
+            'reply'             => $botReply,
+            'forms'             => [],
+            'related_questions' => [],
+            'session_token'     => $session['session_token'],
+            'matched'           => false,
+        ]);
+    }
+
+    // 3.4. Câu hỏi CỤ THỂ và đủ giống 1 câu trong DB → trả lời trực tiếp
+    if (!$isVague && $top && $topScore >= $HIGH_THRESHOLD) {
+        if ($lang === 'en' && !empty($top['answer_text_en'])) {
+            $botReply = $top['answer_text_en'];
         } else {
-            $botReply = $lang === 'en'
-                ? "I couldn't find an exact answer. Here are some related questions you might be interested in:"
-                : "Mình không tìm thấy câu trả lời chính xác. Dưới đây là một số câu hỏi liên quan bạn có thể quan tâm:";
+            $botReply = $top['answer_text'];
         }
+
+        $botReply = $this->stripEmbeddedQuestion($botReply, $message);
+
+        $this->chatModel->saveMessage(
+            $session['id'],
+            'bot',
+            $botReply,
+            $top['id'],
+            $topScore
+        );
+
+        $this->json([
+            'success'           => true,
+            'reply'             => $botReply,
+            'forms'             => [],
+            'related_questions' => [],
+            'session_token'     => $session['session_token'],
+            'matched'           => true,
+        ]);
+    }
+
+    // 3.5. Có liên quan nhưng chưa đủ chắc chắn → chỉ gợi ý list câu hỏi
+    if ($topScore >= $LOW_THRESHOLD && !empty($relatedQuestions)) {
+        $botReply = $lang === 'en'
+            ? "I couldn't find an exact answer. Here are some related questions you might be interested in:"
+            : "Mình không tìm thấy câu trả lời chính xác. Dưới đây là một số câu hỏi liên quan bạn có thể quan tâm:";
 
         $this->chatModel->saveMessage($session['id'], 'bot', $botReply);
 

@@ -706,7 +706,13 @@ let quillAnswerEn = null;
 
 // Khởi tạo Quill editors
 function initQuillEditors() {
-    if (!document.getElementById('answerTextEditor')) return;
+    const editorVi = document.getElementById('answerTextEditor');
+    const editorEn = document.getElementById('answerTextEnEditor');
+    
+    if (!editorVi || !editorEn) {
+        console.warn('Quill editor elements not found');
+        return;
+    }
     
     const toolbarOptions = [
         ['bold', 'italic', 'underline', 'strike'],
@@ -722,37 +728,45 @@ function initQuillEditors() {
     ];
     
     // Editor tiếng Việt
-    if (!quillAnswerVi) {
-        quillAnswerVi = new Quill('#answerTextEditor', {
-            theme: 'snow',
-            modules: {
-                toolbar: toolbarOptions
-            },
-            placeholder: 'Nhập câu trả lời tiếng Việt...'
-        });
-        
-        // Sync với textarea ẩn
-        quillAnswerVi.on('text-change', function() {
-            const html = quillAnswerVi.root.innerHTML;
-            document.getElementById('answerText').value = html === '<p><br></p>' ? '' : html;
-        });
+    if (!quillAnswerVi || !quillAnswerVi.root) {
+        try {
+            quillAnswerVi = new Quill('#answerTextEditor', {
+                theme: 'snow',
+                modules: {
+                    toolbar: toolbarOptions
+                },
+                placeholder: 'Nhập câu trả lời tiếng Việt...'
+            });
+            
+            // Sync với textarea ẩn
+            quillAnswerVi.on('text-change', function() {
+                const html = quillAnswerVi.root.innerHTML;
+                document.getElementById('answerText').value = html === '<p><br></p>' ? '' : html;
+            });
+        } catch (e) {
+            console.error('Error initializing Quill Vi:', e);
+        }
     }
     
     // Editor tiếng Anh
-    if (!quillAnswerEn) {
-        quillAnswerEn = new Quill('#answerTextEnEditor', {
-            theme: 'snow',
-            modules: {
-                toolbar: toolbarOptions
-            },
-            placeholder: 'Nhập câu trả lời tiếng Anh (nếu có)...'
-        });
-        
-        // Sync với textarea ẩn
-        quillAnswerEn.on('text-change', function() {
-            const html = quillAnswerEn.root.innerHTML;
-            document.getElementById('answerTextEn').value = html === '<p><br></p>' ? '' : html;
-        });
+    if (!quillAnswerEn || !quillAnswerEn.root) {
+        try {
+            quillAnswerEn = new Quill('#answerTextEnEditor', {
+                theme: 'snow',
+                modules: {
+                    toolbar: toolbarOptions
+                },
+                placeholder: 'Nhập câu trả lời tiếng Anh (nếu có)...'
+            });
+            
+            // Sync với textarea ẩn
+            quillAnswerEn.on('text-change', function() {
+                const html = quillAnswerEn.root.innerHTML;
+                document.getElementById('answerTextEn').value = html === '<p><br></p>' ? '' : html;
+            });
+        } catch (e) {
+            console.error('Error initializing Quill En:', e);
+        }
     }
 }
 
@@ -844,12 +858,18 @@ function openAddModal(categoryId = null) {
     document.getElementById('questionText').value = '';
     document.getElementById('keywordsInput').value = '';
     
-    // Khởi tạo Quill editors nếu chưa có
-    initQuillEditors();
+    // Mở modal trước
+    document.getElementById('questionModal').classList.add('active');
     
-    // Clear Quill editors
-    if (quillAnswerVi) quillAnswerVi.setContents([]);
-    if (quillAnswerEn) quillAnswerEn.setContents([]);
+    // Đợi modal render xong rồi mới khởi tạo Quill
+    setTimeout(() => {
+        // Khởi tạo Quill editors nếu chưa có
+        initQuillEditors();
+        
+        // Clear Quill editors
+        if (quillAnswerVi) quillAnswerVi.setContents([]);
+        if (quillAnswerEn) quillAnswerEn.setContents([]);
+    }, 100);
     
     // Nếu không truyền categoryId, kiểm tra filter danh mục hiện tại
     if (!categoryId) {
@@ -865,7 +885,6 @@ function openAddModal(categoryId = null) {
         questionCategoryEl.value = categoryId || '';
     }
     
-    document.getElementById('questionModal').classList.add('active');
     // Bắt đầu theo dõi thay đổi để lưu draft
     FormDraftManager.watchFields('question', QUESTION_DRAFT_FIELDS);
 }
@@ -895,20 +914,25 @@ async function editQuestion(id) {
             document.getElementById('questionCategory').value = q.category_id || '';
             document.getElementById('questionText').value = q.question_text;
             
-            // Khởi tạo Quill editors nếu chưa có
-            initQuillEditors();
-            
-            // Set nội dung cho Quill editors
-            if (quillAnswerVi) {
-                const answerHtml = q.answer_text || '';
-                quillAnswerVi.root.innerHTML = answerHtml;
-            }
-            if (quillAnswerEn) {
-                const answerEnHtml = q.answer_text_en || '';
-                quillAnswerEn.root.innerHTML = answerEnHtml;
-            }
-            
+            // Mở modal trước
             document.getElementById('questionModal').classList.add('active');
+            
+            // Đợi modal render xong rồi mới khởi tạo Quill
+            setTimeout(() => {
+                // Khởi tạo Quill editors nếu chưa có
+                initQuillEditors();
+                
+                // Set nội dung cho Quill editors
+                if (quillAnswerVi) {
+                    const answerHtml = q.answer_text || '';
+                    quillAnswerVi.root.innerHTML = answerHtml;
+                }
+                if (quillAnswerEn) {
+                    const answerEnHtml = q.answer_text_en || '';
+                    quillAnswerEn.root.innerHTML = answerEnHtml;
+                }
+            }, 100);
+            
             // Bắt đầu theo dõi thay đổi để lưu draft
             FormDraftManager.watchFields('question', QUESTION_DRAFT_FIELDS);
         } else {
