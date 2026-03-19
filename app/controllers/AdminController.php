@@ -229,8 +229,12 @@ class AdminController extends BaseController
             return $this->createQuestion();
         }
 
-        $questions = $this->questionModel->getAllWithCategory();
-        $this->json(['questions' => $questions]);
+        try {
+            $questions = $this->questionModel->getAllWithCategory();
+            $this->json(['questions' => $questions]);
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Lỗi khi tải danh sách câu hỏi: ' . $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -303,52 +307,71 @@ class AdminController extends BaseController
 
         if (!$id) {
             $this->json(['error' => 'ID không hợp lệ'], 400);
+            return;
         }
 
         if ($this->getMethod() === 'DELETE') {
-            $this->questionModel->delete($id);
-            $this->json(['success' => true]);
+            try {
+                $this->questionModel->delete($id);
+                $this->json(['success' => true]);
+            } catch (\Exception $e) {
+                $this->json(['error' => 'Lỗi khi xóa câu hỏi: ' . $e->getMessage()], 500);
+            }
+            return;
         }
 
         if ($this->getMethod() === 'PUT') {
-            $input = $this->getJsonInput();
-            $this->questionModel->update($id, [
-                'category_id' => $input['category_id'] ?? null,
-                'question_text' => sanitize($input['question_text']),
-                'answer_text' => $input['answer_text'],
-                'answer_text_en' => $input['answer_text_en'] ?? null,
-                'is_active' => $input['is_active'] ?? 1,
-            ]);
+            try {
+                $input = $this->getJsonInput();
+                $this->questionModel->update($id, [
+                    'category_id' => $input['category_id'] ?? null,
+                    'question_text' => sanitize($input['question_text']),
+                    'answer_text' => $input['answer_text'],
+                    'answer_text_en' => $input['answer_text_en'] ?? null,
+                    'is_active' => $input['is_active'] ?? 1,
+                ]);
 
-            $db = Database::getInstance()->getConnection();
-            
-            // Xóa tất cả từ khóa cũ (cả thủ công và tự động)
-            $db->prepare("DELETE FROM keywords WHERE question_id = ?")->execute([$id]);
-            
-            // Thêm từ khóa thủ công mới
-            if (!empty($input['keywords'])) {
-                $stmt = $db->prepare("INSERT INTO keywords (question_id, keyword, is_auto, language) VALUES (?, ?, 0, 'vi')");
-                foreach ($input['keywords'] as $keyword) {
-                    $kw = trim($keyword);
-                    if ($kw !== '') {
-                        $stmt->execute([$id, $kw]);
+                $db = Database::getInstance()->getConnection();
+                
+                // Xóa tất cả từ khóa cũ (cả thủ công và tự động)
+                $db->prepare("DELETE FROM keywords WHERE question_id = ?")->execute([$id]);
+                
+                // Thêm từ khóa thủ công mới
+                if (!empty($input['keywords'])) {
+                    $stmt = $db->prepare("INSERT INTO keywords (question_id, keyword, is_auto, language) VALUES (?, ?, 0, 'vi')");
+                    foreach ($input['keywords'] as $keyword) {
+                        $kw = trim($keyword);
+                        if ($kw !== '') {
+                            $stmt->execute([$id, $kw]);
+                        }
                     }
                 }
+
+                // Tự động tạo lại từ khóa từ câu hỏi mới
+                $autoKeywords = $this->generateAutoKeywords($input['question_text']);
+                $this->saveAutoKeywords($db, $id, $autoKeywords);
+
+                $this->json([
+                    'success' => true,
+                    'auto_keywords' => $autoKeywords,
+                ]);
+            } catch (\Exception $e) {
+                $this->json(['error' => 'Lỗi khi cập nhật câu hỏi: ' . $e->getMessage()], 500);
             }
-
-            // Tự động tạo lại từ khóa từ câu hỏi mới
-            $autoKeywords = $this->generateAutoKeywords($input['question_text']);
-            $this->saveAutoKeywords($db, $id, $autoKeywords);
-
-            $this->json([
-                'success' => true,
-                'auto_keywords' => $autoKeywords,
-            ]);
+            return;
         }
 
         // GET - lấy chi tiết
-        $question = $this->questionModel->getById($id);
-        $this->json(['question' => $question]);
+        try {
+            $question = $this->questionModel->getById($id);
+            if (!$question) {
+                $this->json(['error' => 'Không tìm thấy câu hỏi với ID: ' . $id], 404);
+                return;
+            }
+            $this->json(['question' => $question]);
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Lỗi khi tải câu hỏi: ' . $e->getMessage()], 500);
+        }
     }
 
     /**

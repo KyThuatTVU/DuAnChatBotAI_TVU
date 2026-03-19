@@ -759,12 +759,16 @@ function initQuillEditors() {
 async function loadQuestions() {
     try {
         const res = await fetch(`${ADMIN_API}/admin/questions`);
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
         const data = await res.json();
         allQuestions = data.questions || [];
         // Không render ngay, để filterQuestions() xử lý
         // renderQuestions(allQuestions);
     } catch (e) {
         console.error('Failed to load questions:', e);
+        alert(`Lỗi khi tải danh sách câu hỏi: ${e.message}\n\nVui lòng kiểm tra:\n- Kết nối mạng\n- Server đang chạy\n- Database đã được cấu hình đúng`);
     }
 }
 
@@ -875,7 +879,15 @@ function closeModal() {
 async function editQuestion(id) {
     try {
         const res = await fetch(`${ADMIN_API}/admin/question/${id}`);
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
         const data = await res.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
         if (data.question) {
             const q = data.question;
             document.getElementById('modalTitle').textContent = 'Sửa câu hỏi';
@@ -899,9 +911,12 @@ async function editQuestion(id) {
             document.getElementById('questionModal').classList.add('active');
             // Bắt đầu theo dõi thay đổi để lưu draft
             FormDraftManager.watchFields('question', QUESTION_DRAFT_FIELDS);
+        } else {
+            throw new Error('Không tìm thấy dữ liệu câu hỏi');
         }
     } catch (e) {
-        alert('Lỗi khi tải câu hỏi');
+        console.error('Error loading question:', e);
+        alert(`Lỗi khi tải câu hỏi: ${e.message}\n\nVui lòng thử lại hoặc liên hệ quản trị viên.`);
     }
 }
 
