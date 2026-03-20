@@ -348,8 +348,16 @@ const AdminSPA = {
             await loadCategoriesForSelect();
             await loadQuestions();
             PageStateManager.restoreAndWatch('questions', ['#searchInput', '#filterCategory', '#filterSource'], () => { try { filterQuestions(); } catch(e){} });
-            // Luôn gọi filterQuestions() để apply filter (hoặc hiển thị tất cả nếu không có filter)
-            filterQuestions();
+            // Đợi một chút để đảm bảo DOM đã sẵn sàng, sau đó gọi filterQuestions()
+            setTimeout(() => {
+                try {
+                    filterQuestions();
+                } catch(e) {
+                    console.error('Error in filterQuestions:', e);
+                    // Fallback: render trực tiếp nếu filter fail
+                    renderQuestions(allQuestions);
+                }
+            }, 50);
             const _pq = sessionStorage.getItem('celras_pendingQuestion');
             if (_pq) {
                 sessionStorage.removeItem('celras_pendingQuestion');
@@ -539,6 +547,12 @@ const AdminSPA = {
             const newScripts = doc.querySelectorAll('body > script:not([src])');
 
             // --- Cleanup DOM cũ ---
+            // Reset Quill editors nếu đang ở trang questions
+            if (this.currentPage === 'questions') {
+                quillAnswerVi = null;
+                quillAnswerEn = null;
+            }
+            
             // Xóa modals cũ
             document.querySelectorAll('body > .modal-overlay').forEach(m => m.remove());
             // Xóa styles cũ của SPA
@@ -770,9 +784,17 @@ function initQuillEditors() {
         ['clean']
     ];
     
-    // Editor tiếng Việt
-    if (!quillAnswerVi || !quillAnswerVi.root) {
+    // Kiểm tra xem Quill đã được khởi tạo cho element này chưa
+    // Nếu element đã có class ql-container thì đã được khởi tạo rồi
+    const isViInitialized = editorVi.classList.contains('ql-container') || editorVi.querySelector('.ql-editor');
+    const isEnInitialized = editorEn.classList.contains('ql-container') || editorEn.querySelector('.ql-editor');
+    
+    // Editor tiếng Việt - luôn khởi tạo lại nếu DOM mới
+    if (!isViInitialized) {
         try {
+            // Clear nội dung cũ nếu có
+            editorVi.innerHTML = '';
+            
             quillAnswerVi = new Quill('#answerTextEditor', {
                 theme: 'snow',
                 modules: {
@@ -791,9 +813,12 @@ function initQuillEditors() {
         }
     }
     
-    // Editor tiếng Anh
-    if (!quillAnswerEn || !quillAnswerEn.root) {
+    // Editor tiếng Anh - luôn khởi tạo lại nếu DOM mới
+    if (!isEnInitialized) {
         try {
+            // Clear nội dung cũ nếu có
+            editorEn.innerHTML = '';
+            
             quillAnswerEn = new Quill('#answerTextEnEditor', {
                 theme: 'snow',
                 modules: {
@@ -831,8 +856,13 @@ async function loadQuestions() {
 
 function renderQuestions(questions) {
     const tbody = document.getElementById('questionsBody');
-    if (!questions.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-400">Chưa có câu hỏi nào</td></tr>';
+    if (!tbody) {
+        console.error('questionsBody element not found');
+        return;
+    }
+    
+    if (!questions || !questions.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">Chưa có câu hỏi nào</td></tr>';
         return;
     }
 
@@ -843,14 +873,13 @@ function renderQuestions(questions) {
             </td>
             <td data-label="#" class="text-gray-500">${i + 1}</td>
             <td data-label="Câu hỏi">
-                <div class="font-medium text-sm">${escapeHtml(q.question_text.substring(0, 80))}${q.question_text.length > 80 ? '...' : ''}</div>
-                <div class="text-xs text-gray-400 mt-1">${stripHtml(q.answer_text).substring(0, 60)}...</div>
+                <div class="font-medium text-sm">${escapeHtml(q.question_text.substring(0, 120))}${q.question_text.length > 120 ? '...' : ''}</div>
+                <div class="text-xs text-gray-400 mt-1">${stripHtml(q.answer_text).substring(0, 80)}...</div>
             </td>
-            <td data-label="Câu trả lời" class="hidden md:table-cell">
-                <div class="text-xs text-gray-600">${stripHtml(q.answer_text).substring(0, 100)}${q.answer_text.length > 100 ? '...' : ''}</div>
+            <td data-label="Câu trả lời">
+                <div class="text-xs text-gray-600">${stripHtml(q.answer_text).substring(0, 150)}${q.answer_text.length > 150 ? '...' : ''}</div>
             </td>
             <td data-label="Danh mục"><span class="badge badge-info">${q.category_name || 'Chưa phân loại'}</span></td>
-            <td data-label="Nguồn"><span class="badge ${q.source_type === 'manual' ? 'badge-success' : 'badge-warning'}">${q.source_type === 'manual' ? 'Nhập tay' : q.source_type.toUpperCase()}</span></td>
             <td data-label="Thao tác">
                 <div class="flex items-center gap-2">
                     <button onclick="viewKeywords(${q.id})" class="text-green-600 hover:text-green-800" title="Xem từ khóa">
@@ -880,9 +909,20 @@ function renderQuestions(questions) {
 }
 
 function filterQuestions() {
-    const search = document.getElementById('searchInput').value.toLowerCase();
-    const category = document.getElementById('filterCategory').value;
-    const source = document.getElementById('filterSource').value;
+    const searchEl = document.getElementById('searchInput');
+    const categoryEl = document.getElementById('filterCategory');
+    const sourceEl = document.getElementById('filterSource');
+    
+    // Kiểm tra các element có tồn tại không
+    if (!searchEl || !categoryEl) {
+        console.warn('Filter elements not found, rendering all questions');
+        renderQuestions(allQuestions);
+        return;
+    }
+    
+    const search = searchEl.value.toLowerCase();
+    const category = categoryEl.value;
+    const source = sourceEl ? sourceEl.value : '';
 
     let filtered = allQuestions.filter(q => {
         const matchSearch = !search || q.question_text.toLowerCase().includes(search) || q.answer_text.toLowerCase().includes(search);
@@ -1095,7 +1135,10 @@ function showAutoKeywordsNotification(autoKeywords) {
             <div style="margin-bottom:8px">
                 <div style="font-size:11px;font-weight:600;color:#059669;margin-bottom:4px">🇻🇳 TIẾNG VIỆT (${totalVi})</div>
                 <div style="display:flex;flex-wrap:wrap;gap:4px">
-                    ${displayVi.map(kw => `<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:500">${kw}</span>`).join('')}
+                    ${displayVi.map(kw => {
+                        const keyword = typeof kw === 'object' ? kw.keyword : kw;
+                        return `<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:500">${keyword}</span>`;
+                    }).join('')}
                     ${moreVi ? `<span style="color:#059669;font-size:11px;padding:3px 6px">${moreVi}</span>` : ''}
                 </div>
             </div>
@@ -1110,7 +1153,10 @@ function showAutoKeywordsNotification(autoKeywords) {
             <div>
                 <div style="font-size:11px;font-weight:600;color:#0891b2;margin-bottom:4px">🇬🇧 TIẾNG ANH (${totalEn})</div>
                 <div style="display:flex;flex-wrap:wrap;gap:4px">
-                    ${displayEn.map(kw => `<span style="background:#cffafe;color:#155e75;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:500">${kw}</span>`).join('')}
+                    ${displayEn.map(kw => {
+                        const keyword = typeof kw === 'object' ? kw.keyword : kw;
+                        return `<span style="background:#cffafe;color:#155e75;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:500">${keyword}</span>`;
+                    }).join('')}
                     ${moreEn ? `<span style="color:#0891b2;font-size:11px;padding:3px 6px">${moreEn}</span>` : ''}
                 </div>
             </div>
@@ -1163,7 +1209,8 @@ async function deleteQuestion(id) {
     if (!confirm('Bạn có chắc muốn xóa câu hỏi này?')) return;
     try {
         await fetch(`${ADMIN_API}/admin/question/${id}`, { method: 'DELETE' });
-        loadQuestions();
+        await loadQuestions();
+        filterQuestions();
     } catch (e) {
         alert('Lỗi khi xóa');
     }
@@ -1294,6 +1341,82 @@ async function deleteMultipleQuestions() {
     } catch (e) {
         console.error('Error deleting multiple questions:', e);
         alert('Lỗi khi xóa câu hỏi');
+    }
+}
+
+/**
+ * Xuất toàn bộ dữ liệu câu hỏi ra file Excel
+ */
+async function exportQuestionsToExcel() {
+    try {
+        // Hiển thị loading
+        const btn = event.target.closest('button');
+        const originalHTML = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `
+            <svg class="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Đang xuất...
+        `;
+
+        // Gọi API xuất Excel
+        const response = await fetch(`${ADMIN_API}/admin/exportQuestions`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Không thể xuất file Excel');
+        }
+
+        // Lấy tên file từ header hoặc tạo tên mặc định
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let fileName = 'DuLieuCauHoi_' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.xlsx';
+        
+        if (contentDisposition) {
+            const fileNameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+            if (fileNameMatch && fileNameMatch[1]) {
+                fileName = fileNameMatch[1];
+            }
+        }
+
+        // Tạo blob và download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        // Hiển thị thông báo thành công
+        alert('✅ Đã xuất file Excel thành công!');
+
+        // Khôi phục nút
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+
+    } catch (error) {
+        console.error('Error exporting to Excel:', error);
+        alert('❌ Lỗi khi xuất file Excel: ' + error.message);
+        
+        // Khôi phục nút
+        const btn = event.target.closest('button');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Xuất Excel
+            `;
+        }
     }
 }
 

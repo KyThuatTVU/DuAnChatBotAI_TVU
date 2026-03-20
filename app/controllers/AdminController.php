@@ -1867,4 +1867,210 @@ class AdminController extends BaseController
         $resetLink = FRONTEND_URL . '/login.html?reset_token=' . $result['token'];
         $this->json(['success' => true, 'reset_link' => $resetLink]);
     }
+
+    // ==================== EXPORT EXCEL ====================
+
+    /**
+     * GET /api/admin/exportQuestions - Xuất toàn bộ dữ liệu câu hỏi ra Excel
+     * Sử dụng XML format (Excel 2003) - không cần thư viện bên ngoài
+     */
+    public function exportQuestions()
+    {
+        $this->requireAuth();
+
+        try {
+            $db = Database::getInstance()->getConnection();
+            
+            // Lấy toàn bộ dữ liệu câu hỏi kèm danh mục và từ khóa
+            $sql = "SELECT 
+                        q.id,
+                        q.question_text,
+                        q.answer_text,
+                        q.answer_text_en,
+                        c.name as category_name,
+                        q.source_type,
+                        q.is_active,
+                        q.created_at,
+                        q.updated_at,
+                        GROUP_CONCAT(DISTINCT CASE WHEN k.is_auto = 0 THEN k.keyword END SEPARATOR ', ') as manual_keywords,
+                        GROUP_CONCAT(DISTINCT CASE WHEN k.is_auto = 1 AND k.language = 'vi' THEN k.keyword END SEPARATOR ', ') as auto_keywords_vi,
+                        GROUP_CONCAT(DISTINCT CASE WHEN k.is_auto = 1 AND k.language = 'en' THEN k.keyword END SEPARATOR ', ') as auto_keywords_en
+                    FROM questions q
+                    LEFT JOIN categories c ON q.category_id = c.id
+                    LEFT JOIN keywords k ON q.id = k.question_id
+                    GROUP BY q.id
+                    ORDER BY q.created_at DESC";
+            
+            $stmt = $db->prepare($sql);
+            $stmt->execute();
+            $questions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            if (empty($questions)) {
+                $this->json(['error' => 'Không có dữ liệu để xuất'], 404);
+            }
+
+            // Tạo tên file
+            $fileName = 'DuLieuCauHoi_' . date('Y-m-d_His') . '.xls';
+
+            // Tạo nội dung Excel XML (Excel 2003 format)
+            $excelContent = $this->generateExcelXML($questions);
+
+            // Gửi file về client
+            header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . $fileName . '"');
+            header('Cache-Control: max-age=0');
+            
+            echo "\xEF\xBB\xBF"; // UTF-8 BOM
+            echo $excelContent;
+            exit;
+
+        } catch (\Exception $e) {
+            $this->json([
+                'error' => 'Lỗi khi xuất file Excel: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Tạo nội dung Excel XML format (Excel 2003)
+     * Không cần thư viện bên ngoài
+     */
+    private function generateExcelXML($questions)
+    {
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        $xml .= '<?mso-application progid="Excel.Sheet"?>' . "\n";
+        $xml .= '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"' . "\n";
+        $xml .= ' xmlns:o="urn:schemas-microsoft-com:office:office"' . "\n";
+        $xml .= ' xmlns:x="urn:schemas-microsoft-com:office:excel"' . "\n";
+        $xml .= ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"' . "\n";
+        $xml .= ' xmlns:html="http://www.w3.org/TR/REC-html40">' . "\n";
+        
+        // Styles
+        $xml .= '<Styles>' . "\n";
+        
+        // Header style
+        $xml .= '<Style ss:ID="Header">' . "\n";
+        $xml .= '<Font ss:Bold="1" ss:Size="12" ss:Color="#FFFFFF"/>' . "\n";
+        $xml .= '<Interior ss:Color="#1976D2" ss:Pattern="Solid"/>' . "\n";
+        $xml .= '<Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>' . "\n";
+        $xml .= '<Borders>' . "\n";
+        $xml .= '<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+        $xml .= '<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+        $xml .= '<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+        $xml .= '<Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
+        $xml .= '</Borders>' . "\n";
+        $xml .= '</Style>' . "\n";
+        
+        // Data style
+        $xml .= '<Style ss:ID="Data">' . "\n";
+        $xml .= '<Alignment ss:Vertical="Top" ss:WrapText="1"/>' . "\n";
+        $xml .= '<Borders>' . "\n";
+        $xml .= '<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
+        $xml .= '<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
+        $xml .= '<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
+        $xml .= '<Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
+        $xml .= '</Borders>' . "\n";
+        $xml .= '</Style>' . "\n";
+        
+        // Center style
+        $xml .= '<Style ss:ID="Center">' . "\n";
+        $xml .= '<Alignment ss:Horizontal="Center" ss:Vertical="Top"/>' . "\n";
+        $xml .= '<Borders>' . "\n";
+        $xml .= '<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
+        $xml .= '<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
+        $xml .= '<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
+        $xml .= '<Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
+        $xml .= '</Borders>' . "\n";
+        $xml .= '</Style>' . "\n";
+        
+        $xml .= '</Styles>' . "\n";
+        
+        // Worksheet
+        $xml .= '<Worksheet ss:Name="Câu hỏi">' . "\n";
+        $xml .= '<Table>' . "\n";
+        
+        // Column widths
+        $xml .= '<Column ss:Width="50"/>' . "\n";  // ID
+        $xml .= '<Column ss:Width="300"/>' . "\n"; // Câu hỏi
+        $xml .= '<Column ss:Width="400"/>' . "\n"; // Câu trả lời VI
+        $xml .= '<Column ss:Width="400"/>' . "\n"; // Câu trả lời EN
+        $xml .= '<Column ss:Width="150"/>' . "\n"; // Danh mục
+        $xml .= '<Column ss:Width="200"/>' . "\n"; // Từ khóa thủ công
+        $xml .= '<Column ss:Width="200"/>' . "\n"; // Từ khóa auto VI
+        $xml .= '<Column ss:Width="200"/>' . "\n"; // Từ khóa auto EN
+        $xml .= '<Column ss:Width="100"/>' . "\n"; // Nguồn
+        $xml .= '<Column ss:Width="100"/>' . "\n"; // Trạng thái
+        $xml .= '<Column ss:Width="150"/>' . "\n"; // Ngày tạo
+        $xml .= '<Column ss:Width="150"/>' . "\n"; // Ngày cập nhật
+        
+        // Header row
+        $xml .= '<Row ss:Height="30">' . "\n";
+        $headers = ['ID', 'Câu hỏi', 'Câu trả lời (Tiếng Việt)', 'Câu trả lời (Tiếng Anh)', 
+                    'Danh mục', 'Từ khóa thủ công', 'Từ khóa tự động (VI)', 'Từ khóa tự động (EN)',
+                    'Nguồn', 'Trạng thái', 'Ngày tạo', 'Ngày cập nhật'];
+        
+        foreach ($headers as $header) {
+            $xml .= '<Cell ss:StyleID="Header"><Data ss:Type="String">' . htmlspecialchars($header, ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+        }
+        $xml .= '</Row>' . "\n";
+        
+        // Data rows
+        $sourceMap = [
+            'manual' => 'Thủ công',
+            'word' => 'Word',
+            'pdf' => 'PDF'
+        ];
+        
+        foreach ($questions as $q) {
+            $xml .= '<Row>' . "\n";
+            
+            // ID
+            $xml .= '<Cell ss:StyleID="Center"><Data ss:Type="Number">' . $q['id'] . '</Data></Cell>' . "\n";
+            
+            // Câu hỏi
+            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($q['question_text'], ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            
+            // Câu trả lời VI (loại bỏ HTML)
+            $answerText = strip_tags($q['answer_text']);
+            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($answerText, ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            
+            // Câu trả lời EN (loại bỏ HTML)
+            $answerTextEn = strip_tags($q['answer_text_en'] ?? '');
+            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($answerTextEn, ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            
+            // Danh mục
+            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($q['category_name'] ?? 'Chưa phân loại', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            
+            // Từ khóa thủ công
+            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($q['manual_keywords'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            
+            // Từ khóa tự động VI
+            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($q['auto_keywords_vi'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            
+            // Từ khóa tự động EN
+            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($q['auto_keywords_en'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            
+            // Nguồn
+            $source = $sourceMap[$q['source_type']] ?? $q['source_type'];
+            $xml .= '<Cell ss:StyleID="Center"><Data ss:Type="String">' . htmlspecialchars($source, ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            
+            // Trạng thái
+            $status = $q['is_active'] ? 'Hoạt động' : 'Tắt';
+            $xml .= '<Cell ss:StyleID="Center"><Data ss:Type="String">' . htmlspecialchars($status, ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            
+            // Ngày tạo
+            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($q['created_at'], ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            
+            // Ngày cập nhật
+            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($q['updated_at'], ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            
+            $xml .= '</Row>' . "\n";
+        }
+        
+        $xml .= '</Table>' . "\n";
+        $xml .= '</Worksheet>' . "\n";
+        $xml .= '</Workbook>';
+        
+        return $xml;
+    }
 }
