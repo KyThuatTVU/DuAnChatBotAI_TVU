@@ -862,9 +862,18 @@ function renderQuestions(questions) {
     }
     
     if (!questions || !questions.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">Chưa có câu hỏi nào</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-400">Chưa có câu hỏi nào</td></tr>';
         return;
     }
+
+    // Hàm tạo badge trạng thái - chỉ 2 trạng thái
+    const getApprovalBadge = (status) => {
+        const badges = {
+            'approved': '<span class="badge badge-success" title="Đã duyệt">✅ Đã duyệt</span>',
+            'pending': '<span class="badge badge-warning" title="Chưa duyệt">⏳ Chưa duyệt</span>'
+        };
+        return badges[status] || badges['pending'];
+    };
 
     tbody.innerHTML = questions.map((q, i) => `
         <tr>
@@ -880,9 +889,22 @@ function renderQuestions(questions) {
                 <div class="text-xs text-gray-600">${stripHtml(q.answer_text).substring(0, 150)}${q.answer_text.length > 150 ? '...' : ''}</div>
             </td>
             <td data-label="Danh mục"><span class="badge badge-info">${q.category_name || 'Chưa phân loại'}</span></td>
+            <td data-label="Trạng thái" class="text-center">
+                ${getApprovalBadge(q.approval_status || 'pending')}
+                ${q.approved_by_name ? `<div class="text-xs text-gray-400 mt-1">Bởi: ${q.approved_by_name}</div>` : ''}
+            </td>
             <td data-label="Thao tác">
-                <div class="flex items-center gap-2">
-                    <button onclick="viewKeywords(${q.id})" class="text-green-600 hover:text-green-800" title="Xem từ khóa">
+                <div class="flex items-center gap-2 justify-center">
+                    ${q.approval_status !== 'approved' ? `
+                        <button onclick="approveQuestion(${q.id}, 'approved')" class="text-green-600 hover:text-green-800" title="Phê duyệt">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        </button>
+                    ` : `
+                        <button onclick="approveQuestion(${q.id}, 'pending')" class="text-orange-600 hover:text-orange-800" title="Đưa về chưa duyệt">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </button>
+                    `}
+                    <button onclick="viewKeywords(${q.id})" class="text-purple-600 hover:text-purple-800" title="Xem từ khóa">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
                     </button>
                     <button onclick="editQuestion(${q.id})" class="text-sky-600 hover:text-sky-800" title="Sửa">
@@ -911,6 +933,7 @@ function renderQuestions(questions) {
 function filterQuestions() {
     const searchEl = document.getElementById('searchInput');
     const categoryEl = document.getElementById('filterCategory');
+    const approvalStatusEl = document.getElementById('filterApprovalStatus');
     const sourceEl = document.getElementById('filterSource');
     
     // Kiểm tra các element có tồn tại không
@@ -922,13 +945,15 @@ function filterQuestions() {
     
     const search = searchEl.value.toLowerCase();
     const category = categoryEl.value;
+    const approvalStatus = approvalStatusEl ? approvalStatusEl.value : '';
     const source = sourceEl ? sourceEl.value : '';
 
     let filtered = allQuestions.filter(q => {
         const matchSearch = !search || q.question_text.toLowerCase().includes(search) || q.answer_text.toLowerCase().includes(search);
         const matchCategory = !category || q.category_id == category;
+        const matchApprovalStatus = !approvalStatus || q.approval_status === approvalStatus;
         const matchSource = !source || q.source_type === source;
-        return matchSearch && matchCategory && matchSource;
+        return matchSearch && matchCategory && matchApprovalStatus && matchSource;
     });
     renderQuestions(filtered);
 }
@@ -974,6 +999,11 @@ function openAddModal(categoryId = null) {
 
 function closeModal() {
     document.getElementById('questionModal').classList.remove('active');
+    // Ẩn phần từ khóa tự động
+    const autoKeywordsSection = document.getElementById('autoKeywordsSection');
+    if (autoKeywordsSection) {
+        autoKeywordsSection.style.display = 'none';
+    }
     // Xóa draft khi đóng modal (user chủ động đóng)
     FormDraftManager.clearDraft('question');
 }
@@ -1016,6 +1046,9 @@ async function editQuestion(id) {
                 }
             }, 100);
             
+            // Load và hiển thị từ khóa tự động
+            await loadAutoKeywords(q.id);
+            
             // Bắt đầu theo dõi thay đổi để lưu draft
             FormDraftManager.watchFields('question', QUESTION_DRAFT_FIELDS);
         } else {
@@ -1025,6 +1058,243 @@ async function editQuestion(id) {
         console.error('Error loading question:', e);
         alert(`Lỗi khi tải câu hỏi: ${e.message}\n\nVui lòng thử lại hoặc liên hệ quản trị viên.`);
     }
+}
+
+/**
+ * Load và hiển thị từ khóa tự động của câu hỏi
+ */
+async function loadAutoKeywords(questionId) {
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/keywords/${questionId}`);
+        const data = await res.json();
+        
+        if (data.keywords) {
+            const section = document.getElementById('autoKeywordsSection');
+            const display = document.getElementById('autoKeywordsDisplay');
+            
+            if (!section || !display) return;
+            
+            const autoVi = data.keywords.auto_vi || [];
+            const autoEn = data.keywords.auto_en || [];
+            
+            if (autoVi.length === 0 && autoEn.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+            
+            section.style.display = 'block';
+            
+            let html = '';
+            
+            // Từ khóa tiếng Việt
+            if (autoVi.length > 0) {
+                html += `
+                    <div class="p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="text-xs font-semibold text-green-700">🇻🇳 TIẾNG VIỆT (${autoVi.length})</div>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            ${autoVi.map(kw => `
+                                <div class="inline-flex items-center gap-1 bg-white border border-green-200 rounded-lg px-2 py-1 group hover:border-green-400 transition-colors">
+                                    <input type="text" 
+                                           value="${escapeHtml(kw.keyword)}" 
+                                           data-keyword-id="${kw.id}"
+                                           class="keyword-edit-input bg-transparent border-none outline-none text-xs font-medium text-green-700 w-auto min-w-[60px] max-w-[200px]"
+                                           style="width: ${Math.max(60, kw.keyword.length * 8)}px"
+                                           onchange="updateKeyword(${kw.id}, this.value)"
+                                           onkeypress="if(event.key==='Enter'){this.blur()}"
+                                    />
+                                    <button onclick="deleteKeywordConfirm(${kw.id})" 
+                                            class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity p-0.5"
+                                            title="Xóa từ khóa">
+                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Từ khóa tiếng Anh
+            if (autoEn.length > 0) {
+                html += `
+                    <div class="p-3 bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="text-xs font-semibold text-blue-700">🇬🇧 TIẾNG ANH (${autoEn.length})</div>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            ${autoEn.map(kw => `
+                                <div class="inline-flex items-center gap-1 bg-white border border-blue-200 rounded-lg px-2 py-1 group hover:border-blue-400 transition-colors">
+                                    <input type="text" 
+                                           value="${escapeHtml(kw.keyword)}" 
+                                           data-keyword-id="${kw.id}"
+                                           class="keyword-edit-input bg-transparent border-none outline-none text-xs font-medium text-blue-700 w-auto min-w-[60px] max-w-[200px]"
+                                           style="width: ${Math.max(60, kw.keyword.length * 8)}px"
+                                           onchange="updateKeyword(${kw.id}, this.value)"
+                                           onkeypress="if(event.key==='Enter'){this.blur()}"
+                                    />
+                                    <button onclick="deleteKeywordConfirm(${kw.id})" 
+                                            class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity p-0.5"
+                                            title="Xóa từ khóa">
+                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            display.innerHTML = html;
+        }
+    } catch (e) {
+        console.error('Error loading auto keywords:', e);
+    }
+}
+
+/**
+ * Cập nhật một từ khóa tự động
+ */
+async function updateKeyword(keywordId, newValue) {
+    const trimmedValue = newValue.trim();
+    
+    if (!trimmedValue) {
+        alert('Từ khóa không được để trống');
+        // Reload lại để khôi phục giá trị cũ
+        const questionId = document.getElementById('questionId').value;
+        if (questionId) await loadAutoKeywords(questionId);
+        return;
+    }
+    
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/updateKeyword/${keywordId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keyword: trimmedValue })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            // Hiển thị thông báo nhỏ
+            showToast('✅ Đã cập nhật từ khóa', 'success');
+        } else {
+            alert(data.error || 'Lỗi khi cập nhật từ khóa');
+            // Reload lại để khôi phục giá trị cũ
+            const questionId = document.getElementById('questionId').value;
+            if (questionId) await loadAutoKeywords(questionId);
+        }
+    } catch (e) {
+        console.error('Error updating keyword:', e);
+        alert('Lỗi kết nối server');
+    }
+}
+
+/**
+ * Xóa một từ khóa tự động (có xác nhận)
+ */
+async function deleteKeywordConfirm(keywordId) {
+    if (!confirm('Bạn có chắc muốn xóa từ khóa này?')) return;
+    
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/deleteKeyword/${keywordId}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            // Reload lại danh sách từ khóa
+            const questionId = document.getElementById('questionId').value;
+            if (questionId) await loadAutoKeywords(questionId);
+            showToast('✅ Đã xóa từ khóa', 'success');
+        } else {
+            alert(data.error || 'Lỗi khi xóa từ khóa');
+        }
+    } catch (e) {
+        console.error('Error deleting keyword:', e);
+        alert('Lỗi kết nối server');
+    }
+}
+
+/**
+ * Tạo lại từ khóa tự động cho câu hỏi
+ */
+async function regenerateKeywords() {
+    const questionId = document.getElementById('questionId').value;
+    
+    if (!questionId) {
+        alert('Vui lòng lưu câu hỏi trước khi tạo lại từ khóa');
+        return;
+    }
+    
+    if (!confirm('Bạn có chắc muốn tạo lại từ khóa tự động?\n\nCác từ khóa tự động hiện tại sẽ bị xóa và thay thế bằng từ khóa mới.')) {
+        return;
+    }
+    
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/regenerateKeywords/${questionId}`, {
+            method: 'POST'
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            // Reload lại danh sách từ khóa
+            await loadAutoKeywords(questionId);
+            
+            // Hiển thị thông báo với từ khóa mới
+            if (data.auto_keywords) {
+                showAutoKeywordsNotification(data.auto_keywords);
+            } else {
+                showToast('✅ Đã tạo lại từ khóa tự động', 'success');
+            }
+        } else {
+            alert(data.error || 'Lỗi khi tạo lại từ khóa');
+        }
+    } catch (e) {
+        console.error('Error regenerating keywords:', e);
+        alert('Lỗi kết nối server');
+    }
+}
+
+/**
+ * Hiển thị toast notification nhỏ
+ */
+function showToast(message, type = 'info') {
+    const colors = {
+        success: { bg: '#dcfce7', border: '#22c55e', text: '#166534' },
+        error: { bg: '#fee2e2', border: '#ef4444', text: '#991b1b' },
+        info: { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af' }
+    };
+    
+    const color = colors[type] || colors.info;
+    
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+        background: ${color.bg}; border: 1px solid ${color.border}; border-left: 4px solid ${color.border};
+        border-radius: 12px; padding: 12px 18px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        animation: slideInRight 0.3s ease-out;
+        font-family: 'Inter', sans-serif;
+        color: ${color.text};
+        font-size: 13px;
+        font-weight: 600;
+    `;
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'slideOutRight 0.3s ease-in';
+        setTimeout(() => toast.remove(), 300);
+    }, 2000);
 }
 
 async function saveQuestion(event) {
@@ -1243,7 +1513,7 @@ function updateSelectedCount() {
     const checkboxes = document.querySelectorAll('.question-checkbox:checked');
     const count = checkboxes.length;
     
-    // Desktop
+    // Desktop - Nút xóa
     const deleteBtn = document.getElementById('deleteMultipleBtn');
     const countSpan = document.getElementById('selectedCount');
     
@@ -1258,6 +1528,24 @@ function updateSelectedCount() {
         } else {
             deleteBtn.classList.add('hidden');
             deleteBtn.classList.remove('inline-flex');
+        }
+    }
+    
+    // Desktop - Nút phê duyệt
+    const approveBtn = document.getElementById('approveMultipleBtn');
+    const countSpanApprove = document.getElementById('selectedCountApprove');
+    
+    if (countSpanApprove) {
+        countSpanApprove.textContent = count;
+    }
+    
+    if (approveBtn) {
+        if (count > 0) {
+            approveBtn.classList.remove('hidden');
+            approveBtn.classList.add('inline-flex');
+        } else {
+            approveBtn.classList.add('hidden');
+            approveBtn.classList.remove('inline-flex');
         }
     }
     
@@ -1417,6 +1705,95 @@ async function exportQuestionsToExcel() {
                 Xuất Excel
             `;
         }
+    }
+}
+
+/**
+ * Phê duyệt một câu hỏi
+ */
+async function approveQuestion(id, status) {
+    if (!id || !status) {
+        alert('Thông tin không hợp lệ');
+        return;
+    }
+
+    const statusText = {
+        'approved': 'phê duyệt',
+        'pending': 'đưa về chưa duyệt'
+    };
+
+    const confirmMsg = `Bạn có chắc muốn ${statusText[status]} câu hỏi này?`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/approveQuestion/${id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            // Reload danh sách câu hỏi
+            await loadQuestions();
+            filterQuestions();
+        } else {
+            alert(data.error || 'Có lỗi xảy ra khi cập nhật trạng thái');
+        }
+    } catch (e) {
+        console.error('Error approving question:', e);
+        alert('Lỗi khi cập nhật trạng thái câu hỏi');
+    }
+}
+
+/**
+ * Phê duyệt nhiều câu hỏi đã chọn
+ */
+async function approveMultipleQuestions(status) {
+    const checkboxes = document.querySelectorAll('.question-checkbox:checked');
+    const ids = Array.from(checkboxes).map(cb => parseInt(cb.getAttribute('data-id')));
+
+    if (ids.length === 0) {
+        alert('Vui lòng chọn ít nhất một câu hỏi để phê duyệt');
+        return;
+    }
+
+    const statusText = {
+        'approved': 'phê duyệt',
+        'pending': 'đưa về chưa duyệt'
+    };
+
+    const confirmMsg = `Bạn có chắc muốn ${statusText[status]} ${ids.length} câu hỏi đã chọn?`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/approveMultipleQuestions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids, status })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            alert(data.message || `Đã ${statusText[status]} ${ids.length} câu hỏi thành công`);
+            
+            // Reset checkbox "Chọn tất cả"
+            const selectAllCheckbox = document.getElementById('selectAllQuestions');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = false;
+            }
+            
+            // Tải lại danh sách
+            await loadQuestions();
+            filterQuestions();
+        } else {
+            alert(data.error || 'Có lỗi xảy ra khi phê duyệt câu hỏi');
+        }
+    } catch (e) {
+        console.error('Error approving multiple questions:', e);
+        alert('Lỗi khi phê duyệt câu hỏi');
     }
 }
 

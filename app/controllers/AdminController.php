@@ -233,6 +233,8 @@ class AdminController extends BaseController
             $questions = $this->questionModel->getAllWithCategory();
             $this->json(['questions' => $questions]);
         } catch (\Exception $e) {
+            error_log("Error in questions API: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
             $this->json(['error' => 'Lỗi khi tải danh sách câu hỏi: ' . $e->getMessage()], 500);
         }
     }
@@ -420,6 +422,126 @@ class AdminController extends BaseController
                 ]);
             } else {
                 $this->json(['error' => 'Không thể xóa câu hỏi'], 500);
+            }
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Lỗi: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * POST /api/admin/question/{id}/approve - Phê duyệt câu hỏi
+     */
+    public function approveQuestion($id = null)
+    {
+        $adminId = $this->requireAuth();
+
+        if (!$id) {
+            $this->json(['error' => 'ID không hợp lệ'], 400);
+            return;
+        }
+
+        if ($this->getMethod() !== 'POST') {
+            $this->json(['error' => 'Method not allowed'], 405);
+            return;
+        }
+
+        try {
+            $input = $this->getJsonInput();
+            $status = $input['status'] ?? 'approved'; // approved hoặc pending
+
+            // Validate status - chỉ cho phép 2 giá trị
+            if (!in_array($status, ['approved', 'pending'])) {
+                $this->json(['error' => 'Trạng thái không hợp lệ. Chỉ chấp nhận: approved, pending'], 400);
+                return;
+            }
+
+            // Cập nhật trạng thái
+            $result = $this->questionModel->updateApprovalStatus($id, $status, $adminId);
+
+            if ($result) {
+                $statusText = [
+                    'approved' => 'đã duyệt',
+                    'pending' => 'chưa duyệt'
+                ];
+
+                $this->json([
+                    'success' => true,
+                    'message' => 'Đã cập nhật trạng thái câu hỏi thành ' . $statusText[$status],
+                    'status' => $status
+                ]);
+            } else {
+                $this->json(['error' => 'Không thể cập nhật trạng thái'], 500);
+            }
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Lỗi: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * POST /api/admin/questions/approve-multiple - Phê duyệt nhiều câu hỏi
+     */
+    public function approveMultipleQuestions()
+    {
+        $adminId = $this->requireAuth();
+
+        if ($this->getMethod() !== 'POST') {
+            $this->json(['error' => 'Method not allowed'], 405);
+            return;
+        }
+
+        $input = $this->getJsonInput();
+        $ids = $input['ids'] ?? [];
+        $status = $input['status'] ?? 'approved';
+
+        if (empty($ids) || !is_array($ids)) {
+            $this->json(['error' => 'Danh sách ID không hợp lệ'], 400);
+            return;
+        }
+
+        // Validate status - chỉ cho phép 2 giá trị
+        if (!in_array($status, ['approved', 'pending'])) {
+            $this->json(['error' => 'Trạng thái không hợp lệ. Chỉ chấp nhận: approved, pending'], 400);
+            return;
+        }
+
+        // Validate IDs
+        $ids = array_filter($ids, function($id) {
+            return is_numeric($id) && $id > 0;
+        });
+
+        if (empty($ids)) {
+            $this->json(['error' => 'Không có ID hợp lệ'], 400);
+            return;
+        }
+
+        try {
+            $db = Database::getInstance()->getConnection();
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            
+            $sql = "UPDATE questions 
+                    SET approval_status = ?, 
+                        approved_by = ?, 
+                        approved_at = NOW() 
+                    WHERE id IN ($placeholders)";
+            
+            $params = array_merge([$status, $adminId], $ids);
+            $stmt = $db->prepare($sql);
+            $result = $stmt->execute($params);
+
+            if ($result) {
+                $statusText = [
+                    'approved' => 'đã duyệt',
+                    'pending' => 'chưa duyệt'
+                ];
+
+                $this->json([
+                    'success' => true,
+                    'message' => 'Đã cập nhật ' . count($ids) . ' câu hỏi thành ' . $statusText[$status],
+                    'updated_count' => count($ids),
+                    'status' => $status
+                ]);
+            } else {
+                $this->json(['error' => 'Không thể cập nhật trạng thái'], 500);
             }
         } catch (\Exception $e) {
             $this->json(['error' => 'Lỗi: ' . $e->getMessage()], 500);
@@ -1668,6 +1790,100 @@ class AdminController extends BaseController
             'success' => true,
             'auto_keywords' => $autoKeywords,
             'message' => 'Đã tạo lại từ khóa tự động',
+        ]);
+    }
+
+    /**
+     * PUT /api/admin/updateKeyword/{keywordId} - Cập nhật một từ khóa tự động
+     */
+    public function updateKeyword($keywordId = null)
+    {
+        $this->requireAuth();
+        
+        if (!$keywordId) {
+            $this->json(['error' => 'Keyword ID không hợp lệ'], 400);
+        }
+
+        if ($this->getMethod() !== 'PUT') {
+            $this->json(['error' => 'Method not allowed'], 405);
+        }
+
+        $input = $this->getJsonInput();
+        $newKeyword = trim($input['keyword'] ?? '');
+        
+        if (empty($newKeyword)) {
+            $this->json(['error' => 'Từ khóa không được để trống'], 400);
+        }
+
+        $db = Database::getInstance()->getConnection();
+        
+        // Kiểm tra từ khóa có tồn tại không
+        $stmt = $db->prepare("SELECT id, question_id, is_auto FROM keywords WHERE id = ?");
+        $stmt->execute([$keywordId]);
+        $keyword = $stmt->fetch();
+        
+        if (!$keyword) {
+            $this->json(['error' => 'Từ khóa không tồn tại'], 404);
+        }
+
+        // Chỉ cho phép sửa từ khóa tự động
+        if ($keyword['is_auto'] != 1) {
+            $this->json(['error' => 'Chỉ có thể sửa từ khóa tự động'], 403);
+        }
+
+        // Cập nhật từ khóa
+        try {
+            $stmt = $db->prepare("UPDATE keywords SET keyword = ? WHERE id = ?");
+            $stmt->execute([$newKeyword, $keywordId]);
+            
+            $this->json([
+                'success' => true,
+                'message' => 'Đã cập nhật từ khóa',
+            ]);
+        } catch (\Exception $e) {
+            // Có thể bị lỗi unique constraint nếu từ khóa đã tồn tại
+            $this->json(['error' => 'Từ khóa đã tồn tại hoặc có lỗi khi cập nhật'], 500);
+        }
+    }
+
+    /**
+     * DELETE /api/admin/deleteKeyword/{keywordId} - Xóa một từ khóa tự động
+     */
+    public function deleteKeyword($keywordId = null)
+    {
+        $this->requireAuth();
+        
+        if (!$keywordId) {
+            $this->json(['error' => 'Keyword ID không hợp lệ'], 400);
+        }
+
+        if ($this->getMethod() !== 'DELETE') {
+            $this->json(['error' => 'Method not allowed'], 405);
+        }
+
+        $db = Database::getInstance()->getConnection();
+        
+        // Kiểm tra từ khóa có tồn tại không
+        $stmt = $db->prepare("SELECT id, is_auto FROM keywords WHERE id = ?");
+        $stmt->execute([$keywordId]);
+        $keyword = $stmt->fetch();
+        
+        if (!$keyword) {
+            $this->json(['error' => 'Từ khóa không tồn tại'], 404);
+        }
+
+        // Chỉ cho phép xóa từ khóa tự động
+        if ($keyword['is_auto'] != 1) {
+            $this->json(['error' => 'Chỉ có thể xóa từ khóa tự động'], 403);
+        }
+
+        // Xóa từ khóa
+        $stmt = $db->prepare("DELETE FROM keywords WHERE id = ?");
+        $stmt->execute([$keywordId]);
+        
+        $this->json([
+            'success' => true,
+            'message' => 'Đã xóa từ khóa',
         ]);
     }
 
