@@ -78,6 +78,54 @@ ADD COLUMN embedding_updated_at DATETIME NULL COMMENT 'Lần cuối cập nhật
 ALTER TABLE questions 
 ADD INDEX idx_embedding_updated (embedding_updated_at);
 
+
+-- Thêm cột approval_status vào bảng questions
+ALTER TABLE questions 
+ADD COLUMN approval_status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending' 
+COMMENT 'Trạng thái phê duyệt: pending (chờ duyệt), approved (đã duyệt), rejected (từ chối)' 
+AFTER is_active;
+
+-- Thêm cột approved_by để lưu người phê duyệt
+ALTER TABLE questions 
+ADD COLUMN approved_by INT NULL 
+COMMENT 'ID admin phê duyệt' 
+AFTER approval_status;
+
+-- Thêm cột approved_at để lưu thời gian phê duyệt
+ALTER TABLE questions 
+ADD COLUMN approved_at DATETIME NULL 
+COMMENT 'Thời gian phê duyệt' 
+AFTER approved_by;
+
+
+
+-- Thêm foreign key cho approved_by
+ALTER TABLE questions 
+ADD CONSTRAINT fk_questions_approved_by 
+FOREIGN KEY (approved_by) REFERENCES admins(id) ON DELETE SET NULL;
+
+-- Thêm index cho approval_status để tăng tốc query
+ALTER TABLE questions 
+ADD INDEX idx_approval_status (approval_status);
+
+-- Cập nhật tất cả câu hỏi hiện có thành trạng thái 'approved' (đã duyệt)
+-- Vì đây là dữ liệu cũ, mặc định coi như đã được duyệt
+UPDATE questions 
+SET approval_status = 'approved', 
+    approved_at = created_at 
+WHERE approval_status = 'pending';
+
+
+-- Sửa lại cột approval_status chỉ còn 2 giá trị
+ALTER TABLE questions 
+MODIFY COLUMN approval_status ENUM('pending', 'approved') NOT NULL DEFAULT 'pending' 
+COMMENT 'Trạng thái phê duyệt: pending (chưa duyệt), approved (đã duyệt)';
+
+-- Cập nhật các câu hỏi rejected (nếu có) thành pending
+UPDATE questions 
+SET approval_status = 'pending' 
+WHERE approval_status = 'rejected';
+
 -- Bảng cache embeddings cho user queries (tránh gọi API nhiều lần)
 CREATE TABLE IF NOT EXISTS embedding_cache (
     id INT AUTO_INCREMENT PRIMARY KEY,

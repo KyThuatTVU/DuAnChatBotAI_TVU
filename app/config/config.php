@@ -55,8 +55,10 @@ define('APP_VERSION', '1.0.0');
 
 // Hiển thị lỗi chi tiết khi debug
 if (APP_DEBUG) {
-    ini_set('display_errors', 1);
+    ini_set('display_errors', 0); // Tắt tạm thời để debug JSON
     error_reporting(E_ALL);
+    ini_set('log_errors', 1);
+    ini_set('error_log', __DIR__ . '/../../error.log');
 } else {
     ini_set('display_errors', 0);
     error_reporting(0);

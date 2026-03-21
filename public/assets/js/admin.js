@@ -999,11 +999,6 @@ function openAddModal(categoryId = null) {
 
 function closeModal() {
     document.getElementById('questionModal').classList.remove('active');
-    // Ẩn phần từ khóa tự động
-    const autoKeywordsSection = document.getElementById('autoKeywordsSection');
-    if (autoKeywordsSection) {
-        autoKeywordsSection.style.display = 'none';
-    }
     // Xóa draft khi đóng modal (user chủ động đóng)
     FormDraftManager.clearDraft('question');
 }

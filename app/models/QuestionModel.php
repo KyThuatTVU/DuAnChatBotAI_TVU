@@ -11,13 +11,41 @@ class QuestionModel extends BaseModel
      */
     public function getAllWithCategory()
     {
-        $sql = "SELECT q.*, c.name as category_name 
-                FROM {$this->table} q 
-                LEFT JOIN categories c ON q.category_id = c.id 
-                ORDER BY q.created_at DESC";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute();
-        return $stmt->fetchAll();
+        try {
+            $sql = "SELECT q.*, c.name as category_name
+                    FROM {$this->table} q 
+                    LEFT JOIN categories c ON q.category_id = c.id 
+                    ORDER BY q.created_at DESC";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute();
+            $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Thêm thông tin người phê duyệt nếu có
+            if (!empty($results)) {
+                foreach ($results as $key => $row) {
+                    $results[$key]['approved_by_name'] = null;
+                    
+                    if (!empty($row['approved_by'])) {
+                        try {
+                            $stmtAdmin = $this->db->prepare("SELECT full_name FROM admins WHERE id = ?");
+                            $stmtAdmin->execute([$row['approved_by']]);
+                            $admin = $stmtAdmin->fetch(PDO::FETCH_ASSOC);
+                            if ($admin) {
+                                $results[$key]['approved_by_name'] = $admin['full_name'];
+                            }
+                        } catch (Exception $e) {
+                            // Bỏ qua lỗi khi lấy tên admin
+                            error_log("Error fetching admin name: " . $e->getMessage());
+                        }
+                    }
+                }
+            }
+            
+            return $results;
+        } catch (Exception $e) {
+            error_log("Error in getAllWithCategory: " . $e->getMessage());
+            throw $e;
+        }
     }
 
     /**
@@ -45,9 +73,10 @@ class QuestionModel extends BaseModel
         // Đếm số từ trong câu hỏi
         $wordCount = count(preg_split('/\s+/u', trim($lowerMessage)));
 
-        // 1. Tìm chính xác (exact match) - so sánh không phân biệt hoa thường
+        // 1. Tìm chính xác (exact match) - so sánh không phân biệt hoa thường - chỉ lấy câu đã duyệt
         $sql = "SELECT * FROM {$this->table} 
                 WHERE is_active = 1 
+                AND approval_status = 'approved'
                 AND LOWER(TRIM(question_text)) = ?
                 LIMIT 1";
         $stmt = $this->db->prepare($sql);
@@ -58,11 +87,12 @@ class QuestionModel extends BaseModel
             return $result;
         }
 
-        // 2. Tìm bằng FULLTEXT (hiểu ngữ cảnh tốt nhất)
+        // 2. Tìm bằng FULLTEXT (hiểu ngữ cảnh tốt nhất) - chỉ lấy câu đã duyệt
         if ($messageLength >= 3) {
             $sql = "SELECT q.*, MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE) as relevance
                     FROM {$this->table} q 
                     WHERE q.is_active = 1 
+                    AND q.approval_status = 'approved'
                     AND MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE)
                     HAVING relevance > 0.3
                     ORDER BY relevance DESC 
@@ -79,11 +109,12 @@ class QuestionModel extends BaseModel
             }
         }
 
-        // 3. KHÔNG dùng LIKE cho câu hỏi vắn tắt (< 15 ký tự hoặc < 3 từ)
+        // 3. KHÔNG dùng LIKE cho câu hỏi vắn tắt (< 15 ký tự hoặc < 3 từ) - chỉ lấy câu đã duyệt
         // Vì sẽ khớp quá nhiều kết quả không chính xác
         if ($messageLength >= 15 && $wordCount >= 3) {
             $sql = "SELECT * FROM {$this->table} 
                     WHERE is_active = 1 
+                    AND approval_status = 'approved'
                     AND LOWER(question_text) LIKE CONCAT('%', ?, '%')
                     LIMIT 1";
             $stmt = $this->db->prepare($sql);
@@ -179,12 +210,13 @@ class QuestionModel extends BaseModel
 
         $results = [];
 
-        // BƯỚC 1: TÌM CANDIDATES TRONG DB
+        // BƯỚC 1: TÌM CANDIDATES TRONG DB - chỉ lấy câu đã duyệt
         // Sử dụng FULLTEXT search để lấy candidates
         $sql = "SELECT q.*, 
                 MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE) as relevance
                 FROM {$this->table} q 
                 WHERE q.is_active = 1 
+                AND q.approval_status = 'approved'
                 AND MATCH(question_text) AGAINST(? IN NATURAL LANGUAGE MODE)
                 HAVING relevance > 0
                 ORDER BY relevance DESC 
@@ -211,6 +243,7 @@ class QuestionModel extends BaseModel
                 if (!empty($conditions)) {
                     $sql = "SELECT * FROM {$this->table} 
                             WHERE is_active = 1 
+                            AND approval_status = 'approved'
                             AND (" . implode(' OR ', $conditions) . ")
                             LIMIT ?";
                     $params[] = $limit * 10;
@@ -331,12 +364,14 @@ class QuestionModel extends BaseModel
     }
 
     /**
-     * Lấy câu hỏi theo danh mục
+     * Lấy câu hỏi theo danh mục - chỉ lấy câu đã duyệt
      */
     public function getByCategory($categoryId)
     {
         $sql = "SELECT * FROM {$this->table} 
-                WHERE is_active = 1 AND category_id = ? 
+                WHERE is_active = 1 
+                AND approval_status = 'approved'
+                AND category_id = ? 
                 ORDER BY created_at DESC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$categoryId]);
@@ -420,5 +455,43 @@ class QuestionModel extends BaseModel
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$limit]);
         return $stmt->fetchAll();
+    }
+
+    /**
+     * Cập nhật trạng thái phê duyệt câu hỏi
+     */
+    public function updateApprovalStatus($id, $status, $adminId)
+    {
+        $sql = "UPDATE {$this->table} 
+                SET approval_status = ?, 
+                    approved_by = ?, 
+                    approved_at = NOW() 
+                WHERE id = ?";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([$status, $adminId, $id]);
+    }
+
+    /**
+     * Lấy số lượng câu hỏi theo trạng thái phê duyệt
+     */
+    public function countByApprovalStatus()
+    {
+        $sql = "SELECT approval_status, COUNT(*) as count 
+                FROM {$this->table} 
+                GROUP BY approval_status";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        $results = $stmt->fetchAll();
+        
+        $counts = [
+            'pending' => 0,
+            'approved' => 0
+        ];
+        
+        foreach ($results as $row) {
+            $counts[$row['approval_status']] = (int)$row['count'];
+        }
+        
+        return $counts;
     }
 }
