@@ -966,6 +966,9 @@ function openAddModal(categoryId = null) {
     document.getElementById('questionText').value = '';
     document.getElementById('keywordsInput').value = '';
     
+    // Xóa unanswered_question_id khi mở modal thủ công (không phải từ trang "Chưa trả lời")
+    sessionStorage.removeItem('celras_unansweredQuestionId');
+    
     // Mở modal trước
     document.getElementById('questionModal').classList.add('active');
     
@@ -1314,6 +1317,12 @@ async function saveQuestion(event) {
         keywords: document.getElementById('keywordsInput').value.split(',').map(k => k.trim()).filter(k => k),
     };
 
+    // Thêm unanswered_question_id nếu đang tạo câu trả lời từ trang "Chưa trả lời"
+    const unansweredId = sessionStorage.getItem('celras_unansweredQuestionId');
+    if (unansweredId && !id) { // Chỉ khi tạo mới, không phải edit
+        payload.unanswered_question_id = parseInt(unansweredId);
+    }
+
     try {
         const url = id ? `${ADMIN_API}/admin/question/${id}` : `${ADMIN_API}/admin/questions`;
         const method = id ? 'PUT' : 'POST';
@@ -1325,6 +1334,11 @@ async function saveQuestion(event) {
         const data = await res.json();
         if (data.success) {
             FormDraftManager.markSaved('question');
+            
+            // Xóa unanswered_question_id sau khi lưu thành công
+            if (unansweredId) {
+                sessionStorage.removeItem('celras_unansweredQuestionId');
+            }
             
             // Hiển thị từ khóa tự động đã tạo
             if (data.auto_keywords) {
@@ -1349,6 +1363,11 @@ async function saveQuestion(event) {
                 const data2 = await res2.json();
                 if (data2.success) {
                     FormDraftManager.markSaved('question');
+                    
+                    // Xóa unanswered_question_id sau khi lưu thành công
+                    if (unansweredId) {
+                        sessionStorage.removeItem('celras_unansweredQuestionId');
+                    }
                     
                     // Hiển thị từ khóa tự động đã tạo
                     if (data2.auto_keywords) {
@@ -2546,9 +2565,15 @@ function renderDatasets(datasets) {
 
 async function loadUnanswered() {
     try {
-        const res = await fetch(`${ADMIN_API}/admin/unanswered`);
+        const res = await fetch(`${ADMIN_API}/admin/unanswered`, {
+            cache: 'no-cache', // Tránh cache
+            headers: {
+                'Cache-Control': 'no-cache'
+            }
+        });
         const data = await res.json();
         const items = data.unanswered || [];
+        console.log('Loaded unanswered questions:', items.length, 'items');
         renderUnanswered(items);
     } catch (e) {
         console.error('Failed to load unanswered:', e);
@@ -2569,19 +2594,23 @@ function renderUnanswered(items) {
             ? escapeHtml(item.question_text.substring(0, 100)) + '...' 
             : safeQuestion;
         const dateDisplay = item.created_at ? new Date(item.created_at).toLocaleString('vi-VN') : '';
+        
+        // Convert is_resolved sang boolean để tránh lỗi với string "0"/"1"
+        const isResolved = Boolean(Number(item.is_resolved));
+        
         return `
         <tr>
             <td data-label="#">${i + 1}</td>
             <td data-label="Câu hỏi" class="font-medium" title="${safeQuestion}">${displayQuestion}</td>
             <td data-label="Số lần hỏi"><span class="badge badge-warning">${item.frequency} lần</span></td>
-            <td data-label="Trạng thái">${item.is_resolved ? '<span class="badge badge-success">Đã xử lý</span>' : '<span class="badge badge-danger">Chưa xử lý</span>'}</td>
+            <td data-label="Trạng thái">${isResolved ? '<span class="badge badge-success">Đã xử lý</span>' : '<span class="badge badge-danger">Chưa xử lý</span>'}</td>
             <td data-label="Ngày" class="text-sm text-gray-500">${dateDisplay}</td>
             <td data-label="Thao tác">
                 <div class="flex items-center gap-3 flex-wrap">
                     <button data-question-id="${item.id}" data-question-text="${safeQuestion}" onclick="createAnswerForUnanswered(this)" class="text-sky-600 hover:text-sky-800 text-sm font-medium whitespace-nowrap">
                         + Tạo trả lời
                     </button>
-                    ${!item.is_resolved ? `<button data-id="${item.id}" onclick="resolveUnanswered(this)" class="text-green-600 hover:text-green-800 text-sm font-medium" title="Đánh dấu đã xử lý">✓</button>` : ''}
+                    ${!isResolved ? `<button data-id="${item.id}" onclick="resolveUnanswered(this)" class="text-green-600 hover:text-green-800 text-sm font-medium" title="Đánh dấu đã xử lý">✓</button>` : ''}
                     <button data-id="${item.id}" onclick="deleteUnanswered(this)" class="text-red-500 hover:text-red-700 text-sm font-medium" title="Xóa">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                     </button>
@@ -2592,12 +2621,16 @@ function renderUnanswered(items) {
 }
 
 function createAnswerForUnanswered(btn) {
+    const questionId = btn.getAttribute('data-question-id');
     const questionText = btn.getAttribute('data-question-text');
     const div = document.createElement('div');
     div.innerHTML = questionText;
     const rawText = div.textContent;
-    // Lưu tạm vào sessionStorage để trang questions đọc lại sau khi SPA load xong
+    
+    // Lưu cả ID và text vào sessionStorage
     sessionStorage.setItem('celras_pendingQuestion', rawText);
+    sessionStorage.setItem('celras_unansweredQuestionId', questionId);
+    
     if (typeof AdminSPA !== 'undefined' && AdminSPA.initialized) {
         AdminSPA.loadPage('questions', true);
     } else {
@@ -2608,16 +2641,35 @@ function createAnswerForUnanswered(btn) {
 async function resolveUnanswered(btn) {
     const id = btn.getAttribute('data-id');
     if (!confirm('Đánh dấu câu hỏi này đã được xử lý?')) return;
+    
+    // Disable button để tránh click nhiều lần
+    btn.disabled = true;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '⏳';
+    
     try {
-        const res = await fetch(`${ADMIN_API}/admin/resolveUnanswered/${id}`, { method: 'PUT' });
+        const res = await fetch(`${ADMIN_API}/admin/resolveUnanswered/${id}`, { 
+            method: 'PUT',
+            cache: 'no-cache'
+        });
         const data = await res.json();
         if (data.success) {
-            loadUnanswered();
+            console.log('Successfully resolved question ID:', id);
+            // Reload danh sách để cập nhật UI
+            await loadUnanswered();
+            // Hiển thị thông báo thành công
+            showToast('Đã đánh dấu câu hỏi là đã xử lý', 'success');
         } else {
+            console.error('Failed to resolve:', data.error);
             alert(data.error || 'Lỗi khi cập nhật');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
         }
     } catch (e) {
+        console.error('Error resolving unanswered:', e);
         alert('Lỗi kết nối server');
+        btn.disabled = false;
+        btn.innerHTML = originalText;
     }
 }
 

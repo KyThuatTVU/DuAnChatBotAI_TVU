@@ -293,6 +293,15 @@ class AdminController extends BaseController
         $autoKeywords = $this->generateAutoKeywords($input['question_text']);
         $this->saveAutoKeywords($db, $id, $autoKeywords);
 
+        // Tự động đánh dấu câu hỏi chưa trả lời là đã xử lý (nếu có)
+        if (!empty($input['unanswered_question_id'])) {
+            $unansweredId = (int)$input['unanswered_question_id'];
+            $stmt = $db->prepare(
+                "UPDATE unanswered_questions SET is_resolved = 1, resolved_by = ?, resolved_at = NOW() WHERE id = ?"
+            );
+            $stmt->execute([$adminId, $unansweredId]);
+        }
+
         $this->json([
             'success' => true, 
             'id' => $id,
@@ -1522,7 +1531,15 @@ class AdminController extends BaseController
             "SELECT * FROM unanswered_questions ORDER BY is_resolved ASC, frequency DESC, created_at DESC"
         );
         $stmt->execute();
-        $this->json(['unanswered' => $stmt->fetchAll()]);
+        $results = $stmt->fetchAll();
+        
+        // Convert is_resolved sang integer để tránh lỗi với JavaScript
+        foreach ($results as &$row) {
+            $row['is_resolved'] = (int)$row['is_resolved'];
+            $row['frequency'] = (int)$row['frequency'];
+        }
+        
+        $this->json(['unanswered' => $results]);
     }
 
     /**
@@ -1539,6 +1556,12 @@ class AdminController extends BaseController
             "UPDATE unanswered_questions SET is_resolved = 1, resolved_by = ?, resolved_at = NOW() WHERE id = ?"
         );
         $stmt->execute([$adminId, $id]);
+        
+        // Kiểm tra xem có dòng nào được cập nhật không
+        if ($stmt->rowCount() === 0) {
+            $this->json(['error' => 'Không tìm thấy câu hỏi hoặc đã được xử lý'], 404);
+        }
+        
         $this->json(['success' => true]);
     }
 
