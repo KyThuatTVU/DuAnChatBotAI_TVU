@@ -340,6 +340,7 @@ class AdminController extends BaseController
                     'answer_text' => $input['answer_text'],
                     'answer_text_en' => $input['answer_text_en'] ?? null,
                     'is_active' => $input['is_active'] ?? 1,
+                    'updated_by' => $adminId,
                 ]);
 
                 $db = Database::getInstance()->getConnection();

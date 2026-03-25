@@ -1,0 +1,14 @@
+[25-Mar-2026 01:31:53 Europe/Berlin] Error in getAllWithCategory: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'q.updated_by' in 'on clause'
+[25-Mar-2026 01:31:53 Europe/Berlin] Error in questions API: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'q.updated_by' in 'on clause'
+[25-Mar-2026 01:31:53 Europe/Berlin] Stack trace: #0 D:\xampp\htdocs\DuAnChatbotThuVien\app\models\QuestionModel.php(26): PDO->prepare('SELECT q.*, \r\n ...')
+#1 D:\xampp\htdocs\DuAnChatbotThuVien\app\controllers\AdminController.php(233): QuestionModel->getAllWithCategory()
+#2 D:\xampp\htdocs\DuAnChatbotThuVien\app\core\App.php(58): AdminController->questions()
+#3 D:\xampp\htdocs\DuAnChatbotThuVien\public\index.php(54): App->__construct()
+#4 {main}
+[25-Mar-2026 01:31:57 Europe/Berlin] Error in getAllWithCategory: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'q.updated_by' in 'on clause'
+[25-Mar-2026 01:31:57 Europe/Berlin] Error in questions API: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'q.updated_by' in 'on clause'
+[25-Mar-2026 01:31:57 Europe/Berlin] Stack trace: #0 D:\xampp\htdocs\DuAnChatbotThuVien\app\models\QuestionModel.php(26): PDO->prepare('SELECT q.*, \r\n ...')
+#1 D:\xampp\htdocs\DuAnChatbotThuVien\app\controllers\AdminController.php(233): QuestionModel->getAllWithCategory()
+#2 D:\xampp\htdocs\DuAnChatbotThuVien\app\core\App.php(58): AdminController->questions()
+#3 D:\xampp\htdocs\DuAnChatbotThuVien\public\index.php(54): App->__construct()
+#4 {main}

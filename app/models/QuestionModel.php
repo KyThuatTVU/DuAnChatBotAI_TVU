@@ -12,34 +12,39 @@ class QuestionModel extends BaseModel
     public function getAllWithCategory()
     {
         try {
-            $sql = "SELECT q.*, c.name as category_name
-                    FROM {$this->table} q 
-                    LEFT JOIN categories c ON q.category_id = c.id 
-                    ORDER BY q.created_at DESC";
+            // Kiểm tra xem cột updated_by có tồn tại không
+            $checkColumn = $this->db->query("SHOW COLUMNS FROM {$this->table} LIKE 'updated_by'")->fetch();
+            
+            if ($checkColumn) {
+                // Nếu có cột updated_by, JOIN với bảng admins
+                $sql = "SELECT q.*, 
+                               c.name as category_name,
+                               a.full_name as approved_by_name,
+                               a.email as approved_by_email,
+                               u.full_name as updated_by_name,
+                               u.email as updated_by_email
+                        FROM {$this->table} q 
+                        LEFT JOIN categories c ON q.category_id = c.id 
+                        LEFT JOIN admins a ON q.approved_by = a.id
+                        LEFT JOIN admins u ON q.updated_by = u.id
+                        ORDER BY q.created_at DESC";
+            } else {
+                // Nếu chưa có cột updated_by, chỉ JOIN approved_by
+                $sql = "SELECT q.*, 
+                               c.name as category_name,
+                               a.full_name as approved_by_name,
+                               a.email as approved_by_email,
+                               NULL as updated_by_name,
+                               NULL as updated_by_email
+                        FROM {$this->table} q 
+                        LEFT JOIN categories c ON q.category_id = c.id 
+                        LEFT JOIN admins a ON q.approved_by = a.id
+                        ORDER BY q.created_at DESC";
+            }
+            
             $stmt = $this->db->prepare($sql);
             $stmt->execute();
             $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Thêm thông tin người phê duyệt nếu có
-            if (!empty($results)) {
-                foreach ($results as $key => $row) {
-                    $results[$key]['approved_by_name'] = null;
-                    
-                    if (!empty($row['approved_by'])) {
-                        try {
-                            $stmtAdmin = $this->db->prepare("SELECT full_name FROM admins WHERE id = ?");
-                            $stmtAdmin->execute([$row['approved_by']]);
-                            $admin = $stmtAdmin->fetch(PDO::FETCH_ASSOC);
-                            if ($admin) {
-                                $results[$key]['approved_by_name'] = $admin['full_name'];
-                            }
-                        } catch (Exception $e) {
-                            // Bỏ qua lỗi khi lấy tên admin
-                            error_log("Error fetching admin name: " . $e->getMessage());
-                        }
-                    }
-                }
-            }
             
             return $results;
         } catch (Exception $e) {
@@ -403,17 +408,44 @@ class QuestionModel extends BaseModel
      */
     public function update($id, $data)
     {
-        $sql = "UPDATE {$this->table} 
-                SET category_id = ?, question_text = ?, answer_text = ?, answer_text_en = ? 
-                WHERE id = ?";
-        $stmt = $this->db->prepare($sql);
-        return $stmt->execute([
-            $data['category_id'],
-            $data['question_text'],
-            $data['answer_text'],
-            $data['answer_text_en'] ?? null,
-            $id
-        ]);
+        // Kiểm tra xem cột updated_by có tồn tại không
+        $checkColumn = $this->db->query("SHOW COLUMNS FROM {$this->table} LIKE 'updated_by'")->fetch();
+        
+        if ($checkColumn && isset($data['updated_by'])) {
+            // Nếu có cột updated_by, cập nhật cả updated_by
+            $sql = "UPDATE {$this->table} 
+                    SET category_id = ?, 
+                        question_text = ?, 
+                        answer_text = ?, 
+                        answer_text_en = ?,
+                        updated_by = ?
+                    WHERE id = ?";
+            $stmt = $this->db->prepare($sql);
+            return $stmt->execute([
+                $data['category_id'],
+                $data['question_text'],
+                $data['answer_text'],
+                $data['answer_text_en'] ?? null,
+                $data['updated_by'],
+                $id
+            ]);
+        } else {
+            // Nếu chưa có cột updated_by, chỉ cập nhật các trường cơ bản
+            $sql = "UPDATE {$this->table} 
+                    SET category_id = ?, 
+                        question_text = ?, 
+                        answer_text = ?, 
+                        answer_text_en = ?
+                    WHERE id = ?";
+            $stmt = $this->db->prepare($sql);
+            return $stmt->execute([
+                $data['category_id'],
+                $data['question_text'],
+                $data['answer_text'],
+                $data['answer_text_en'] ?? null,
+                $id
+            ]);
+        }
     }
 
     /**
@@ -462,13 +494,29 @@ class QuestionModel extends BaseModel
      */
     public function updateApprovalStatus($id, $status, $adminId)
     {
-        $sql = "UPDATE {$this->table} 
-                SET approval_status = ?, 
-                    approved_by = ?, 
-                    approved_at = NOW() 
-                WHERE id = ?";
-        $stmt = $this->db->prepare($sql);
-        return $stmt->execute([$status, $adminId, $id]);
+        // Kiểm tra xem cột updated_by có tồn tại không
+        $checkColumn = $this->db->query("SHOW COLUMNS FROM {$this->table} LIKE 'updated_by'")->fetch();
+        
+        if ($checkColumn) {
+            // Nếu có cột updated_by, cập nhật cả updated_by
+            $sql = "UPDATE {$this->table} 
+                    SET approval_status = ?, 
+                        approved_by = ?, 
+                        approved_at = NOW(),
+                        updated_by = ?
+                    WHERE id = ?";
+            $stmt = $this->db->prepare($sql);
+            return $stmt->execute([$status, $adminId, $adminId, $id]);
+        } else {
+            // Nếu chưa có cột updated_by, chỉ cập nhật approval
+            $sql = "UPDATE {$this->table} 
+                    SET approval_status = ?, 
+                        approved_by = ?, 
+                        approved_at = NOW()
+                    WHERE id = ?";
+            $stmt = $this->db->prepare($sql);
+            return $stmt->execute([$status, $adminId, $id]);
+        }
     }
 
     /**

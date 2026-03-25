@@ -763,6 +763,20 @@ let quillAnswerEn = null;
 
 // Khởi tạo Quill editors
 function initQuillEditors() {
+    // Kiểm tra Quill đã load chưa
+    if (typeof Quill === 'undefined') {
+        console.warn('Quill is not loaded yet, waiting...');
+        // Đợi Quill load xong
+        setTimeout(() => {
+            if (typeof Quill !== 'undefined') {
+                initQuillEditors();
+            } else {
+                console.error('Quill failed to load after waiting');
+            }
+        }, 200);
+        return;
+    }
+    
     const editorVi = document.getElementById('answerTextEditor');
     const editorEn = document.getElementById('answerTextEnEditor');
     
@@ -874,6 +888,39 @@ function renderQuestions(questions) {
         };
         return badges[status] || badges['pending'];
     };
+    
+    // Hàm tạo thông tin người chỉnh sửa cuối cùng
+    const getEditorInfo = (q) => {
+        // Ưu tiên hiển thị người chỉnh sửa cuối (updated_by)
+        // Nếu không có thì hiển thị người duyệt (approved_by)
+        const editorName = q.updated_by_name || q.approved_by_name;
+        const editorEmail = q.updated_by_email || q.approved_by_email;
+        const editTime = q.updated_at;
+        
+        if (!editorName) return '';
+        
+        const emailTitle = editorEmail ? ` title="${escapeHtml(editorEmail)}"` : '';
+        
+        let html = `<div class="mt-2 pt-2 border-t border-gray-100">`;
+        html += `<div class="flex items-center gap-1.5 text-xs text-gray-600"${emailTitle}>`;
+        html += `<svg class="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">`;
+        html += `<path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>`;
+        html += `</svg>`;
+        html += `<span class="font-medium">${escapeHtml(editorName)}</span>`;
+        html += `</div>`;
+        
+        if (editTime) {
+            html += `<div class="flex items-center gap-1.5 text-xs text-gray-500 mt-1">`;
+            html += `<svg class="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">`;
+            html += `<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>`;
+            html += `</svg>`;
+            html += `<span>${formatDateTime(editTime)}</span>`;
+            html += `</div>`;
+        }
+        
+        html += `</div>`;
+        return html;
+    };
 
     tbody.innerHTML = questions.map((q, i) => `
         <tr>
@@ -890,8 +937,10 @@ function renderQuestions(questions) {
             </td>
             <td data-label="Danh mục"><span class="badge badge-info">${q.category_name || 'Chưa phân loại'}</span></td>
             <td data-label="Trạng thái" class="text-center">
-                ${getApprovalBadge(q.approval_status || 'pending')}
-                ${q.approved_by_name ? `<div class="text-xs text-gray-400 mt-1">Bởi: ${q.approved_by_name}</div>` : ''}
+                <div class="flex flex-col items-center">
+                    ${getApprovalBadge(q.approval_status || 'pending')}
+                    ${getEditorInfo(q)}
+                </div>
             </td>
             <td data-label="Thao tác">
                 <div class="flex items-center gap-2 justify-center">
@@ -3101,6 +3150,41 @@ function stripHtml(html) {
     const div = document.createElement('div');
     div.innerHTML = html;
     return div.textContent || div.innerText || '';
+}
+
+/**
+ * Format datetime thành định dạng dễ đọc
+ */
+function formatDateTime(dateTimeStr) {
+    if (!dateTimeStr) return '';
+    try {
+        const date = new Date(dateTimeStr);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        // Nếu trong vòng 1 phút
+        if (diffMins < 1) return 'Vừa xong';
+        // Nếu trong vòng 1 giờ
+        if (diffMins < 60) return `${diffMins} phút trước`;
+        // Nếu trong vòng 24 giờ
+        if (diffHours < 24) return `${diffHours} giờ trước`;
+        // Nếu trong vòng 7 ngày
+        if (diffDays < 7) return `${diffDays} ngày trước`;
+        
+        // Ngày cụ thể
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        
+        return `${day}/${month}/${year} ${hours}:${minutes}`;
+    } catch (e) {
+        return dateTimeStr;
+    }
 }
 
 // Đảm bảo các hàm forms có thể truy cập từ toàn cục
