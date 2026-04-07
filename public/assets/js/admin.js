@@ -3,7 +3,7 @@
  * Xử lý logic trang quản trị
  */
 
-const ADMIN_API = '/DuAnChatbotThuVien/public/index.php?url=api';
+const ADMIN_API = '../../index.php?url=api';
 
 // ==================== FORM DRAFT MANAGER ====================
 // Tự động lưu trạng thái form vào sessionStorage khi user đang nhập liệu
@@ -285,18 +285,37 @@ const PageStateManager = {
      */
     restoreAndWatch(page, selectors, onRestore) {
         let restored = false;
+        
+        // 1) Lấy URL parameters (ưu tiên cao nhất)
+        const urlParams = new URLSearchParams(window.location.search);
+        
         try {
             const raw = localStorage.getItem(this.PREFIX + page);
+            let state = {};
             if (raw) {
-                const state = JSON.parse(raw);
-                if (!state._ts || (Date.now() - state._ts) < this.TTL) {
-                    selectors.forEach(sel => {
-                        if (state[sel] === undefined) return;
-                        const el = document.querySelector(sel);
-                        if (el) { el.value = state[sel]; restored = true; }
-                    });
+                const parsed = JSON.parse(raw);
+                if (!parsed._ts || (Date.now() - parsed._ts) < this.TTL) {
+                    state = parsed;
                 }
             }
+
+            selectors.forEach(sel => {
+                const el = document.querySelector(sel);
+                if (!el) return;
+
+                let val = null;
+                // Ưu tiên URL param cho category
+                if (sel === '#filterCategory' && urlParams.has('category')) {
+                    val = urlParams.get('category');
+                } else if (state[sel] !== undefined) {
+                    val = state[sel];
+                }
+
+                if (val !== null) {
+                    el.value = val;
+                    restored = true;
+                }
+            });
         } catch(e) {}
 
         if (restored && onRestore) { try { onRestore(); } catch(e) {} }
@@ -347,17 +366,17 @@ const AdminSPA = {
         questions:  async () => {
             await loadCategoriesForSelect();
             await loadQuestions();
-            PageStateManager.restoreAndWatch('questions', ['#searchInput', '#filterCategory', '#filterSource'], () => { try { filterQuestions(); } catch(e){} });
-            // Đợi một chút để đảm bảo DOM đã sẵn sàng, sau đó gọi filterQuestions()
-            setTimeout(() => {
-                try {
-                    filterQuestions();
-                } catch(e) {
-                    console.error('Error in filterQuestions:', e);
-                    // Fallback: render trực tiếp nếu filter fail
-                    renderQuestions(allQuestions);
-                }
-            }, 50);
+            
+            // Khôi phục state và apply filter (nếu có)
+            PageStateManager.restoreAndWatch('questions', ['#searchInput', '#filterCategory', '#filterApprovalStatus', '#filterSource'], () => { 
+                try { 
+                    filterQuestions(); 
+                } catch(e){
+                    console.error('Error in filter callback:', e);
+                } 
+            });
+            
+            // Kiểm tra có pending question từ trang "Chưa trả lời" không
             const _pq = sessionStorage.getItem('celras_pendingQuestion');
             if (_pq) {
                 sessionStorage.removeItem('celras_pendingQuestion');
@@ -437,12 +456,15 @@ const AdminSPA = {
         // Xử lý nút Back / Forward trình duyệt
         window.addEventListener('popstate', (e) => {
             if (e.state && e.state.adminPage) {
-                this.loadPage(e.state.adminPage, false);
+                this.loadPage(e.state.adminPage, false, e.state.queryString || '');
             }
         });
 
         // Ghi state hiện tại
-        history.replaceState({ adminPage: this.currentPage }, '', window.location.href);
+        history.replaceState({ 
+            adminPage: this.currentPage, 
+            queryString: window.location.search 
+        }, '', window.location.href);
 
         this.initialized = true;
     },
@@ -497,21 +519,22 @@ const AdminSPA = {
             if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
 
             // Kiểm tra link có trỏ đến trang admin không
-            const match = href.match(/(?:^|\/)(\w+)\.html(?:\?.*)?$/);
+            const match = href.match(/(?:^|\/)(\w+)\.html(\?.*)?$/);
             if (!match) return;
             const pageName = match[1];
+            const queryString = match[2] || '';
             if (!this.PAGE_INIT[pageName] && pageName !== 'dashboard') return;
 
             // Chặn reload và dùng SPA
             e.preventDefault();
-            this.loadPage(pageName, true);
+            this.loadPage(pageName, true, queryString);
         });
     },
 
     /**
      * Tải trang mới bằng AJAX — không reload
      */
-    async loadPage(pageName, pushState = true) {
+    async loadPage(pageName, pushState = true, queryString = '') {
         if (this.isNavigating) return;
         this.isNavigating = true;
 
@@ -524,7 +547,7 @@ const AdminSPA = {
         contentEl.style.transform = 'translateY(6px)';
 
         try {
-            const fullUrl = '/DuAnChatbotThuVien/public/pages/admin/' + pageName + '.html';
+            const fullUrl = pageName + '.html' + queryString;
             const res = await fetch(fullUrl, { cache: 'no-cache' });
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const html = await res.text();
@@ -597,7 +620,10 @@ const AdminSPA = {
 
             // URL
             if (pushState) {
-                history.pushState({ adminPage: pageName }, '', fullUrl);
+                history.pushState({ 
+                    adminPage: pageName,
+                    queryString: queryString
+                }, '', fullUrl);
             }
 
             // Active nav
@@ -625,7 +651,7 @@ const AdminSPA = {
         } catch (err) {
             console.error('[AdminSPA] Error:', err);
             // Fallback → chuyển trang bình thường
-            window.location.href = '/DuAnChatbotThuVien/public/pages/admin/' + pageName + '.html';
+            window.location.href = pageName + '.html';
         } finally {
             this.isNavigating = false;
         }
@@ -693,7 +719,7 @@ async function loadAdminPage(pageName) {
     if (typeof checkAuth !== 'function') {
         await new Promise((resolve, reject) => {
             const s = document.createElement('script');
-            s.src = '/DuAnChatbotThuVien/public/assets/js/auth.js';
+            s.src = '../../assets/js/auth.js';
             s.onload = resolve;
             s.onerror = reject;
             document.head.appendChild(s);
@@ -711,7 +737,7 @@ async function loadAdminPage(pageName) {
     });
 
     // Điền thông tin admin vào header
-    const fallbackAvatar = '/DuAnChatbotThuVien/public/assets/images/US.jpg';
+    const fallbackAvatar = '../../assets/images/US.jpg';
     const avatarSrc = admin.avatar || fallbackAvatar;
 
     const avatarEl = document.getElementById('dashAdminAvatar');
@@ -860,8 +886,19 @@ async function loadQuestions() {
         }
         const data = await res.json();
         allQuestions = data.questions || [];
-        // Không render ngay, để filterQuestions() xử lý
-        // renderQuestions(allQuestions);
+        
+        // Debug: Kiểm tra dữ liệu câu hỏi
+        if (allQuestions.length > 0) {
+            console.log('Loaded questions:', allQuestions.length);
+            // Kiểm tra xem có câu hỏi nào thiếu answer_text không
+            const missingAnswer = allQuestions.filter(q => !q.answer_text);
+            if (missingAnswer.length > 0) {
+                console.warn(`Found ${missingAnswer.length} questions without answer_text:`, missingAnswer.map(q => q.id));
+            }
+        }
+        
+        // Render ngay sau khi load xong
+        renderQuestions(allQuestions);
     } catch (e) {
         console.error('Failed to load questions:', e);
         alert(`Lỗi khi tải danh sách câu hỏi: ${e.message}\n\nVui lòng kiểm tra:\n- Kết nối mạng\n- Server đang chạy\n- Database đã được cấu hình đúng`);
@@ -921,6 +958,30 @@ function renderQuestions(questions) {
         html += `</div>`;
         return html;
     };
+    
+    // Hàm an toàn để lấy text từ answer_text - đảm bảo encoding UTF-8
+    const getAnswerPreview = (answerText, maxLength = 150) => {
+        if (!answerText || answerText.trim() === '') {
+            return '<span class="text-gray-400 italic">(Chưa có câu trả lời)</span>';
+        }
+        // Đảm bảo text được decode đúng UTF-8
+        let text = answerText;
+        try {
+            // Nếu text đã được encode, decode nó
+            if (text.includes('&') && (text.includes('&#') || text.includes('&lt;') || text.includes('&gt;'))) {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = text;
+                text = tempDiv.textContent || tempDiv.innerText || '';
+            }
+        } catch(e) {
+            console.warn('Error decoding answer text:', e);
+        }
+        const stripped = stripHtml(text);
+        if (stripped.length > maxLength) {
+            return escapeHtml(stripped.substring(0, maxLength)) + '...';
+        }
+        return escapeHtml(stripped);
+    };
 
     tbody.innerHTML = questions.map((q, i) => `
         <tr>
@@ -930,10 +991,10 @@ function renderQuestions(questions) {
             <td data-label="#" class="text-gray-500">${i + 1}</td>
             <td data-label="Câu hỏi">
                 <div class="font-medium text-sm">${escapeHtml(q.question_text.substring(0, 120))}${q.question_text.length > 120 ? '...' : ''}</div>
-                <div class="text-xs text-gray-400 mt-1">${stripHtml(q.answer_text).substring(0, 80)}...</div>
+                <div class="text-xs text-gray-400 mt-1">${getAnswerPreview(q.answer_text, 80)}</div>
             </td>
             <td data-label="Câu trả lời">
-                <div class="text-xs text-gray-600">${stripHtml(q.answer_text).substring(0, 150)}${q.answer_text.length > 150 ? '...' : ''}</div>
+                <div class="text-xs text-gray-600">${getAnswerPreview(q.answer_text, 150)}</div>
             </td>
             <td data-label="Danh mục"><span class="badge badge-info">${q.category_name || 'Chưa phân loại'}</span></td>
             <td data-label="Trạng thái" class="text-center">
@@ -998,7 +1059,7 @@ function filterQuestions() {
     const source = sourceEl ? sourceEl.value : '';
 
     let filtered = allQuestions.filter(q => {
-        const matchSearch = !search || q.question_text.toLowerCase().includes(search) || q.answer_text.toLowerCase().includes(search);
+        const matchSearch = !search || q.question_text.toLowerCase().includes(search) || (q.answer_text || '').toLowerCase().includes(search);
         const matchCategory = !category || q.category_id == category;
         const matchApprovalStatus = !approvalStatus || q.approval_status === approvalStatus;
         const matchSource = !source || q.source_type === source;
@@ -1069,6 +1130,15 @@ async function editQuestion(id) {
         
         if (data.question) {
             const q = data.question;
+            
+            // Debug: Log dữ liệu câu hỏi
+            console.log('Loading question for edit:', {
+                id: q.id,
+                question_text: q.question_text?.substring(0, 50),
+                has_answer_text: !!q.answer_text,
+                has_answer_text_en: !!q.answer_text_en
+            });
+            
             document.getElementById('modalTitle').textContent = 'Sửa câu hỏi';
             document.getElementById('questionId').value = q.id;
             document.getElementById('questionCategory').value = q.category_id || '';
@@ -1082,15 +1152,35 @@ async function editQuestion(id) {
                 // Khởi tạo Quill editors nếu chưa có
                 initQuillEditors();
                 
-                // Set nội dung cho Quill editors
-                if (quillAnswerVi) {
-                    const answerHtml = q.answer_text || '';
-                    quillAnswerVi.root.innerHTML = answerHtml;
-                }
-                if (quillAnswerEn) {
-                    const answerEnHtml = q.answer_text_en || '';
-                    quillAnswerEn.root.innerHTML = answerEnHtml;
-                }
+                // Đợi thêm một chút để đảm bảo Quill đã sẵn sàng
+                setTimeout(() => {
+                    // Set nội dung cho Quill editors - đảm bảo UTF-8
+                    if (quillAnswerVi) {
+                        const answerHtml = q.answer_text || '';
+                        // Đảm bảo HTML được decode đúng UTF-8
+                        try {
+                            quillAnswerVi.root.innerHTML = answerHtml;
+                            console.log('Set answer_text to Quill Vi:', answerHtml.substring(0, 100));
+                        } catch(e) {
+                            console.error('Error setting Quill Vi content:', e);
+                            // Fallback: set text thuần
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = answerHtml;
+                            quillAnswerVi.setText(tempDiv.textContent || '');
+                        }
+                    }
+                    if (quillAnswerEn) {
+                        const answerEnHtml = q.answer_text_en || '';
+                        try {
+                            quillAnswerEn.root.innerHTML = answerEnHtml;
+                        } catch(e) {
+                            console.error('Error setting Quill En content:', e);
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = answerEnHtml;
+                            quillAnswerEn.setText(tempDiv.textContent || '');
+                        }
+                    }
+                }, 50);
             }, 100);
             
             // Load và hiển thị từ khóa tự động
@@ -1903,7 +1993,7 @@ function renderCategories(categories) {
             </div>
             <p class="text-sm text-gray-500 mb-3">${escapeHtml(c.description || 'Không có mô tả')}</p>
             <div class="flex items-center gap-2">
-                <a href="/DuAnChatbotThuVien/public/pages/admin/questions.html?category=${c.id}" class="badge badge-info hover:opacity-80 cursor-pointer no-underline" title="Xem danh sách câu hỏi">${c.question_count || 0} câu hỏi</a>
+                <a href="questions.html?category=${c.id}" class="badge badge-info hover:opacity-80 cursor-pointer no-underline" title="Xem danh sách câu hỏi">${c.question_count || 0} câu hỏi</a>
                 <span class="badge ${c.is_active ? 'badge-success' : 'badge-danger'}">${c.is_active ? 'Hoạt động' : 'Đã tắt'}</span>
             </div>
         </div>
@@ -2632,7 +2722,7 @@ async function loadUnanswered() {
 function renderUnanswered(items) {
     const tbody = document.getElementById('unansweredBody');
     if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">Không có câu hỏi chưa trả lời 🎉</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-400">Không có câu hỏi chưa trả lời 🎉</td></tr>';
         return;
     }
 
@@ -2649,6 +2739,9 @@ function renderUnanswered(items) {
         
         return `
         <tr>
+            <td data-label="Chọn">
+                <input type="checkbox" class="unanswered-checkbox w-4 h-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500 cursor-pointer" data-id="${item.id}" onchange="updateUnansweredSelectionUI()">
+            </td>
             <td data-label="#">${i + 1}</td>
             <td data-label="Câu hỏi" class="font-medium" title="${safeQuestion}">${displayQuestion}</td>
             <td data-label="Số lần hỏi"><span class="badge badge-warning">${item.frequency} lần</span></td>
@@ -2763,14 +2856,78 @@ async function deleteMultipleUnanswered() {
         const data = await res.json();
         
         if (data.success) {
-            alert(data.message || `Đã xóa ${ids.length} câu hỏi thành công`);
+            showToast(data.message || `Đã xóa ${ids.length} câu hỏi thành công`, 'success');
             await loadUnanswered();
+            // Reset checkboxes
+            updateUnansweredSelectionUI();
         } else {
             alert(data.error || 'Có lỗi xảy ra khi xóa');
         }
     } catch (e) {
         console.error('Error deleting multiple unanswered:', e);
         alert('Lỗi khi xóa');
+    }
+}
+
+/**
+ * Toggle chọn tất cả câu hỏi chưa trả lời
+ */
+function toggleSelectAllUnanswered(checkbox) {
+    const checkboxes = document.querySelectorAll('.unanswered-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+    updateUnansweredSelectionUI();
+}
+
+/**
+ * Cập nhật UI khi có thay đổi selection
+ */
+function updateUnansweredSelectionUI() {
+    const checkboxes = document.querySelectorAll('.unanswered-checkbox');
+    const checkedBoxes = document.querySelectorAll('.unanswered-checkbox:checked');
+    const count = checkedBoxes.length;
+    
+    // Update desktop button
+    const deleteBtn = document.getElementById('deleteMultipleUnansweredBtn');
+    const countSpan = document.getElementById('selectedUnansweredCount');
+    if (deleteBtn && countSpan) {
+        if (count > 0) {
+            deleteBtn.classList.remove('hidden');
+            deleteBtn.classList.add('inline-flex');
+        } else {
+            deleteBtn.classList.add('hidden');
+            deleteBtn.classList.remove('inline-flex');
+        }
+        countSpan.textContent = count;
+    }
+    
+    // Update mobile button
+    const deleteBtnMobile = document.getElementById('deleteMultipleUnansweredBtnMobile');
+    const countSpanMobile = document.getElementById('selectedUnansweredCountMobile');
+    if (deleteBtnMobile && countSpanMobile) {
+        if (count > 0) {
+            deleteBtnMobile.classList.remove('hidden');
+            deleteBtnMobile.classList.add('inline-flex');
+        } else {
+            deleteBtnMobile.classList.add('hidden');
+            deleteBtnMobile.classList.remove('inline-flex');
+        }
+        countSpanMobile.textContent = count;
+    }
+    
+    // Update "select all" checkbox state
+    const selectAllDesktop = document.getElementById('selectAllUnanswered');
+    const selectAllMobile = document.getElementById('selectAllUnansweredMobile');
+    
+    if (selectAllDesktop) {
+        selectAllDesktop.checked = checkboxes.length > 0 && count === checkboxes.length;
+        selectAllDesktop.indeterminate = count > 0 && count < checkboxes.length;
+    }
+    
+    if (selectAllMobile) {
+        selectAllMobile.checked = checkboxes.length > 0 && count === checkboxes.length;
+        selectAllMobile.indeterminate = count > 0 && count < checkboxes.length;
     }
 }
 

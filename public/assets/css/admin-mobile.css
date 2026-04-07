@@ -34,6 +34,13 @@
     .mobile-select-bar {
         display: flex !important;
     }
+    
+    /* --- Fix mobile table interaction --- */
+    .data-table tbody td button,
+    .data-table tbody td a {
+        pointer-events: auto !important;
+        touch-action: manipulation !important;
+    }
 
     /* --- Header --- */
     .admin-header {
@@ -76,6 +83,7 @@
         padding: 14px !important;
         margin-bottom: 10px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        position: relative;
     }
     .data-table tbody tr:hover {
         background: #fff !important;
@@ -89,6 +97,17 @@
         gap: 12px;
         flex-wrap: nowrap;
         min-height: 32px;
+        position: relative;
+        z-index: 1;
+    }
+    /* Đảm bảo các button và link có thể click được */
+    .data-table tbody td button,
+    .data-table tbody td a,
+    .data-table tbody td input[type="checkbox"] {
+        position: relative;
+        z-index: 10;
+        pointer-events: auto !important;
+        touch-action: manipulation !important;
     }
     .data-table tbody td > div {
         flex: 1;
@@ -162,13 +181,22 @@
         padding: 0 !important;
         border-radius: 20px !important;
         max-height: 85vh !important;
-        overflow: hidden !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
     }
     .modal > div:last-child {
         padding: 20px !important;
     }
     .modal-overlay {
         padding: 10px !important;
+        overflow-y: auto !important;
+    }
+    
+    /* Fix scroll cho modal content */
+    .modal form {
+        max-height: calc(85vh - 100px) !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
     }
 
     /* --- Form groups --- */

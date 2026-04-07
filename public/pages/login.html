@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
@@ -9,8 +9,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" href="/DuAnChatbotThuVien/public/assets/images/logo1.png" type="image/png">
-    <link rel="stylesheet" href="/DuAnChatbotThuVien/public/assets/css/loading.css">
+    <link rel="icon" href="../assets/images/logo1.png" type="image/png">
+    <link rel="stylesheet" href="../assets/css/loading.css">
     <style>
         body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
         .login-input { display:block; width:100%; padding:10px 14px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; color:#111827; background:#fff; outline:none; transition:border .15s; font-family:inherit; }
@@ -26,7 +26,7 @@
     <div id="page-loader">
         <div class="loader-spinner-wrap">
             <div class="loader-spinner"></div>
-            <img class="loader-logo-img" src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="CELRAS TVU"
+            <img class="loader-logo-img" src="../assets/images/logo1.png" alt="CELRAS TVU"
                  onerror="this.src='https://ui-avatars.com/api/?name=CELRAS+TVU&background=0369a1&color=fff&rounded=true&size=80'">
         </div>
         <div class="loader-brand">CELRAS TVU</div>
@@ -46,7 +46,7 @@
         <div id="panelLogin" class="relative bg-white rounded-2xl shadow-xl p-8 sm:p-10">
             <!-- Logo -->
             <div class="flex flex-col items-center mb-6">
-                <img src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="CELRAS TVU Logo"
+                <img src="../assets/images/logo1.png" alt="CELRAS TVU Logo"
                      class="w-20 h-20 rounded-full object-cover shadow-md mb-4"
                      onerror="this.src='https://ui-avatars.com/api/?name=CELRAS+TVU&background=0369a1&color=fff&rounded=true&size=80'">
                 <h1 class="text-2xl font-bold text-blue-700">CELRAS TVU</h1>
@@ -103,7 +103,7 @@
 
             <!-- Back link -->
             <div class="mt-6">
-                <a href="/DuAnChatbotThuVien/public/pages/index.html" class="text-sm text-sky-600 hover:text-sky-800 flex items-center justify-center gap-1">
+                <a href="index.html" class="text-sm text-sky-600 hover:text-sky-800 flex items-center justify-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                     Quay lại trang Chatbot
                 </a>
@@ -201,9 +201,9 @@
         </div>
     </div>
 
-    <script src="/DuAnChatbotThuVien/public/assets/js/auth.js"></script>
+    <script src="../assets/js/auth.js"></script>
     <script>
-        const API = '/DuAnChatbotThuVien/public/index.php?url=api';
+        const API = '../index.php?url=api';
 
         // ========== Panel switching ==========
         function showPanel(id) {
@@ -248,7 +248,7 @@
                 const data = await res.json();
                 if (data.success) {
                     showMsg('loginMessage', 'Đăng nhập thành công! Đang chuyển hướng...', false);
-                    setTimeout(() => window.location.href = '/DuAnChatbotThuVien/public/pages/admin/dashboard.html', 800);
+                    setTimeout(() => window.location.href = 'admin/dashboard.html', 800);
                 } else {
                     showMsg('loginMessage', data.error || 'Đăng nhập thất bại');
                 }
@@ -371,6 +371,6 @@
             checkAuthAndRedirect();
         });
     </script>
-    <script src="/DuAnChatbotThuVien/public/assets/js/loading.js"></script>
+    <script src="../assets/js/loading.js"></script>
 </body>
 </html>

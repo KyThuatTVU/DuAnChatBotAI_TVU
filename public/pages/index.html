@@ -16,8 +16,8 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" href="/DuAnChatbotThuVien/public/assets/images/logo.png" type="image/png">
-    <link rel="stylesheet" href="/DuAnChatbotThuVien/public/assets/css/event-themes.css">
+    <link rel="icon" href="../assets/images/logo.png" type="image/png">
+    <link rel="stylesheet" href="../assets/css/event-themes.css">
 
     <style>
         body {
@@ -660,6 +660,25 @@
             background: linear-gradient(145deg, #0d3a5f, #0f4a7a);
             border-color: rgba(56,130,246,0.4);
         }
+
+        /* ===== MARQUEE STYLE ===== */
+        .marquee-text {
+            animation: scroll-marquee 15s linear infinite;
+            display: block;
+        }
+
+        @keyframes scroll-marquee {
+            0% {
+                transform: translateX(100%);
+            }
+            100% {
+                transform: translateX(-100%);
+            }
+        }
+
+        .marquee-text:hover {
+            animation-play-state: paused;
+        }
     </style>
 </head>
 
@@ -669,7 +688,7 @@
     <header class="fixed top-0 left-0 right-0 z-50 h-[80px]" style="flex-shrink:0; background: linear-gradient(145deg, #ffffff, #f0f9ff); border-bottom: 2px solid rgba(14,165,233,0.2); box-shadow: 0 8px 32px rgba(14,116,176,0.12), 0 2px 6px rgba(0,0,0,0.06);">
         <div class="max-w-7xl mx-auto px-4 sm:px-5 h-full flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <a href="/DuAnChatbotThuVien/public/pages/index.html" class="flex items-center gap-3 group">
+                <a href="index.html" class="flex items-center gap-3 group">
                     <img src="../assets/images/logo2.png" alt="CELRAS TVU" class="w-14 h-14 rounded-lg object-cover flex-shrink-0 transition-all duration-300 group-hover:scale-105" style="box-shadow: 0 4px 16px rgba(14,165,233,0.25), 0 2px 4px rgba(0,0,0,0.08); border: 2px solid #fff;">
                 <span class="font-bold text-[16px] hidden sm:inline tracking-tight logo-text transition-all duration-300" style="color: #0c4a6e;">CELRAS TVU</span>
                 </a>
@@ -696,6 +715,7 @@
                 </button>
             </div>
 
+        
             <div class="flex items-center gap-2">
                 <!-- Language Toggle -->
                 <button class="lang-toggle" onclick="toggleLanguage()" id="langToggle" data-i18n-title="switch_lang" title="Chuyển ngôn ngữ">
@@ -947,7 +967,7 @@ box-shadow: 0 -3px 15px rgba(14,116,176,0.08);">
         window.translateCatName = translateCatName;
     </script>
 
-    <script src="/DuAnChatbotThuVien/public/assets/js/chatbot.js?v=20260310"></script>
+    <script src="../assets/js/chatbot.js?v=20260310"></script>
     <script>
         // ===== DARK MODE =====
         function toggleTheme() {

@@ -3,9 +3,10 @@
  * Xử lý giao diện chat phía người dùng
  */
 
-const API_BASE = '/DuAnChatbotThuVien/public/index.php?url=api';
+const API_BASE = '../index.php?url=api';
 let sessionToken = localStorage.getItem('chat_session') || '';
 let activeCategoryId = null; // Danh mục đang mở
+let defaultSuggestions = []; // Lưu trữ gợi ý mặc định
 
 // ==================== CHAT HISTORY (SESSION) ====================
 // Lưu lịch sử trò chuyện vào sessionStorage để khôi phục khi load lại trang.
@@ -104,6 +105,7 @@ async function initChatbot() {
 
             // Hiển thị câu hỏi gợi ý
             if (data.suggestions && data.suggestions.length > 0) {
+                defaultSuggestions = data.suggestions; // Lưu lại để khôi phục sau này
                 renderSuggestions(data.suggestions);
             }
         }
@@ -336,10 +338,10 @@ function appendMessage(sender, text, forms = []) {
 function _renderMessage(sender, text, forms = []) {
     const container = document.getElementById('chatMessages');
     const avatarUrl = sender === 'bot'
-        ? "/DuAnChatbotThuVien/public/assets/images/logo1.png"
-        : "/DuAnChatbotThuVien/public/assets/images/US.jpg";
+        ? "../assets/images/logo1.png"
+        : "../assets/images/US.jpg";
 
-    // Render nội dung text
+    // Render nội dung text - đảm bảo UTF-8 encoding
     let safeText;
     if (sender === 'bot') {
         // Bot message: kiểm tra xem có phải HTML từ Quill không
@@ -350,13 +352,17 @@ function _renderMessage(sender, text, forms = []) {
             const hasFormatting = /<(strong|em|u|b|i|ul|ol|h1|h2|h3|blockquote|code)/.test(text);
             
             if (hasFormatting) {
-                // Có formatting thực sự → giữ HTML
-                safeText = text;
-            } else {
-                // Chỉ có <p> đơn giản → lấy text thuần
+                // Có formatting thực sự → giữ HTML và đảm bảo UTF-8
+                // Decode HTML entities nếu có
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = text;
-                safeText = tempDiv.textContent.replace(/\n/g, '<br>');
+                safeText = tempDiv.innerHTML;
+            } else {
+                // Chỉ có <p> đơn giản → lấy text thuần và giữ xuống dòng
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = text;
+                const plainText = tempDiv.textContent || tempDiv.innerText || '';
+                safeText = escapeHtml(plainText).replace(/\n/g, '<br>');
             }
         } else {
             // Text thuần → giữ xuống dòng
@@ -409,7 +415,7 @@ function showTypingIndicator() {
     const typingLabel = (typeof t === 'function') ? t('typing') : 'Đang trả lời';
     const html = `
         <div class="message bot" id="typingIndicator">
-            <img src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="bot" class="avatar">
+            <img src="../assets/images/logo1.png" alt="bot" class="avatar">
             <div class="bubble">
                 <div class="typing-wrapper">
                     <div class="typing-indicator">
@@ -442,7 +448,7 @@ async function startNewChat() {
     const suggestions = document.getElementById('suggestionsContainer');
     if (suggestions) suggestions.style.display = 'flex';
 
-    // Reset danh mục sidebar
+    // Reset danh mục sidebar và gợi ý
     closeCategoryQuestions();
 
     // Xóa lịch sử phiên làm việc
@@ -618,10 +624,11 @@ function renderCategories(categories) {
 }
 
 /**
- * Mở danh mục → tải câu hỏi inline bên dưới
+ * Mở danh mục → tải câu hỏi inline bên dưới & cập nhật chip gợi ý
  */
 async function openCategory(categoryId, itemEl) {
     const questionsDiv = document.getElementById(`catQuestions_${categoryId}`);
+    const suggestionsContainer = document.getElementById('suggestionsContainer');
 
     // Nếu bấm lại danh mục đang mở → đóng
     if (activeCategoryId === categoryId) {
@@ -636,7 +643,7 @@ async function openCategory(categoryId, itemEl) {
     // Highlight item
     if (itemEl) itemEl.classList.add('active');
 
-    // Hiện panel câu hỏi
+    // Hiện panel câu hỏi trong sidebar
     if (questionsDiv) {
         questionsDiv.classList.add('open');
         questionsDiv.innerHTML = `
@@ -653,19 +660,31 @@ async function openCategory(categoryId, itemEl) {
         const res = await fetch(`${API_BASE}/chat/categoryQuestions/${categoryId}`);
         const data = await res.json();
 
-        if (data.success && questionsDiv) {
-            if (data.questions.length === 0) {
-                questionsDiv.innerHTML = `
-                    <div class="text-center py-3 text-gray-400 text-xs">
-                        ${typeof t === 'function' ? t('no_questions') : 'Chưa có câu hỏi nào.'}
-                    </div>`;
-            } else {
-                questionsDiv.innerHTML = data.questions.map(q =>
-                    `<div class="cat-question-item" onclick="askCategoryQuestion(this)" data-question="${escapeHtml(stripLeadingNumber(q.question_text))}" data-question-vi="${escapeHtml(stripLeadingNumber(q.question_text))}"${q.question_text_en ? ` data-question-en="${escapeHtml(stripLeadingNumber(q.question_text_en))}"` : ''}>
-                        <span class="q-dot"></span>
-                        <span class="q-text">${escapeHtml(stripLeadingNumber(q.question_text))}</span>
-                    </div>`
-                ).join('');
+        if (data.success) {
+            // Hiển thị trong sidebar
+            if (questionsDiv) {
+                if (data.questions.length === 0) {
+                    questionsDiv.innerHTML = `
+                        <div class="text-center py-3 text-gray-400 text-xs">
+                            ${typeof t === 'function' ? t('no_questions') : 'Chưa có câu hỏi nào.'}
+                        </div>`;
+                } else {
+                    questionsDiv.innerHTML = data.questions.map(q =>
+                        `<div class="cat-question-item" onclick="askCategoryQuestion(this)" data-question="${escapeHtml(stripLeadingNumber(q.question_text))}" data-question-vi="${escapeHtml(stripLeadingNumber(q.question_text))}"${q.question_text_en ? ` data-question-en="${escapeHtml(stripLeadingNumber(q.question_text_en))}"` : ''}>
+                            <span class="q-dot"></span>
+                            <span class="q-text">${escapeHtml(stripLeadingNumber(q.question_text))}</span>
+                        </div>`
+                    ).join('');
+                }
+            }
+
+            // Cập nhật chip gợi ý chính (giúp "trỏ đến câu hỏi đó" như yêu cầu)
+            if (suggestionsContainer && data.questions.length > 0) {
+                // Hiện lại gợi ý nếu đang bị ẩn (sau khi đã chat)
+                if (suggestionsContainer.style.display === 'none') {
+                    suggestionsContainer.style.display = 'flex';
+                }
+                renderSuggestions(data.questions);
             }
         } else if (questionsDiv) {
             questionsDiv.innerHTML = `
@@ -684,7 +703,7 @@ async function openCategory(categoryId, itemEl) {
 }
 
 /**
- * Đóng panel câu hỏi danh mục
+ * Đóng panel câu hỏi danh mục và khôi phục gợi ý mặc định
  */
 function closeCategoryQuestions() {
     activeCategoryId = null;
@@ -693,6 +712,11 @@ function closeCategoryQuestions() {
         c.classList.remove('open');
         c.innerHTML = '';
     });
+
+    // Khôi phục gợi ý mặc định
+    if (defaultSuggestions && defaultSuggestions.length > 0) {
+        renderSuggestions(defaultSuggestions);
+    }
 }
 
 /**
@@ -720,7 +744,7 @@ async function logout() {
     try {
         await fetch(`${API_BASE}/auth/logout`);
     } catch (e) {}
-    window.location.href = '/DuAnChatbotThuVien/public/pages/index.html';
+    window.location.href = 'index.html';
 }
 
 // ===== VOICE INPUT (SPEECH RECOGNITION) =====
@@ -994,7 +1018,7 @@ function showVoiceError(message) {
  */
 function appendRelatedQuestions(questions) {
     const container = document.getElementById('chatMessages');
-    const avatarUrl = "/DuAnChatbotThuVien/public/assets/images/logo1.png";
+    const avatarUrl = "../assets/images/logo1.png";
 
     const questionsHtml = questions.map(q => {
         const questionText = stripLeadingNumber(q.question_text);

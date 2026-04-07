@@ -1,14 +1,14 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cài đặt giao diện - CELRAS TVU Admin</title>
-    <link rel="icon" type="image/png" href="/DuAnChatbotThuVien/public/assets/images/logo2.png">
+    <link rel="icon" type="image/png" href="../../assets/images/logo2.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/DuAnChatbotThuVien/public/assets/css/loading.css">
-    <link rel="stylesheet" href="/DuAnChatbotThuVien/public/assets/css/admin-mobile.css">
+    <link rel="stylesheet" href="../../assets/css/loading.css">
+    <link rel="stylesheet" href="../../assets/css/admin-mobile.css">
     <style>
         body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif}
         .admin-layout{min-height:100vh}
@@ -271,8 +271,8 @@
     <div id="page-loader">
         <div class="loader-spinner-wrap">
             <div class="loader-spinner"></div>
-            <img class="loader-logo-img" src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="CELRAS TVU"
-                 onerror="this.src='/DuAnChatbotThuVien/public/assets/images/logo2.png'">
+            <img class="loader-logo-img" src="../../assets/images/logo1.png" alt="CELRAS TVU"
+                 onerror="this.src='../../assets/images/logo2.png'">
         </div>
         <div class="loader-brand">CELRAS TVU</div>
         <div class="loader-tagline">Trung tâm Học liệu và Hỗ trợ Học thuật<br>Đại học Trà Vinh</div>
@@ -297,8 +297,8 @@
         <!-- ===== SIDEBAR ===== -->
         <aside class="admin-sidebar" id="adminSidebar">
             <div class="sidebar-logo">
-                <a href="/DuAnChatbotThuVien/public/pages/index.html" class="flex items-center gap-2" style="text-decoration:none">
-                    <img src="/DuAnChatbotThuVien/public/assets/images/logo1.png" alt="Logo" class="w-8 h-8 rounded-full object-cover" onerror="this.src='/DuAnChatbotThuVien/public/assets/images/logo2.png'">
+                <a href="../index.html" class="flex items-center gap-2" style="text-decoration:none">
+                    <img src="../../assets/images/logo1.png" alt="Logo" class="w-8 h-8 rounded-full object-cover" onerror="this.src='../../assets/images/logo2.png'">
                     <span>CELRAS TVU</span>
                 </a>
             </div>
@@ -322,7 +322,7 @@
                 </div>
             </div>
             <div class="sidebar-logout flex flex-col gap-1">
-                <a href="/DuAnChatbotThuVien/public/pages/index.html" class="nav-item"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>Về trang chatbot</a>
+                <a href="../index.html" class="nav-item"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>Về trang chatbot</a>
                 <a href="#" onclick="logout();return false" class="nav-item" style="color:#f87171"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>Đăng xuất</a>
             </div>
         </aside>
@@ -702,8 +702,8 @@
         </div>
     </div>
 
-    <script src="/DuAnChatbotThuVien/public/assets/js/loading.js"></script>
-    <script src="/DuAnChatbotThuVien/public/assets/js/admin.js?v=20260306c"></script>
+    <script src="../../assets/js/loading.js"></script>
+    <script src="../../assets/js/admin.js?v=20260406c"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             await loadAdminPage('settings');
