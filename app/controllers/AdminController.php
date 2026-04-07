@@ -2263,6 +2263,7 @@ class AdminController extends BaseController
 
     /**
      * GET /api/admin/exportQuestions - Xuất toàn bộ dữ liệu câu hỏi ra Excel (.xlsx)
+     * Query params: category_id (optional) - Lọc theo danh mục
      */
     public function exportQuestions()
     {
@@ -2271,44 +2272,123 @@ class AdminController extends BaseController
         try {
             $db = Database::getInstance()->getConnection();
             
-            // Lấy toàn bộ dữ liệu câu hỏi kèm danh mục và từ khóa
-            $sql = "SELECT 
+            // Log toàn bộ $_GET để debug
+            error_log("=== EXPORT EXCEL DEBUG ===");
+            error_log("Full \$_GET: " . print_r($_GET, true));
+            error_log("Full \$_SERVER['QUERY_STRING']: " . ($_SERVER['QUERY_STRING'] ?? 'EMPTY'));
+            error_log("Full \$_SERVER['REQUEST_URI']: " . ($_SERVER['REQUEST_URI'] ?? 'EMPTY'));
+            
+            // Lấy tham số lọc từ query string
+            $categoryId = isset($_GET['category_id']) && $_GET['category_id'] !== '' ? intval($_GET['category_id']) : null;
+            
+            error_log("Parsed category_id: " . ($categoryId ?? 'NULL'));
+            error_log("Is null? " . ($categoryId === null ? 'YES' : 'NO'));
+            error_log("Is zero? " . ($categoryId === 0 ? 'YES' : 'NO'));
+            
+            // Bước 1: Lấy danh sách câu hỏi (không có keywords)
+            $sqlQuestions = "SELECT 
                         q.id,
                         q.question_text,
                         q.answer_text,
                         q.answer_text_en,
+                        q.category_id,
                         c.name as category_name,
                         q.source_type,
                         q.approval_status,
                         q.is_active,
                         q.created_at,
-                        q.updated_at,
-                        GROUP_CONCAT(DISTINCT CASE WHEN k.is_auto = 0 THEN k.keyword END SEPARATOR ', ') as manual_keywords,
-                        GROUP_CONCAT(DISTINCT CASE WHEN k.is_auto = 1 AND k.language = 'vi' THEN k.keyword END SEPARATOR ', ') as auto_keywords_vi,
-                        GROUP_CONCAT(DISTINCT CASE WHEN k.is_auto = 1 AND k.language = 'en' THEN k.keyword END SEPARATOR ', ') as auto_keywords_en
+                        q.updated_at
                     FROM questions q
-                    LEFT JOIN categories c ON q.category_id = c.id
-                    LEFT JOIN keywords k ON q.id = k.question_id
-                    GROUP BY q.id
-                    ORDER BY q.created_at DESC";
+                    LEFT JOIN categories c ON q.category_id = c.id";
             
-            $stmt = $db->prepare($sql);
+            // Thêm WHERE nếu có category_id
+            if ($categoryId) {
+                $sqlQuestions .= " WHERE q.category_id = " . intval($categoryId);
+                error_log("ADDING WHERE CLAUSE: q.category_id = " . intval($categoryId));
+            } else {
+                error_log("NO WHERE CLAUSE - EXPORTING ALL QUESTIONS");
+            }
+            
+            $sqlQuestions .= " ORDER BY q.created_at DESC";
+            
+            error_log("Final SQL: " . $sqlQuestions);
+            
+            $stmt = $db->prepare($sqlQuestions);
             $stmt->execute();
             $questions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            error_log("Found " . count($questions) . " questions");
+            if (!empty($questions)) {
+                error_log("First 3 questions category_ids: " . implode(', ', array_slice(array_column($questions, 'category_id'), 0, 3)));
+            }
 
             if (empty($questions)) {
                 $this->json(['error' => 'Không có dữ liệu để xuất'], 404);
                 return;
             }
+            
+            // Bước 2: Lấy keywords cho các câu hỏi
+            $questionIds = array_column($questions, 'id');
+            
+            if (!empty($questionIds)) {
+                $placeholders = implode(',', array_fill(0, count($questionIds), '?'));
+                
+                $sqlKeywords = "SELECT 
+                                question_id,
+                                GROUP_CONCAT(DISTINCT CASE WHEN is_auto = 0 THEN keyword END SEPARATOR ', ') as manual_keywords,
+                                GROUP_CONCAT(DISTINCT CASE WHEN is_auto = 1 AND language = 'vi' THEN keyword END SEPARATOR ', ') as auto_keywords_vi,
+                                GROUP_CONCAT(DISTINCT CASE WHEN is_auto = 1 AND language = 'en' THEN keyword END SEPARATOR ', ') as auto_keywords_en
+                            FROM keywords
+                            WHERE question_id IN ($placeholders)
+                            GROUP BY question_id";
+                
+                $stmtKeywords = $db->prepare($sqlKeywords);
+                $stmtKeywords->execute($questionIds);
+                $keywordsData = $stmtKeywords->fetchAll(\PDO::FETCH_ASSOC);
+                
+                // Map keywords vào questions
+                $keywordsMap = [];
+                foreach ($keywordsData as $kw) {
+                    $keywordsMap[$kw['question_id']] = $kw;
+                }
+                
+                // Merge keywords vào questions
+                foreach ($questions as &$q) {
+                    if (isset($keywordsMap[$q['id']])) {
+                        $q['manual_keywords'] = $keywordsMap[$q['id']]['manual_keywords'];
+                        $q['auto_keywords_vi'] = $keywordsMap[$q['id']]['auto_keywords_vi'];
+                        $q['auto_keywords_en'] = $keywordsMap[$q['id']]['auto_keywords_en'];
+                    } else {
+                        $q['manual_keywords'] = null;
+                        $q['auto_keywords_vi'] = null;
+                        $q['auto_keywords_en'] = null;
+                    }
+                }
+            }
 
-            // Tạo tên file
-            $fileName = 'DuLieuCauHoi_' . date('Y-m-d_His') . '.xlsx';
+            // Tạo tên file với tên danh mục nếu có lọc
+            $fileName = 'CauHoi';
+            if ($categoryId && !empty($questions)) {
+                $categoryName = $questions[0]['category_name'] ?? 'DanhMuc';
+                // Chuyển tiếng Việt có dấu thành không dấu
+                $categoryName = $this->removeVietnameseTones($categoryName);
+                // Loại bỏ ký tự đặc biệt, chỉ giữ chữ và số
+                $categoryName = preg_replace('/[^a-zA-Z0-9]/', '', $categoryName);
+                if (!empty($categoryName)) {
+                    $fileName .= '_' . $categoryName;
+                }
+            }
+            $fileName .= '_' . date('d-m-Y_His') . '.xlsx';
+            
+            error_log("File name: " . $fileName);
+            error_log("=== END EXPORT DEBUG ===");
 
             // Tạo file Excel
             $this->generateExcelFile($questions, $fileName);
 
         } catch (\Exception $e) {
             error_log("Export error: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
             $this->json([
                 'error' => 'Lỗi khi xuất file: ' . $e->getMessage()
             ], 500);
@@ -2617,5 +2697,27 @@ class AdminController extends BaseController
         } else {
             $this->json(['error' => 'Không thể xóa'], 500);
         }
+    }
+
+    /**
+     * Chuyển chuỗi tiếng Việt có dấu thành không dấu
+     */
+    private function removeVietnameseTones($str)
+    {
+        $str = preg_replace("/(à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ)/", 'a', $str);
+        $str = preg_replace("/(è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ)/", 'e', $str);
+        $str = preg_replace("/(ì|í|ị|ỉ|ĩ)/", 'i', $str);
+        $str = preg_replace("/(ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ)/", 'o', $str);
+        $str = preg_replace("/(ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ)/", 'u', $str);
+        $str = preg_replace("/(ỳ|ý|ỵ|ỷ|ỹ)/", 'y', $str);
+        $str = preg_replace("/(đ)/", 'd', $str);
+        $str = preg_replace("/(À|Á|Ạ|Ả|Ã|Â|Ầ|Ấ|Ậ|Ẩ|Ẫ|Ă|Ằ|Ắ|Ặ|Ẳ|Ẵ)/", 'A', $str);
+        $str = preg_replace("/(È|É|Ẹ|Ẻ|Ẽ|Ê|Ề|Ế|Ệ|Ể|Ễ)/", 'E', $str);
+        $str = preg_replace("/(Ì|Í|Ị|Ỉ|Ĩ)/", 'I', $str);
+        $str = preg_replace("/(Ò|Ó|Ọ|Ỏ|Õ|Ô|Ồ|Ố|Ộ|Ổ|Ỗ|Ơ|Ờ|Ớ|Ợ|Ở|Ỡ)/", 'O', $str);
+        $str = preg_replace("/(Ù|Ú|Ụ|Ủ|Ũ|Ư|Ừ|Ứ|Ự|Ử|Ữ)/", 'U', $str);
+        $str = preg_replace("/(Ỳ|Ý|Ỵ|Ỷ|Ỹ)/", 'Y', $str);
+        $str = preg_replace("/(Đ)/", 'D', $str);
+        return $str;
     }
 }

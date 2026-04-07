@@ -1934,6 +1934,22 @@ async function deleteMultipleQuestions() {
  */
 async function exportQuestionsToExcel() {
     try {
+        // Lấy giá trị lọc danh mục hiện tại
+        const filterCategory = document.getElementById('filterCategory');
+        const categoryId = filterCategory ? filterCategory.value : '';
+        const categoryText = filterCategory && categoryId ? filterCategory.options[filterCategory.selectedIndex].text : '';
+        
+        // Debug log
+        console.log('Export Excel - Category ID:', categoryId);
+        console.log('Export Excel - Category Text:', categoryText);
+        
+        // Xác nhận với người dùng
+        let confirmMsg = categoryId 
+            ? `Bạn có muốn xuất dữ liệu câu hỏi của danh mục "${categoryText}"?`
+            : 'Bạn có muốn xuất TOÀN BỘ dữ liệu câu hỏi?';
+        
+        if (!confirm(confirmMsg)) return;
+        
         // Hiển thị loading
         const btn = event.target.closest('button');
         const originalHTML = btn.innerHTML;
@@ -1945,9 +1961,17 @@ async function exportQuestionsToExcel() {
             </svg>
             Đang xuất...
         `;
+        
+        // Tạo URL với tham số category nếu có
+        let url = `${ADMIN_API}/admin/exportQuestions`;
+        if (categoryId) {
+            url += `&category_id=${encodeURIComponent(categoryId)}`; // Dùng & thay vì ?
+        }
+        
+        console.log('Export URL:', url);
 
         // Gọi API xuất Excel
-        const response = await fetch(`${ADMIN_API}/admin/exportQuestions`, {
+        const response = await fetch(url, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -1972,18 +1996,21 @@ async function exportQuestionsToExcel() {
 
         // Tạo blob và download
         const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
+        const url2 = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.style.display = 'none';
-        a.href = url;
+        a.href = url2;
         a.download = fileName;
         document.body.appendChild(a);
         a.click();
-        window.URL.revokeObjectURL(url);
+        window.URL.revokeObjectURL(url2);
         document.body.removeChild(a);
 
         // Hiển thị thông báo thành công
-        alert('✅ Đã xuất file Excel thành công!');
+        const successMsg = categoryId 
+            ? `✅ Đã xuất file Excel cho danh mục "${categoryText}" thành công!`
+            : '✅ Đã xuất toàn bộ file Excel thành công!';
+        alert(successMsg);
 
         // Khôi phục nút
         btn.disabled = false;
