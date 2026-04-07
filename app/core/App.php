@@ -61,7 +61,10 @@ class App
     protected function parseUrl()
     {
         if (isset($_GET['url'])) {
-            return explode('/', filter_var(rtrim($_GET['url'], '/'), FILTER_SANITIZE_URL));
+            // Loại bỏ query string nếu có
+            $url = $_GET['url'];
+            $url = strtok($url, '?'); // Lấy phần trước dấu ?
+            return explode('/', filter_var(rtrim($url, '/'), FILTER_SANITIZE_URL));
         }
         return null;
     }

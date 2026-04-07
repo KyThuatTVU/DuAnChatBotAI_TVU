@@ -358,6 +358,7 @@ const AdminSPA = {
         forms: 'Biểu mẫu / Giấy tờ',
         settings: 'Cài đặt giao diện',
         unanswered: 'Chưa trả lời',
+        trash: 'Thùng rác',
     },
 
     // Hàm khởi tạo dữ liệu cho từng trang
@@ -437,6 +438,7 @@ const AdminSPA = {
         },
         settings:   async () => { await loadSettings(); await loadThemes(); setTimeout(() => { try { checkSettingsDraft(); watchSettingsFields(); } catch(e){} }, 1000); },
         unanswered: () => loadUnanswered(),
+        trash:      () => loadTrash(),
     },
 
     /**
@@ -787,6 +789,10 @@ let allQuestions = [];
 let quillAnswerVi = null;
 let quillAnswerEn = null;
 
+// Format Painter state
+let formatPainterActive = false;
+let copiedFormat = null;
+
 // Khởi tạo Quill editors
 function initQuillEditors() {
     // Kiểm tra Quill đã load chưa
@@ -821,26 +827,115 @@ function initQuillEditors() {
         [{ 'color': [] }, { 'background': [] }],
         [{ 'align': [] }],
         ['link'],
-        ['clean']
+        ['clean'],
+        ['formatPainter']  // Thêm nút Format Painter
     ];
     
+    // Cấu hình clipboard để xử lý paste tốt hơn
+    const quillConfig = {
+        theme: 'snow',
+        modules: {
+            toolbar: {
+                container: toolbarOptions,
+                handlers: {
+                    // Custom handler cho nút "clean" - xóa format hiệu quả hơn
+                    'clean': function() {
+                        const range = this.quill.getSelection();
+                        if (range) {
+                            if (range.length === 0) {
+                                // Không có text được chọn - xóa format của toàn bộ document
+                                const length = this.quill.getLength();
+                                this.quill.removeFormat(0, length);
+                            } else {
+                                // Có text được chọn - xóa format của phần đã chọn
+                                this.quill.removeFormat(range.index, range.length);
+                            }
+                        }
+                    },
+                    // Custom handler cho Format Painter
+                    'formatPainter': function() {
+                        const quill = this.quill;
+                        const range = quill.getSelection();
+                        
+                        if (!formatPainterActive) {
+                            // Chế độ copy format
+                            if (range && range.length > 0) {
+                                // Lấy format của text đã chọn
+                                copiedFormat = quill.getFormat(range.index, range.length);
+                                formatPainterActive = true;
+                                
+                                // Thay đổi cursor thành paintbrush
+                                const editor = quill.root;
+                                editor.style.cursor = 'copy';
+                                
+                                // Highlight nút format painter
+                                const btn = document.querySelector('.ql-formatPainter');
+                                if (btn) {
+                                    btn.classList.add('format-painter-active');
+                                }
+                                
+                                // Hiển thị thông báo
+                                showFormatPainterToast('✅ Đã sao chép định dạng! Bây giờ hãy chọn văn bản để áp dụng.');
+                            } else {
+                                showFormatPainterToast('⚠️ Hãy chọn văn bản có định dạng mẫu trước!', 'warning');
+                            }
+                        } else {
+                            // Tắt chế độ format painter
+                            deactivateFormatPainter(quill);
+                        }
+                    }
+                }
+            },
+            clipboard: {
+                matchVisual: false  // Không giữ lại visual formatting khi paste
+            }
+        }
+    };
+    
     // Kiểm tra xem Quill đã được khởi tạo cho element này chưa
-    // Nếu element đã có class ql-container thì đã được khởi tạo rồi
     const isViInitialized = editorVi.classList.contains('ql-container') || editorVi.querySelector('.ql-editor');
     const isEnInitialized = editorEn.classList.contains('ql-container') || editorEn.querySelector('.ql-editor');
     
-    // Editor tiếng Việt - luôn khởi tạo lại nếu DOM mới
+    // Editor tiếng Việt
     if (!isViInitialized) {
         try {
-            // Clear nội dung cũ nếu có
             editorVi.innerHTML = '';
             
             quillAnswerVi = new Quill('#answerTextEditor', {
-                theme: 'snow',
-                modules: {
-                    toolbar: toolbarOptions
-                },
+                ...quillConfig,
                 placeholder: 'Nhập câu trả lời tiếng Việt...'
+            });
+            
+            // Xử lý paste - loại bỏ inline styles không cần thiết
+            quillAnswerVi.clipboard.addMatcher(Node.ELEMENT_NODE, (node, delta) => {
+                const ops = [];
+                delta.ops.forEach(op => {
+                    if (op.insert && typeof op.insert === 'string') {
+                        // Giữ lại text nhưng loại bỏ các format không nhất quán
+                        // Chỉ giữ lại các format cơ bản nếu có
+                        const cleanOp = { insert: op.insert };
+                        
+                        // Giữ lại một số format cơ bản nếu user muốn
+                        if (op.attributes) {
+                            const allowedFormats = ['bold', 'italic', 'underline', 'link'];
+                            const cleanAttrs = {};
+                            allowedFormats.forEach(format => {
+                                if (op.attributes[format]) {
+                                    cleanAttrs[format] = op.attributes[format];
+                                }
+                            });
+                            if (Object.keys(cleanAttrs).length > 0) {
+                                cleanOp.attributes = cleanAttrs;
+                            }
+                        }
+                        
+                        ops.push(cleanOp);
+                    } else {
+                        ops.push(op);
+                    }
+                });
+                delta.ops = ops;
+                return delta;
             });
             
             // Sync với textarea ẩn
@@ -848,29 +943,78 @@ function initQuillEditors() {
                 const html = quillAnswerVi.root.innerHTML;
                 document.getElementById('answerText').value = html === '<p><br></p>' ? '' : html;
             });
+            
+            // Xử lý selection change cho Format Painter
+            quillAnswerVi.on('selection-change', function(range, oldRange, source) {
+                if (formatPainterActive && range && range.length > 0) {
+                    // Áp dụng format đã copy
+                    if (copiedFormat) {
+                        quillAnswerVi.formatText(range.index, range.length, copiedFormat);
+                        showFormatPainterToast('✨ Đã áp dụng định dạng!', 'success');
+                    }
+                    // Tắt format painter sau khi áp dụng
+                    deactivateFormatPainter(quillAnswerVi);
+                }
+            });
         } catch (e) {
             console.error('Error initializing Quill Vi:', e);
         }
     }
     
-    // Editor tiếng Anh - luôn khởi tạo lại nếu DOM mới
+    // Editor tiếng Anh
     if (!isEnInitialized) {
         try {
-            // Clear nội dung cũ nếu có
             editorEn.innerHTML = '';
             
             quillAnswerEn = new Quill('#answerTextEnEditor', {
-                theme: 'snow',
-                modules: {
-                    toolbar: toolbarOptions
-                },
+                ...quillConfig,
                 placeholder: 'Nhập câu trả lời tiếng Anh (nếu có)...'
+            });
+            
+            // Xử lý paste - loại bỏ inline styles không cần thiết
+            quillAnswerEn.clipboard.addMatcher(Node.ELEMENT_NODE, (node, delta) => {
+                const ops = [];
+                delta.ops.forEach(op => {
+                    if (op.insert && typeof op.insert === 'string') {
+                        const cleanOp = { insert: op.insert };
+                        
+                        if (op.attributes) {
+                            const allowedFormats = ['bold', 'italic', 'underline', 'link'];
+                            const cleanAttrs = {};
+                            allowedFormats.forEach(format => {
+                                if (op.attributes[format]) {
+                                    cleanAttrs[format] = op.attributes[format];
+                                }
+                            });
+                            if (Object.keys(cleanAttrs).length > 0) {
+                                cleanOp.attributes = cleanAttrs;
+                            }
+                        }
+                        
+                        ops.push(cleanOp);
+                    } else {
+                        ops.push(op);
+                    }
+                });
+                delta.ops = ops;
+                return delta;
             });
             
             // Sync với textarea ẩn
             quillAnswerEn.on('text-change', function() {
                 const html = quillAnswerEn.root.innerHTML;
                 document.getElementById('answerTextEn').value = html === '<p><br></p>' ? '' : html;
+            });
+            
+            // Xử lý selection change cho Format Painter
+            quillAnswerEn.on('selection-change', function(range, oldRange, source) {
+                if (formatPainterActive && range && range.length > 0) {
+                    if (copiedFormat) {
+                        quillAnswerEn.formatText(range.index, range.length, copiedFormat);
+                        showFormatPainterToast('✨ Đã áp dụng định dạng!', 'success');
+                    }
+                    deactivateFormatPainter(quillAnswerEn);
+                }
             });
         } catch (e) {
             console.error('Error initializing Quill En:', e);
@@ -3644,5 +3788,400 @@ async function regenerateKeywords(questionId) {
         }
     } catch (e) {
         alert('Lỗi kết nối server: ' + e.message);
+    }
+}
+
+
+// ==================== FORMAT PAINTER HELPERS ====================
+
+/**
+ * Tắt chế độ Format Painter
+ */
+function deactivateFormatPainter(quill) {
+    formatPainterActive = false;
+    copiedFormat = null;
+    
+    // Reset cursor
+    if (quill && quill.root) {
+        quill.root.style.cursor = 'text';
+    }
+    
+    // Remove highlight từ nút
+    const btn = document.querySelector('.ql-formatPainter');
+    if (btn) {
+        btn.classList.remove('format-painter-active');
+    }
+}
+
+/**
+ * Hiển thị toast notification cho Format Painter
+ */
+function showFormatPainterToast(message, type = 'info') {
+    // Xóa toast cũ nếu có
+    const oldToast = document.getElementById('formatPainterToast');
+    if (oldToast) oldToast.remove();
+    
+    const colors = {
+        info: { bg: 'linear-gradient(145deg, #dbeafe, #bfdbfe)', border: '#3b82f6', text: '#1e40af' },
+        success: { bg: 'linear-gradient(145deg, #d1fae5, #a7f3d0)', border: '#10b981', text: '#065f46' },
+        warning: { bg: 'linear-gradient(145deg, #fef3c7, #fde68a)', border: '#f59e0b', text: '#92400e' }
+    };
+    
+    const color = colors[type] || colors.info;
+    
+    const toast = document.createElement('div');
+    toast.id = 'formatPainterToast';
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 9999;
+        background: ${color.bg};
+        border: 2px solid ${color.border};
+        border-radius: 12px;
+        padding: 12px 18px;
+        max-width: 350px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        animation: slideInRight 0.3s ease-out;
+        font-family: 'Inter', sans-serif;
+        color: ${color.text};
+        font-size: 13px;
+        font-weight: 600;
+    `;
+    toast.textContent = message;
+    
+    // Thêm animation
+    if (!document.getElementById('formatPainterToastStyles')) {
+        const style = document.createElement('style');
+        style.id = 'formatPainterToastStyles';
+        style.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOutRight {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(120%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(toast);
+    
+    // Tự động ẩn sau 3 giây
+    setTimeout(() => {
+        toast.style.animation = 'slideOutRight 0.3s ease-in forwards';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+
+// ==================== TRASH (THÙNG RÁC) ====================
+
+let currentTrashTab = 'questions';
+
+async function loadTrash() {
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/getTrash?type=all`);
+        
+        // Debug: Kiểm tra response
+        console.log('Trash API status:', res.status);
+        const text = await res.text();
+        console.log('Trash API response:', text);
+        
+        if (!text) {
+            console.error('Empty response from trash API');
+            // Hiển thị empty state
+            document.getElementById('countQuestions').textContent = 0;
+            document.getElementById('countCategories').textContent = 0;
+            document.getElementById('countForms').textContent = 0;
+            renderTrashQuestions([]);
+            renderTrashCategories([]);
+            renderTrashForms([]);
+            return;
+        }
+        
+        const data = JSON.parse(text);
+        
+        // Cập nhật số lượng
+        document.getElementById('countQuestions').textContent = data.questions?.length || 0;
+        document.getElementById('countCategories').textContent = data.categories?.length || 0;
+        document.getElementById('countForms').textContent = data.forms?.length || 0;
+        
+        // Render tables
+        renderTrashQuestions(data.questions || []);
+        renderTrashCategories(data.categories || []);
+        renderTrashForms(data.forms || []);
+    } catch (e) {
+        console.error('Failed to load trash:', e);
+    }
+}
+
+function switchTab(tab) {
+    currentTrashTab = tab;
+    
+    // Update tab buttons
+    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.add('active');
+    
+    // Show/hide sections
+    document.getElementById('questionsSection').style.display = tab === 'questions' ? 'block' : 'none';
+    document.getElementById('categoriesSection').style.display = tab === 'categories' ? 'block' : 'none';
+    document.getElementById('formsSection').style.display = tab === 'forms' ? 'block' : 'none';
+}
+
+function renderTrashQuestions(questions) {
+    const container = document.getElementById('questionsContainer');
+    
+    if (!questions || questions.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </div>
+                <div class="empty-state-title">Thùng rác trống</div>
+                <div class="empty-state-text">Chưa có câu hỏi nào bị xóa</div>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = questions.map((q, idx) => {
+        const hoursLeft = parseInt(q.hours_remaining) || 0;
+        const timeClass = hoursLeft < 6 ? 'danger' : hoursLeft < 12 ? 'warning' : 'success';
+        const timeText = hoursLeft < 1 ? 'Sắp hết hạn' : `⏰ ${hoursLeft} giờ còn lại`;
+        const timeIcon = hoursLeft < 6 ? '🔴' : hoursLeft < 12 ? '🟡' : '🟢';
+        
+        return `
+            <div class="trash-card">
+                <div class="trash-card-header">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <span style="font-size:13px;font-weight:700;color:#92400e">#${idx + 1}</span>
+                        <span class="time-badge ${timeClass}">${timeIcon} ${timeText}</span>
+                    </div>
+                </div>
+                <div class="trash-card-body">
+                    <div class="trash-question-text">${escapeHtml(q.question_text)}</div>
+                    <div class="trash-meta">
+                        ${q.category_name ? `
+                            <div class="trash-meta-item">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                                </svg>
+                                <span class="category-badge">${escapeHtml(q.category_name)}</span>
+                            </div>
+                        ` : ''}
+                        <div class="trash-meta-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                            </svg>
+                            <span>Xóa bởi: <strong>${escapeHtml(q.deleted_by_name || 'N/A')}</strong></span>
+                        </div>
+                    </div>
+                    <div class="trash-actions">
+                        <button onclick="restoreItem(${q.id}, 'question')" class="btn-restore">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Khôi phục
+                        </button>
+                        <button onclick="permanentDelete(${q.id}, 'question')" class="btn-delete">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            Xóa vĩnh viễn
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderTrashCategories(categories) {
+    const container = document.getElementById('categoriesContainer');
+    
+    if (!categories || categories.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                    </svg>
+                </div>
+                <div class="empty-state-title">Thùng rác trống</div>
+                <div class="empty-state-text">Chưa có danh mục nào bị xóa</div>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = categories.map((c, idx) => {
+        const hoursLeft = parseInt(c.hours_remaining) || 0;
+        const timeClass = hoursLeft < 6 ? 'danger' : hoursLeft < 12 ? 'warning' : 'success';
+        const timeText = hoursLeft < 1 ? 'Sắp hết hạn' : `⏰ ${hoursLeft} giờ còn lại`;
+        const timeIcon = hoursLeft < 6 ? '🔴' : hoursLeft < 12 ? '🟡' : '🟢';
+        
+        return `
+            <div class="trash-card">
+                <div class="trash-card-header">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <span style="font-size:13px;font-weight:700;color:#92400e">#${idx + 1}</span>
+                        <span class="time-badge ${timeClass}">${timeIcon} ${timeText}</span>
+                    </div>
+                </div>
+                <div class="trash-card-body">
+                    <div class="trash-question-text">🏷️ ${escapeHtml(c.name)}</div>
+                    ${c.description ? `<div style="font-size:13px;color:#6b7280;margin-bottom:12px">${escapeHtml(c.description)}</div>` : ''}
+                    <div class="trash-meta">
+                        <div class="trash-meta-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                            </svg>
+                            <span>Xóa bởi: <strong>${escapeHtml(c.deleted_by_name || 'N/A')}</strong></span>
+                        </div>
+                    </div>
+                    <div class="trash-actions">
+                        <button onclick="restoreItem(${c.id}, 'category')" class="btn-restore">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Khôi phục
+                        </button>
+                        <button onclick="permanentDelete(${c.id}, 'category')" class="btn-delete">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            Xóa vĩnh viễn
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderTrashForms(forms) {
+    const container = document.getElementById('formsContainer');
+    
+    if (!forms || forms.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                </div>
+                <div class="empty-state-title">Thùng rác trống</div>
+                <div class="empty-state-text">Chưa có biểu mẫu nào bị xóa</div>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = forms.map((f, idx) => {
+        const hoursLeft = parseInt(f.hours_remaining) || 0;
+        const timeClass = hoursLeft < 6 ? 'danger' : hoursLeft < 12 ? 'warning' : 'success';
+        const timeText = hoursLeft < 1 ? 'Sắp hết hạn' : `⏰ ${hoursLeft} giờ còn lại`;
+        const timeIcon = hoursLeft < 6 ? '🔴' : hoursLeft < 12 ? '🟡' : '🟢';
+        
+        return `
+            <div class="trash-card">
+                <div class="trash-card-header">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <span style="font-size:13px;font-weight:700;color:#92400e">#${idx + 1}</span>
+                        <span class="time-badge ${timeClass}">${timeIcon} ${timeText}</span>
+                    </div>
+                </div>
+                <div class="trash-card-body">
+                    <div class="trash-question-text">📄 ${escapeHtml(f.title)}</div>
+                    ${f.description ? `<div style="font-size:13px;color:#6b7280;margin-bottom:12px">${escapeHtml(f.description)}</div>` : ''}
+                    <div class="trash-meta">
+                        <div class="trash-meta-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                            </svg>
+                            <span>Xóa bởi: <strong>${escapeHtml(f.deleted_by_name || 'N/A')}</strong></span>
+                        </div>
+                    </div>
+                    <div class="trash-actions">
+                        <button onclick="restoreItem(${f.id}, 'form')" class="btn-restore">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Khôi phục
+                        </button>
+                        <button onclick="permanentDelete(${f.id}, 'form')" class="btn-delete">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            Xóa vĩnh viễn
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function restoreItem(trashId, type) {
+    const typeName = type === 'question' ? 'câu hỏi' : type === 'category' ? 'danh mục' : 'biểu mẫu';
+    
+    if (!confirm(`Bạn có chắc muốn khôi phục ${typeName} này?`)) {
+        return;
+    }
+    
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/trash/restore`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trash_id: trashId, type: type })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            showAdminMsg(`✅ Đã khôi phục ${typeName} thành công!`, false);
+            loadTrash();
+        } else {
+            alert(data.error || 'Không thể khôi phục');
+        }
+    } catch (e) {
+        alert('Lỗi kết nối server');
+    }
+}
+
+async function permanentDelete(trashId, type) {
+    const typeName = type === 'question' ? 'câu hỏi' : type === 'category' ? 'danh mục' : 'biểu mẫu';
+    
+    if (!confirm(`⚠️ CẢNH BÁO: Bạn có chắc muốn XÓA VĨNH VIỄN ${typeName} này?\n\nHành động này KHÔNG THỂ HOÀN TÁC!`)) {
+        return;
+    }
+    
+    // Xác nhận lần 2
+    if (!confirm(`Xác nhận lần cuối: Xóa vĩnh viễn ${typeName}?`)) {
+        return;
+    }
+    
+    try {
+        const res = await fetch(`${ADMIN_API}/admin/trash/permanent`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trash_id: trashId, type: type })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            showAdminMsg(`🗑️ Đã xóa vĩnh viễn ${typeName}`, false);
+            loadTrash();
+        } else {
+            alert(data.error || 'Không thể xóa');
+        }
+    } catch (e) {
+        alert('Lỗi kết nối server');
     }
 }

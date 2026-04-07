@@ -126,6 +126,66 @@ UPDATE questions
 SET approval_status = 'pending' 
 WHERE approval_status = 'rejected';
 
+
+-- Kiểm tra và thêm cột updated_by nếu chưa có
+SET @col_exists = 0;
+SELECT COUNT(*) INTO @col_exists 
+FROM information_schema.COLUMNS 
+WHERE TABLE_SCHEMA = DATABASE() 
+  AND TABLE_NAME = 'questions' 
+  AND COLUMN_NAME = 'updated_by';
+
+SET @sql = IF(@col_exists = 0,
+    "ALTER TABLE questions ADD COLUMN updated_by INT NULL COMMENT 'ID admin chỉnh sửa cuối cùng' AFTER created_by",
+    "SELECT 'Column updated_by already exists' AS message");
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Kiểm tra và thêm foreign key cho updated_by nếu chưa có
+SET @fk_exists = 0;
+SELECT COUNT(*) INTO @fk_exists 
+FROM information_schema.TABLE_CONSTRAINTS 
+WHERE TABLE_SCHEMA = DATABASE() 
+  AND TABLE_NAME = 'questions' 
+  AND CONSTRAINT_NAME = 'fk_questions_updated_by';
+
+SET @sql = IF(@fk_exists = 0,
+    "ALTER TABLE questions ADD CONSTRAINT fk_questions_updated_by FOREIGN KEY (updated_by) REFERENCES admins(id) ON DELETE SET NULL",
+    "SELECT 'Foreign key fk_questions_updated_by already exists' AS message");
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Kiểm tra và thêm index cho updated_by nếu chưa có
+SET @idx_exists = 0;
+SELECT COUNT(*) INTO @idx_exists 
+FROM information_schema.STATISTICS 
+WHERE TABLE_SCHEMA = DATABASE() 
+  AND TABLE_NAME = 'questions' 
+  AND INDEX_NAME = 'idx_updated_by';
+
+SET @sql = IF(@idx_exists = 0,
+    "ALTER TABLE questions ADD INDEX idx_updated_by (updated_by)",
+    "SELECT 'Index idx_updated_by already exists' AS message");
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Hiển thị kết quả
+SELECT 'Migration completed successfully!' AS status;
+SELECT 
+    COLUMN_NAME,
+    COLUMN_TYPE,
+    IS_NULLABLE,
+    COLUMN_DEFAULT,
+    COLUMN_COMMENT
+FROM information_schema.COLUMNS 
+WHERE TABLE_SCHEMA = DATABASE() 
+  AND TABLE_NAME = 'questions' 
+  AND COLUMN_NAME IN ('created_by', 'updated_by', 'approved_by', 'created_at', 'updated_at', 'approved_at')
+ORDER BY ORDINAL_POSITION;
+
 -- Bảng cache embeddings cho user queries (tránh gọi API nhiều lần)
 CREATE TABLE IF NOT EXISTS embedding_cache (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -447,6 +507,73 @@ CREATE TABLE IF NOT EXISTS ai_api_keys (
     INDEX idx_provider (provider)
 ) ENGINE=InnoDB COMMENT='Lưu API key cho các nhà cung cấp AI';
 
+-- Tạo bảng thùng rác cho câu hỏi đã xóa
+CREATE TABLE IF NOT EXISTS trash_questions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    original_question_id INT NOT NULL,
+    question_text TEXT NOT NULL,
+    answer_text TEXT,
+    answer_text_en TEXT,
+    category_id INT,
+    keywords TEXT,
+    auto_keywords_vi TEXT,
+    auto_keywords_en TEXT,
+    source VARCHAR(50) DEFAULT 'manual',
+    approval_status VARCHAR(20) DEFAULT 'approved',
+    created_at DATETIME,
+    updated_at DATETIME,
+    updated_by INT,
+    deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted_by INT,
+    expires_at DATETIME,
+    INDEX idx_expires_at (expires_at),
+    INDEX idx_deleted_at (deleted_at),
+    INDEX idx_original_id (original_question_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tạo bảng thùng rác cho danh mục đã xóa
+CREATE TABLE IF NOT EXISTS trash_categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    original_category_id INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    icon VARCHAR(100),
+    display_order INT DEFAULT 0,
+    is_active TINYINT(1) DEFAULT 1,
+    created_at DATETIME,
+    updated_at DATETIME,
+    deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted_by INT,
+    expires_at DATETIME,
+    INDEX idx_expires_at (expires_at),
+    INDEX idx_deleted_at (deleted_at),
+    INDEX idx_original_id (original_category_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tạo bảng thùng rác cho biểu mẫu đã xóa
+CREATE TABLE IF NOT EXISTS trash_forms (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    original_form_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    file_path VARCHAR(500),
+    file_size INT,
+    download_count INT DEFAULT 0,
+    is_active TINYINT(1) DEFAULT 1,
+    created_at DATETIME,
+    updated_at DATETIME,
+    deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted_by INT,
+    expires_at DATETIME,
+    INDEX idx_expires_at (expires_at),
+    INDEX idx_deleted_at (deleted_at),
+    INDEX idx_original_id (original_form_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tạo event tự động xóa các mục đã hết hạn (sau 24 giờ)
+DROP EVENT IF EXISTS auto_clean_trash;
+
+DELIMITER ;
 -- Insert AI settings if missing
 INSERT INTO chatbot_settings (setting_key, setting_value, setting_type, description, updated_by, created_at, updated_at)
 SELECT 'ai_enabled', 'false', 'boolean', 'Bật/Tắt trả lời AI khi không có đáp án', NULL, NOW(), NOW()

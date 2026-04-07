@@ -9,6 +9,7 @@ class AdminController extends BaseController
     private $settingModel;
     private $formModel;
     private $adminModel;
+    private $trashModel = null;
 
     public function __construct()
     {
@@ -18,6 +19,38 @@ class AdminController extends BaseController
         $this->settingModel  = $this->model('SettingModel');
         $this->formModel     = $this->model('FormModel');
         $this->adminModel    = $this->model('AdminModel');
+        // TrashModel sẽ được load khi cần (lazy loading)
+    }
+    
+    /**
+     * Lazy load TrashModel
+     */
+    private function getTrashModel() {
+        if ($this->trashModel === null) {
+            try {
+                $this->trashModel = $this->model('TrashModel');
+            } catch (Exception $e) {
+                error_log("Error loading TrashModel: " . $e->getMessage());
+                return null;
+            }
+        }
+        return $this->trashModel;
+    }
+    
+    /**
+     * Default index method - không sử dụng
+     */
+    public function index() {
+        error_log("AdminController::index() called - URL: " . ($_GET['url'] ?? 'none'));
+        error_log("Request URI: " . ($_SERVER['REQUEST_URI'] ?? 'none'));
+        $this->json(['error' => 'Invalid endpoint', 'url' => $_GET['url'] ?? null], 404);
+    }
+    
+    /**
+     * Test method để kiểm tra routing
+     */
+    public function test() {
+        $this->json(['message' => 'Test OK', 'methods' => get_class_methods($this)]);
     }
 
     /**
@@ -323,8 +356,19 @@ class AdminController extends BaseController
 
         if ($this->getMethod() === 'DELETE') {
             try {
-                $this->questionModel->delete($id);
-                $this->json(['success' => true]);
+                // Chuyển vào thùng rác thay vì xóa trực tiếp
+                $trashModel = $this->getTrashModel();
+                
+                if ($trashModel && $trashModel->moveQuestionToTrash($id, $adminId)) {
+                    $this->json([
+                        'success' => true,
+                        'message' => 'Đã chuyển câu hỏi vào thùng rác. Có thể khôi phục trong vòng 24 giờ.'
+                    ]);
+                } else {
+                    // Fallback: xóa trực tiếp nếu không có TrashModel
+                    $this->questionModel->delete($id);
+                    $this->json(['success' => true]);
+                }
             } catch (\Exception $e) {
                 $this->json(['error' => 'Lỗi khi xóa câu hỏi: ' . $e->getMessage()], 500);
             }
@@ -387,11 +431,11 @@ class AdminController extends BaseController
     }
 
     /**
-     * POST /api/admin/questions/delete-multiple - Xóa nhiều câu hỏi
+     * POST /api/admin/questions/delete-multiple - Chuyển nhiều câu hỏi vào thùng rác
      */
     public function deleteMultipleQuestions()
     {
-        $this->requireAuth();
+        $adminId = $this->requireAuth();
 
         if ($this->getMethod() !== 'POST') {
             $this->json(['error' => 'Method not allowed'], 405);
@@ -413,27 +457,60 @@ class AdminController extends BaseController
             $this->json(['error' => 'Không có ID hợp lệ'], 400);
         }
 
-        $db = Database::getInstance()->getConnection();
-        
         try {
-            // Xóa từ khóa liên quan trước
-            $placeholders = implode(',', array_fill(0, count($ids), '?'));
-            $stmt = $db->prepare("DELETE FROM keywords WHERE question_id IN ($placeholders)");
-            $stmt->execute($ids);
-
-            // Xóa câu hỏi
-            $result = $this->questionModel->deleteMultiple($ids);
+            error_log("deleteMultipleQuestions: Starting with IDs: " . json_encode($ids));
+            error_log("deleteMultipleQuestions: Admin ID: $adminId");
             
-            if ($result) {
+            $successCount = 0;
+            $trashModel = $this->getTrashModel();
+            
+            error_log("deleteMultipleQuestions: TrashModel loaded: " . ($trashModel ? 'YES' : 'NO'));
+            
+            if (!$trashModel) {
+                error_log("deleteMultipleQuestions: TrashModel not available, using direct delete");
+                // Nếu không có TrashModel, xóa trực tiếp (fallback)
+                $db = Database::getInstance()->getConnection();
+                $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                $stmt = $db->prepare("DELETE FROM keywords WHERE question_id IN ($placeholders)");
+                $stmt->execute($ids);
+                $result = $this->questionModel->deleteMultiple($ids);
+                
+                if ($result) {
+                    $this->json([
+                        'success' => true,
+                        'message' => 'Đã xóa ' . count($ids) . ' câu hỏi',
+                        'deleted_count' => count($ids)
+                    ]);
+                } else {
+                    $this->json(['error' => 'Không thể xóa câu hỏi'], 500);
+                }
+                return;
+            }
+            
+            foreach ($ids as $id) {
+                error_log("deleteMultipleQuestions: Processing question ID: $id");
+                if ($trashModel->moveQuestionToTrash($id, $adminId)) {
+                    $successCount++;
+                    error_log("deleteMultipleQuestions: Successfully moved question $id to trash");
+                } else {
+                    error_log("deleteMultipleQuestions: Failed to move question $id to trash");
+                }
+            }
+            
+            error_log("deleteMultipleQuestions: Total success count: $successCount");
+            
+            if ($successCount > 0) {
                 $this->json([
                     'success' => true,
-                    'message' => 'Đã xóa ' . count($ids) . ' câu hỏi',
-                    'deleted_count' => count($ids)
+                    'message' => "Đã chuyển $successCount câu hỏi vào thùng rác. Có thể khôi phục trong vòng 24 giờ.",
+                    'deleted_count' => $successCount
                 ]);
             } else {
                 $this->json(['error' => 'Không thể xóa câu hỏi'], 500);
             }
         } catch (\Exception $e) {
+            error_log("deleteMultipleQuestions: Exception: " . $e->getMessage());
+            error_log("deleteMultipleQuestions: Stack trace: " . $e->getTraceAsString());
             $this->json(['error' => 'Lỗi: ' . $e->getMessage()], 500);
         }
     }
@@ -594,8 +671,24 @@ class AdminController extends BaseController
         }
 
         if ($this->getMethod() === 'DELETE') {
-            $this->categoryModel->delete($id);
-            $this->json(['success' => true]);
+            try {
+                $adminId = $_SESSION['admin_id'] ?? 0;
+                $trashModel = $this->getTrashModel();
+                
+                if ($trashModel && $trashModel->moveCategoryToTrash($id, $adminId)) {
+                    $this->json([
+                        'success' => true,
+                        'message' => 'Đã chuyển danh mục vào thùng rác. Có thể khôi phục trong vòng 24 giờ.'
+                    ]);
+                } else {
+                    // Fallback: xóa trực tiếp
+                    $this->categoryModel->delete($id);
+                    $this->json(['success' => true]);
+                }
+            } catch (\Exception $e) {
+                $this->json(['error' => 'Lỗi: ' . $e->getMessage()], 500);
+            }
+            return;
         }
 
         if ($this->getMethod() === 'PUT') {
@@ -630,7 +723,7 @@ class AdminController extends BaseController
      */
     public function deleteMultipleCategories()
     {
-        $this->requireAuth();
+        $adminId = $this->requireAuth();
 
         if ($this->getMethod() !== 'POST') {
             $this->json(['error' => 'Method not allowed'], 405);
@@ -651,22 +744,41 @@ class AdminController extends BaseController
             $this->json(['error' => 'Không có ID hợp lệ'], 400);
         }
 
-        $db = Database::getInstance()->getConnection();
-        
         try {
-            // Gỡ liên kết với câu hỏi (set category_id = NULL)
-            $placeholders = implode(',', array_fill(0, count($ids), '?'));
-            $stmt = $db->prepare("UPDATE questions SET category_id = NULL WHERE category_id IN ($placeholders)");
-            $stmt->execute($ids);
-
-            // Xóa danh mục
-            $result = $this->categoryModel->deleteMultiple($ids);
+            $successCount = 0;
+            $trashModel = $this->getTrashModel();
             
-            if ($result) {
+            if (!$trashModel) {
+                // Fallback: xóa trực tiếp
+                $db = Database::getInstance()->getConnection();
+                $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                $stmt = $db->prepare("UPDATE questions SET category_id = NULL WHERE category_id IN ($placeholders)");
+                $stmt->execute($ids);
+                $result = $this->categoryModel->deleteMultiple($ids);
+                
+                if ($result) {
+                    $this->json([
+                        'success' => true,
+                        'message' => 'Đã xóa ' . count($ids) . ' danh mục',
+                        'deleted_count' => count($ids)
+                    ]);
+                } else {
+                    $this->json(['error' => 'Không thể xóa danh mục'], 500);
+                }
+                return;
+            }
+            
+            foreach ($ids as $id) {
+                if ($trashModel->moveCategoryToTrash($id, $adminId)) {
+                    $successCount++;
+                }
+            }
+            
+            if ($successCount > 0) {
                 $this->json([
                     'success' => true,
-                    'message' => 'Đã xóa ' . count($ids) . ' danh mục',
-                    'deleted_count' => count($ids)
+                    'message' => "Đã chuyển $successCount danh mục vào thùng rác. Có thể khôi phục trong vòng 24 giờ.",
+                    'deleted_count' => $successCount
                 ]);
             } else {
                 $this->json(['error' => 'Không thể xóa danh mục'], 500);
@@ -1671,8 +1783,24 @@ class AdminController extends BaseController
         }
 
         if ($this->getMethod() === 'DELETE') {
-            $this->formModel->delete($id);
-            $this->json(['success' => true]);
+            try {
+                $adminId = $_SESSION['admin_id'] ?? 0;
+                $trashModel = $this->getTrashModel();
+                
+                if ($trashModel && $trashModel->moveFormToTrash($id, $adminId)) {
+                    $this->json([
+                        'success' => true,
+                        'message' => 'Đã chuyển biểu mẫu vào thùng rác. Có thể khôi phục trong vòng 24 giờ.'
+                    ]);
+                } else {
+                    // Fallback: xóa trực tiếp
+                    $this->formModel->delete($id);
+                    $this->json(['success' => true]);
+                }
+            } catch (\Exception $e) {
+                $this->json(['error' => 'Lỗi: ' . $e->getMessage()], 500);
+            }
+            return;
         }
 
         if ($this->getMethod() === 'PUT') {
@@ -1699,7 +1827,7 @@ class AdminController extends BaseController
      */
     public function deleteMultipleForms()
     {
-        $this->requireAuth();
+        $adminId = $this->requireAuth();
 
         if ($this->getMethod() !== 'POST') {
             $this->json(['error' => 'Method not allowed'], 405);
@@ -1721,13 +1849,36 @@ class AdminController extends BaseController
         }
 
         try {
-            $result = $this->formModel->deleteMultiple($ids);
+            $successCount = 0;
+            $trashModel = $this->getTrashModel();
             
-            if ($result) {
+            if (!$trashModel) {
+                // Fallback: xóa trực tiếp
+                $result = $this->formModel->deleteMultiple($ids);
+                
+                if ($result) {
+                    $this->json([
+                        'success' => true,
+                        'message' => 'Đã xóa ' . count($ids) . ' biểu mẫu',
+                        'deleted_count' => count($ids)
+                    ]);
+                } else {
+                    $this->json(['error' => 'Không thể xóa biểu mẫu'], 500);
+                }
+                return;
+            }
+            
+            foreach ($ids as $id) {
+                if ($trashModel->moveFormToTrash($id, $adminId)) {
+                    $successCount++;
+                }
+            }
+            
+            if ($successCount > 0) {
                 $this->json([
                     'success' => true,
-                    'message' => 'Đã xóa ' . count($ids) . ' biểu mẫu',
-                    'deleted_count' => count($ids)
+                    'message' => "Đã chuyển $successCount biểu mẫu vào thùng rác. Có thể khôi phục trong vòng 24 giờ.",
+                    'deleted_count' => $successCount
                 ]);
             } else {
                 $this->json(['error' => 'Không thể xóa biểu mẫu'], 500);
@@ -2111,8 +2262,7 @@ class AdminController extends BaseController
     // ==================== EXPORT EXCEL ====================
 
     /**
-     * GET /api/admin/exportQuestions - Xuất toàn bộ dữ liệu câu hỏi ra Excel
-     * Sử dụng XML format (Excel 2003) - không cần thư viện bên ngoài
+     * GET /api/admin/exportQuestions - Xuất toàn bộ dữ liệu câu hỏi ra Excel (.xlsx)
      */
     public function exportQuestions()
     {
@@ -2129,6 +2279,7 @@ class AdminController extends BaseController
                         q.answer_text_en,
                         c.name as category_name,
                         q.source_type,
+                        q.approval_status,
                         q.is_active,
                         q.created_at,
                         q.updated_at,
@@ -2147,170 +2298,324 @@ class AdminController extends BaseController
 
             if (empty($questions)) {
                 $this->json(['error' => 'Không có dữ liệu để xuất'], 404);
+                return;
             }
 
             // Tạo tên file
-            $fileName = 'DuLieuCauHoi_' . date('Y-m-d_His') . '.xls';
+            $fileName = 'DuLieuCauHoi_' . date('Y-m-d_His') . '.xlsx';
 
-            // Tạo nội dung Excel XML (Excel 2003 format)
-            $excelContent = $this->generateExcelXML($questions);
-
-            // Gửi file về client
-            header('Content-Type: application/vnd.ms-excel; charset=utf-8');
-            header('Content-Disposition: attachment; filename="' . $fileName . '"');
-            header('Cache-Control: max-age=0');
-            
-            echo "\xEF\xBB\xBF"; // UTF-8 BOM
-            echo $excelContent;
-            exit;
+            // Tạo file Excel
+            $this->generateExcelFile($questions, $fileName);
 
         } catch (\Exception $e) {
+            error_log("Export error: " . $e->getMessage());
             $this->json([
-                'error' => 'Lỗi khi xuất file Excel: ' . $e->getMessage()
+                'error' => 'Lỗi khi xuất file: ' . $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Tạo nội dung Excel XML format (Excel 2003)
-     * Không cần thư viện bên ngoài
+     * Tạo file Excel thực sự (.xlsx) không cần thư viện
      */
-    private function generateExcelXML($questions)
+    private function generateExcelFile($questions, $fileName)
     {
-        $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-        $xml .= '<?mso-application progid="Excel.Sheet"?>' . "\n";
-        $xml .= '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"' . "\n";
-        $xml .= ' xmlns:o="urn:schemas-microsoft-com:office:office"' . "\n";
-        $xml .= ' xmlns:x="urn:schemas-microsoft-com:office:excel"' . "\n";
-        $xml .= ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"' . "\n";
-        $xml .= ' xmlns:html="http://www.w3.org/TR/REC-html40">' . "\n";
-        
-        // Styles
-        $xml .= '<Styles>' . "\n";
-        
-        // Header style
-        $xml .= '<Style ss:ID="Header">' . "\n";
-        $xml .= '<Font ss:Bold="1" ss:Size="12" ss:Color="#FFFFFF"/>' . "\n";
-        $xml .= '<Interior ss:Color="#1976D2" ss:Pattern="Solid"/>' . "\n";
-        $xml .= '<Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>' . "\n";
-        $xml .= '<Borders>' . "\n";
-        $xml .= '<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
-        $xml .= '<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
-        $xml .= '<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
-        $xml .= '<Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>' . "\n";
-        $xml .= '</Borders>' . "\n";
-        $xml .= '</Style>' . "\n";
-        
-        // Data style
-        $xml .= '<Style ss:ID="Data">' . "\n";
-        $xml .= '<Alignment ss:Vertical="Top" ss:WrapText="1"/>' . "\n";
-        $xml .= '<Borders>' . "\n";
-        $xml .= '<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
-        $xml .= '<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
-        $xml .= '<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
-        $xml .= '<Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
-        $xml .= '</Borders>' . "\n";
-        $xml .= '</Style>' . "\n";
-        
-        // Center style
-        $xml .= '<Style ss:ID="Center">' . "\n";
-        $xml .= '<Alignment ss:Horizontal="Center" ss:Vertical="Top"/>' . "\n";
-        $xml .= '<Borders>' . "\n";
-        $xml .= '<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
-        $xml .= '<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
-        $xml .= '<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
-        $xml .= '<Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>' . "\n";
-        $xml .= '</Borders>' . "\n";
-        $xml .= '</Style>' . "\n";
-        
-        $xml .= '</Styles>' . "\n";
-        
-        // Worksheet
-        $xml .= '<Worksheet ss:Name="Câu hỏi">' . "\n";
-        $xml .= '<Table>' . "\n";
-        
-        // Column widths
-        $xml .= '<Column ss:Width="50"/>' . "\n";  // ID
-        $xml .= '<Column ss:Width="300"/>' . "\n"; // Câu hỏi
-        $xml .= '<Column ss:Width="400"/>' . "\n"; // Câu trả lời VI
-        $xml .= '<Column ss:Width="400"/>' . "\n"; // Câu trả lời EN
-        $xml .= '<Column ss:Width="150"/>' . "\n"; // Danh mục
-        $xml .= '<Column ss:Width="200"/>' . "\n"; // Từ khóa thủ công
-        $xml .= '<Column ss:Width="200"/>' . "\n"; // Từ khóa auto VI
-        $xml .= '<Column ss:Width="200"/>' . "\n"; // Từ khóa auto EN
-        $xml .= '<Column ss:Width="100"/>' . "\n"; // Nguồn
-        $xml .= '<Column ss:Width="100"/>' . "\n"; // Trạng thái
-        $xml .= '<Column ss:Width="150"/>' . "\n"; // Ngày tạo
-        $xml .= '<Column ss:Width="150"/>' . "\n"; // Ngày cập nhật
-        
+        // Tạo thư mục tạm
+        $tempDir = sys_get_temp_dir() . '/excel_' . uniqid();
+        mkdir($tempDir);
+        mkdir($tempDir . '/_rels');
+        mkdir($tempDir . '/xl');
+        mkdir($tempDir . '/xl/_rels');
+        mkdir($tempDir . '/xl/worksheets');
+
+        // [Content_Types].xml
+        $contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+    <Default Extension="xml" ContentType="application/xml"/>
+    <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+    <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+    <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>';
+        file_put_contents($tempDir . '/[Content_Types].xml', $contentTypes);
+
+        // _rels/.rels
+        $rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>';
+        file_put_contents($tempDir . '/_rels/.rels', $rels);
+
+        // xl/_rels/workbook.xml.rels
+        $workbookRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+    <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>';
+        file_put_contents($tempDir . '/xl/_rels/workbook.xml.rels', $workbookRels);
+
+        // xl/workbook.xml
+        $workbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+    <sheets>
+        <sheet name="Câu hỏi" sheetId="1" r:id="rId1"/>
+    </sheets>
+</workbook>';
+        file_put_contents($tempDir . '/xl/workbook.xml', $workbook);
+
+        // xl/styles.xml
+        $styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+    <fonts count="2">
+        <font><sz val="11"/><name val="Calibri"/></font>
+        <font><b/><sz val="11"/><name val="Calibri"/><color rgb="FFFFFFFF"/></font>
+    </fonts>
+    <fills count="2">
+        <fill><patternFill patternType="none"/></fill>
+        <fill><patternFill patternType="solid"><fgColor rgb="FF4472C4"/></patternFill></fill>
+    </fills>
+    <borders count="1">
+        <border><left/><right/><top/><bottom/><diagonal/></border>
+    </borders>
+    <cellXfs count="2">
+        <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
+        <xf numFmtId="0" fontId="1" fillId="1" borderId="0" applyFont="1" applyFill="1"/>
+    </cellXfs>
+</styleSheet>';
+        file_put_contents($tempDir . '/xl/styles.xml', $styles);
+
+        // xl/worksheets/sheet1.xml - Dữ liệu
+        $sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+    <sheetData>';
+
         // Header row
-        $xml .= '<Row ss:Height="30">' . "\n";
-        $headers = ['ID', 'Câu hỏi', 'Câu trả lời (Tiếng Việt)', 'Câu trả lời (Tiếng Anh)', 
-                    'Danh mục', 'Từ khóa thủ công', 'Từ khóa tự động (VI)', 'Từ khóa tự động (EN)',
-                    'Nguồn', 'Trạng thái', 'Ngày tạo', 'Ngày cập nhật'];
+        $sheet .= '<row r="1">';
+        $headers = ['ID', 'Câu hỏi', 'Câu trả lời (VI)', 'Câu trả lời (EN)', 'Danh mục', 
+                    'Từ khóa thủ công', 'Từ khóa tự động (VI)', 'Từ khóa tự động (EN)',
+                    'Nguồn', 'Trạng thái duyệt', 'Kích hoạt', 'Ngày tạo', 'Ngày cập nhật'];
         
+        $col = 'A';
         foreach ($headers as $header) {
-            $xml .= '<Cell ss:StyleID="Header"><Data ss:Type="String">' . htmlspecialchars($header, ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            $sheet .= '<c r="' . $col . '1" s="1" t="inlineStr"><is><t>' . htmlspecialchars($header, ENT_XML1, 'UTF-8') . '</t></is></c>';
+            $col++;
         }
-        $xml .= '</Row>' . "\n";
-        
+        $sheet .= '</row>';
+
         // Data rows
-        $sourceMap = [
-            'manual' => 'Thủ công',
-            'word' => 'Word',
-            'pdf' => 'PDF'
-        ];
-        
+        $rowNum = 2;
         foreach ($questions as $q) {
-            $xml .= '<Row>' . "\n";
+            $sheet .= '<row r="' . $rowNum . '">';
             
-            // ID
-            $xml .= '<Cell ss:StyleID="Center"><Data ss:Type="Number">' . $q['id'] . '</Data></Cell>' . "\n";
+            $values = [
+                $q['id'],
+                $q['question_text'],
+                strip_tags($q['answer_text']),
+                strip_tags($q['answer_text_en'] ?? ''),
+                $q['category_name'] ?? '',
+                $q['manual_keywords'] ?? '',
+                $q['auto_keywords_vi'] ?? '',
+                $q['auto_keywords_en'] ?? '',
+                $q['source_type'] ?? 'manual',
+                $q['approval_status'] ?? 'approved',
+                $q['is_active'] ? 'Có' : 'Không',
+                $q['created_at'],
+                $q['updated_at']
+            ];
             
-            // Câu hỏi
-            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($q['question_text'], ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            $col = 'A';
+            foreach ($values as $value) {
+                $sheet .= '<c r="' . $col . $rowNum . '" t="inlineStr"><is><t>' . htmlspecialchars($value, ENT_XML1, 'UTF-8') . '</t></is></c>';
+                $col++;
+            }
             
-            // Câu trả lời VI (loại bỏ HTML)
-            $answerText = strip_tags($q['answer_text']);
-            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($answerText, ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            $sheet .= '</row>';
+            $rowNum++;
+        }
+
+        $sheet .= '</sheetData></worksheet>';
+        file_put_contents($tempDir . '/xl/worksheets/sheet1.xml', $sheet);
+
+        // Tạo file ZIP
+        $zipFile = sys_get_temp_dir() . '/' . $fileName;
+        $zip = new \ZipArchive();
+        
+        if ($zip->open($zipFile, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === TRUE) {
+            $files = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($tempDir),
+                \RecursiveIteratorIterator::LEAVES_ONLY
+            );
+
+            foreach ($files as $file) {
+                if (!$file->isDir()) {
+                    $filePath = $file->getRealPath();
+                    $relativePath = substr($filePath, strlen($tempDir) + 1);
+                    $zip->addFile($filePath, $relativePath);
+                }
+            }
+            $zip->close();
+
+            // Gửi file về client
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="' . $fileName . '"');
+            header('Content-Length: ' . filesize($zipFile));
+            header('Cache-Control: max-age=0');
             
-            // Câu trả lời EN (loại bỏ HTML)
-            $answerTextEn = strip_tags($q['answer_text_en'] ?? '');
-            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($answerTextEn, ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            readfile($zipFile);
+
+            // Xóa file tạm
+            unlink($zipFile);
+            $this->deleteDirectory($tempDir);
             
-            // Danh mục
-            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($q['category_name'] ?? 'Chưa phân loại', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            exit;
+        } else {
+            throw new \Exception('Không thể tạo file Excel');
+        }
+    }
+
+    /**
+     * Xóa thư mục đệ quy
+     */
+    private function deleteDirectory($dir)
+    {
+        if (!file_exists($dir)) return;
+        
+        $files = array_diff(scandir($dir), ['.', '..']);
+        foreach ($files as $file) {
+            $path = $dir . '/' . $file;
+            is_dir($path) ? $this->deleteDirectory($path) : unlink($path);
+        }
+        rmdir($dir);
+    }
+
+    // ==================== TRASH (THÙNG RÁC) ====================
+
+    /**
+     * /api/admin/trash/{action} - Router cho các thao tác thùng rác
+     */
+    public function trash($action = null)
+    {
+        if ($action === 'restore') {
+            return $this->restoreFromTrash();
+        } elseif ($action === 'permanent') {
+            return $this->permanentDelete();
+        } else {
+            $this->json(['error' => 'Invalid trash action'], 400);
+        }
+    }
+
+    /**
+     * GET /api/admin/getTrash - Lấy danh sách thùng rác
+     */
+    public function getTrash()
+    {
+        try {
+            $this->requireAuth();
             
-            // Từ khóa thủ công
-            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($q['manual_keywords'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            $type = $_GET['type'] ?? 'all';
             
-            // Từ khóa tự động VI
-            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($q['auto_keywords_vi'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            $data = [];
+            $trashModel = $this->getTrashModel();
             
-            // Từ khóa tự động EN
-            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($q['auto_keywords_en'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            if (!$trashModel) {
+                $this->json(['questions' => [], 'categories' => [], 'forms' => []]);
+                return;
+            }
             
-            // Nguồn
-            $source = $sourceMap[$q['source_type']] ?? $q['source_type'];
-            $xml .= '<Cell ss:StyleID="Center"><Data ss:Type="String">' . htmlspecialchars($source, ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            if ($type === 'all' || $type === 'questions') {
+                $data['questions'] = $trashModel->getTrashQuestions();
+            }
             
-            // Trạng thái
-            $status = $q['is_active'] ? 'Hoạt động' : 'Tắt';
-            $xml .= '<Cell ss:StyleID="Center"><Data ss:Type="String">' . htmlspecialchars($status, ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            if ($type === 'all' || $type === 'categories') {
+                $data['categories'] = $trashModel->getTrashCategories();
+            }
             
-            // Ngày tạo
-            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($q['created_at'], ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            if ($type === 'all' || $type === 'forms') {
+                $data['forms'] = $trashModel->getTrashForms();
+            }
             
-            // Ngày cập nhật
-            $xml .= '<Cell ss:StyleID="Data"><Data ss:Type="String">' . htmlspecialchars($q['updated_at'], ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+            if ($type === 'count') {
+                $data = $trashModel->getTrashCount();
+            }
             
-            $xml .= '</Row>' . "\n";
+            $this->json($data);
+        } catch (Exception $e) {
+            error_log("Trash API error: " . $e->getMessage());
+            $this->json(['error' => $e->getMessage(), 'questions' => [], 'categories' => [], 'forms' => []], 500);
+        }
+    }
+
+    /**
+     * POST /api/admin/trash/restore - Khôi phục từ thùng rác
+     */
+    public function restoreFromTrash()
+    {
+        $adminId = $this->requireAuth();
+        
+        $data = json_decode(file_get_contents('php://input'), true);
+        $trashId = $data['trash_id'] ?? 0;
+        $type = $data['type'] ?? '';
+        
+        if (!$trashId || !$type) {
+            $this->json(['error' => 'Thiếu thông tin'], 400);
         }
         
-        $xml .= '</Table>' . "\n";
-        $xml .= '</Worksheet>' . "\n";
-        $xml .= '</Workbook>';
+        $result = false;
+        $trashModel = $this->getTrashModel();
         
-        return $xml;
+        switch ($type) {
+            case 'question':
+                $result = $trashModel->restoreQuestion($trashId);
+                break;
+            case 'category':
+                $result = $trashModel->restoreCategory($trashId);
+                break;
+            case 'form':
+                $result = $trashModel->restoreForm($trashId);
+                break;
+        }
+        
+        if ($result) {
+            $this->json(['success' => true, 'message' => 'Đã khôi phục thành công']);
+        } else {
+            $this->json(['error' => 'Không thể khôi phục'], 500);
+        }
+    }
+
+    /**
+     * DELETE /api/admin/trash/permanent - Xóa vĩnh viễn khỏi thùng rác
+     */
+    public function permanentDelete()
+    {
+        $adminId = $this->requireAuth();
+        
+        $data = json_decode(file_get_contents('php://input'), true);
+        $trashId = $data['trash_id'] ?? 0;
+        $type = $data['type'] ?? '';
+        
+        if (!$trashId || !$type) {
+            $this->json(['error' => 'Thiếu thông tin'], 400);
+        }
+        
+        $result = false;
+        $trashModel = $this->getTrashModel();
+        
+        switch ($type) {
+            case 'question':
+                $result = $trashModel->permanentDeleteQuestion($trashId);
+                break;
+            case 'category':
+                $result = $trashModel->permanentDeleteCategory($trashId);
+                break;
+            case 'form':
+                $result = $trashModel->permanentDeleteForm($trashId);
+                break;
+        }
+        
+        if ($result) {
+            $this->json(['success' => true, 'message' => 'Đã xóa vĩnh viễn']);
+        } else {
+            $this->json(['error' => 'Không thể xóa'], 500);
+        }
     }
 }

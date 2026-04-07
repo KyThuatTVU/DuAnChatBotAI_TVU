@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thùng rác - CELRAS TVU Admin</title>
+    <link rel="icon" type="image/png" href="../../assets/images/logo2.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../assets/css/loading.css">
+    <link rel="stylesheet" href="../../assets/css/admin-mobile.css">
+    <style>
+        body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif}
+        .nav-item{display:flex;align-items:center;gap:12px;padding:10px 16px;color:#94a3b8;font-size:13.5px;font-weight:500;cursor:pointer;transition:all .2s;text-decoration:none;border-radius:10px}
+        .nav-item:hover{background:rgba(255,255,255,.06);color:#e2e8f0}
+        .nav-item.active{background:rgba(14,165,233,.12);color:#38bdf8;font-weight:600}
+        .nav-item svg{width:18px;height:18px;flex-shrink:0}
+        .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:35;backdrop-filter:blur(4px)}
+        .sidebar-overlay.active{display:block}
+        .mobile-topbar{display:none}
+        
+        /* Trash Table Styles */
+        .trash-card{background:white;border-radius:16px;border:1px solid #e5e7eb;overflow:hidden;margin-bottom:16px;transition:all .3s;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
+        .trash-card:hover{box-shadow:0 10px 25px rgba(0,0,0,0.08);transform:translateY(-2px)}
+        .trash-card-header{background:linear-gradient(135deg,#fef3c7,#fde68a);padding:16px 20px;border-bottom:1px solid #fbbf24}
+        .trash-card-body{padding:20px}
+        .trash-question-text{font-size:15px;font-weight:600;color:#1f2937;margin-bottom:12px;line-height:1.6}
+        .trash-meta{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:16px}
+        .trash-meta-item{display:flex;align-items:center;gap:6px;font-size:13px;color:#6b7280}
+        .trash-meta-item svg{width:16px;height:16px;color:#9ca3af}
+        .trash-actions{display:flex;gap:8px;padding-top:12px;border-top:1px solid #f3f4f6}
+        
+        .btn-restore{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:linear-gradient(135deg,#10b981,#059669);color:white;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;box-shadow:0 2px 8px rgba(16,185,129,0.3)}
+        .btn-restore:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(16,185,129,0.4)}
+        
+        .btn-delete{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;box-shadow:0 2px 8px rgba(239,68,68,0.3)}
+        .btn-delete:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(239,68,68,0.4)}
+        
+        .time-badge{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:0.3px}
+        .time-badge.danger{background:#fee2e2;color:#dc2626}
+        .time-badge.warning{background:#fef9c3;color:#a16207}
+        .time-badge.success{background:#dcfce7;color:#15803d}
+        
+        .category-badge{display:inline-flex;align-items:center;padding:4px 10px;background:#dbeafe;color:#1e40af;border-radius:6px;font-size:12px;font-weight:600}
+        
+        .empty-state{text-align:center;padding:60px 20px}
+        .empty-state-icon{width:80px;height:80px;margin:0 auto 20px;background:linear-gradient(135deg,#f3f4f6,#e5e7eb);border-radius:50%;display:flex;align-items:center;justify-content:center}
+        .empty-state-icon svg{width:40px;height:40px;color:#9ca3af}
+        .empty-state-title{font-size:18px;font-weight:700;color:#374151;margin-bottom:8px}
+        .empty-state-text{font-size:14px;color:#6b7280}
+        
+        @media(max-width:768px){
+            .admin-sidebar{transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1)}
+            .admin-sidebar.open{transform:translateX(0)}
+            .trash-meta{flex-direction:column;gap:8px}
+            .trash-actions{flex-direction:column}
+            .btn-restore,.btn-delete{width:100%;justify-content:center}
+        }
+        
+        .tab-button{padding:12px 24px;border-radius:12px;font-size:14px;font-weight:600;transition:all .2s;cursor:pointer;border:none;background:transparent;color:#64748b}
+        .tab-button.active{background:linear-gradient(145deg,#fef3c7,#fde68a);color:#92400e;box-shadow:0 4px 12px rgba(245,158,11,0.25)}
+        .tab-button:hover:not(.active){background:rgba(245,158,11,0.1);color:#d97706}
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 via-slate-50 to-sky-50/30">
+
+    <!-- ===== PAGE LOADER ===== -->
+    <div id="page-loader">
+        <div class="loader-spinner-wrap"><div class="loader-spinner"></div><img class="loader-logo-img" src="../../assets/images/logo1.png" alt="CELRAS TVU" onerror="this.src='../../assets/images/logo2.png'"></div>
+        <div class="loader-brand">CELRAS TVU</div><div class="loader-tagline">Trung tâm Học liệu và Hỗ trợ Học thuật<br>Đại học Trà Vinh</div>
+        <div class="loader-dots"><span></span><span></span><span></span></div><div class="loader-bar-wrap"><div class="loader-bar"></div></div>
+    </div>
+
+    <div class="min-h-screen">
+        <!-- Mobile Top Bar -->
+        <div class="mobile-topbar fixed top-0 left-0 right-0 h-14 bg-white/80 backdrop-blur-lg border-b border-gray-200/60 z-30 items-center px-4 gap-3">
+            <button onclick="toggleSidebar()" class="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-100 transition-colors text-gray-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+            <span class="font-bold text-gray-800 text-sm truncate">Thùng rác</span>
+        </div>
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+        <!-- Sidebar -->
+        <aside class="admin-sidebar w-60 fixed top-0 left-0 h-screen overflow-y-auto z-40 flex flex-col bg-gradient-to-b from-slate-800 to-slate-900" id="adminSidebar">
+            <div class="px-5 py-5 border-b border-white/10 mb-2">
+                <a href="../index.html" class="flex items-center gap-2.5 no-underline">
+                    <img src="../../assets/images/logo1.png" alt="Logo" class="w-9 h-9 rounded-full object-cover ring-2 ring-sky-400/30" onerror="this.src='../../assets/images/logo2.png'">
+                    <span class="font-bold text-[15px] text-white tracking-tight">CELRAS TVU</span>
+                </a>
+            </div>
+            <nav class="flex flex-col flex-1 px-3 space-y-0.5">
+                <a href="dashboard.html" class="nav-item" data-page="dashboard"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1"/></svg>Dashboard</a>
+                <a href="questions.html" class="nav-item" data-page="questions"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Quản lý câu hỏi</a>
+                <a href="categories.html" class="nav-item" data-page="categories"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>Danh mục</a>
+                <a href="datasets.html" class="nav-item" data-page="datasets"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>Tải dữ liệu</a>
+                <a href="forms.html" class="nav-item" data-page="forms"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Biểu mẫu / Giấy tờ</a>
+                <a href="settings.html" class="nav-item" data-page="settings"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Cài đặt giao diện</a>
+                <a href="unanswered.html" class="nav-item" data-page="unanswered"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>Chưa trả lời</a>
+                <a href="trash.html" class="nav-item active" data-page="trash"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>Thùng rác</a>
+                <a href="users.html" class="nav-item nav-admin-only" data-page="users"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-4-4h-3m-4 6H2v-2a4 4 0 014-4h3m2-4a4 4 0 10-8 0 4 4 0 008 0zm6 0a3 3 0 10-6 0 3 3 0 006 0z"/></svg>Tài khoản</a>
+            </nav>
+            <div class="px-5 py-3.5 border-t border-white/10">
+                <div class="flex items-center gap-3">
+                    <img id="sidebarAdminAvatar" src="" alt="" class="w-9 h-9 rounded-full border-2 border-sky-400/50 object-cover flex-shrink-0" referrerpolicy="no-referrer" crossorigin="anonymous">
+                    <div class="overflow-hidden"><p id="sidebarAdminName" class="text-sm font-semibold text-white truncate"></p><p class="text-xs text-slate-400">Quản trị viên</p></div>
+                </div>
+            </div>
+            <div class="px-3 pb-4 pt-2 border-t border-white/10 space-y-0.5">
+                <a href="../index.html" class="nav-item"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>Về trang chatbot</a>
+                <a href="#" onclick="logout();return false" class="nav-item" style="color:#f87171"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>Đăng xuất</a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="admin-content ml-60 p-8 min-h-screen">
+            <!-- Header -->
+            <div class="admin-header flex items-center justify-between mb-8">
+                <div>
+                    <h1 class="text-2xl font-extrabold text-gray-900">🗑️ Thùng rác</h1>
+                    <p class="text-sm text-gray-500 mt-1">Các mục đã xóa sẽ tự động bị xóa vĩnh viễn sau 24 giờ</p>
+                </div>
+            </div>
+
+            <!-- Info Banner -->
+            <div class="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-2xl border border-amber-200/60 p-5 mb-6 flex items-start gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md shadow-amber-500/20">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <p class="text-sm font-semibold text-gray-800 mb-0.5">Lưu ý quan trọng</p>
+                    <p class="text-xs text-gray-600 leading-relaxed">Các mục trong thùng rác có thể được <strong>khôi phục trong vòng 24 giờ</strong>. Sau thời gian này, chúng sẽ bị <strong>xóa vĩnh viễn</strong> và không thể khôi phục.</p>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex gap-2 mb-6">
+                <button class="tab-button active" onclick="switchTab('questions')" id="tabQuestions">
+                    <span>📝 Câu hỏi (<span id="countQuestions">0</span>)</span>
+                </button>
+                <button class="tab-button" onclick="switchTab('categories')" id="tabCategories">
+                    <span>🏷️ Danh mục (<span id="countCategories">0</span>)</span>
+                </button>
+                <button class="tab-button" onclick="switchTab('forms')" id="tabForms">
+                    <span>📄 Biểu mẫu (<span id="countForms">0</span>)</span>
+                </button>
+            </div>
+
+            <!-- Questions Section -->
+            <div id="questionsSection">
+                <div id="questionsContainer"></div>
+            </div>
+
+            <!-- Categories Section -->
+            <div id="categoriesSection" style="display:none;">
+                <div id="categoriesContainer"></div>
+            </div>
+
+            <!-- Forms Section -->
+            <div id="formsSection" style="display:none;">
+                <div id="formsContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../assets/js/loading.js"></script>
+    <script src="../../assets/js/admin.js?v=20260407"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadAdminPage('trash');
+            loadTrash();
+        });
+    </script>
+</body>
+</html>
